@@ -98,7 +98,7 @@ namespace Imazen.Routing.Caching
             }
 
             using var wrapper = fetchResult.Unwrap();
-            using var blob = await wrapper.GetConsumable(cancellationToken);
+            using var blob = await wrapper.GetConsumablePromise().IntoConsumableBlob();
             using var stream = blob.BorrowStream(DisposalPromise.CallerDisposesStreamThenBlob);
             target ??= new ConcurrentBitArray(bucketCount);
             await ReadAllBytesIntoBitArrayAsync(stream, target, ArrayPool<byte>.Shared,
@@ -121,10 +121,10 @@ namespace Imazen.Routing.Caching
             sw.Stop();
             var putRequest = CacheEventDetails.CreateFreshResultGeneratedEvent(BlobCacheRequest.Value,
                 blobFactory, Result<IBlobWrapper, IBlobCacheFetchFailure>.Ok(new BlobWrapper(null,
-                    new MemoryBlob(sw.Elapsed,  new BlobAttributes()
+                    new MemoryBlob(new ArraySegment<byte>(bytes),  new BlobAttributes()
                     {
                         ContentType = "application/octet-stream"
-                    },new ArraySegment<byte>(bytes)))));
+                    },sw.Elapsed))));
 
             var putResponse = await cache.CachePut(putRequest, cancellationToken);
             if (putResponse.IsError)

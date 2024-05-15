@@ -26,9 +26,4 @@
 
         <PackageReference Include="System.Threading.Tasks.Extensions" Version="4.*" Condition="'$(TargetFramework)' == 'netstandard2.0'" />
     </ItemGroup>
-
-    <ItemGroup>
-      <Compile Remove="Unused\LegacyStreamCacheAdapter.cs" />
-      <Compile Remove="Unused\ExistenceProbableMap.cs" />
-    </ItemGroup>
 </Project>

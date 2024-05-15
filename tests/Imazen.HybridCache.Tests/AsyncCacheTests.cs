@@ -33,9 +33,9 @@ namespace Imazen.HybridCache.Tests
                 return Task.FromResult(true);
             }
 
-            public Task<ICacheDatabaseRecord> GetRecordReference(CacheEntry cacheEntry, CancellationToken cancellationToken)
+            public Task<ICacheDatabaseRecord?> GetRecordReference(CacheEntry cacheEntry, CancellationToken cancellationToken)
             {
-                return Task.FromResult<ICacheDatabaseRecord>(null);
+                return Task.FromResult<ICacheDatabaseRecord?>(null);
             }
 
             public Task<ReserveSpaceResult> TryReserveSpace(CacheEntry cacheEntry, CacheDatabaseRecord newRecord, bool allowEviction,
@@ -54,15 +54,18 @@ namespace Imazen.HybridCache.Tests
                 return Task.FromResult(true);
             }
 
-            public Task<CodeResult<IList<IBlobStorageReference>>> CacheSearchByTag(string tag, CancellationToken cancellationToken = default)
+            public Task<CodeResult<IAsyncEnumerable<IBlobStorageReference>>> CacheSearchByTag(SearchableBlobTag tag, CancellationToken cancellationToken = default)
             {
-                throw new NotImplementedException();
+                // return empty list
+                return Task.FromResult(CodeResult<IAsyncEnumerable<IBlobStorageReference>>.Ok(new List<IBlobStorageReference>().ToAsyncEnumerable()));
             }
 
-            public Task<CodeResult<IList<CodeResult<IBlobStorageReference>>>> CachePurgeByTag(string tag, AsyncLockProvider writeLocks, CancellationToken cancellationToken = default)
+            public Task<CodeResult<IAsyncEnumerable<CodeResult<IBlobStorageReference>>>> CachePurgeByTag(SearchableBlobTag tag, AsyncLockProvider writeLocks,
+                CancellationToken cancellationToken = default)
             {
-                throw new NotImplementedException();
+                return Task.FromResult(CodeResult<IAsyncEnumerable<CodeResult<IBlobStorageReference>>>.Ok(new List<CodeResult<IBlobStorageReference>>().ToAsyncEnumerable()));
             }
+
 
             public Task<CodeResult> CacheDelete(string relativePath, AsyncLockProvider writeLocks, CancellationToken cancellationToken = default)
             {
@@ -71,7 +74,7 @@ namespace Imazen.HybridCache.Tests
         }
 
         [Fact]
-        public async void SmokeTestAsyncMissHit()
+        public async Task SmokeTestAsyncMissHit()
         {
             var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}");
             Directory.CreateDirectory(path);
@@ -81,7 +84,10 @@ namespace Imazen.HybridCache.Tests
                 var builder = new HashBasedPathBuilder(path,
                     8192, '/', ".jpg");
                 
-                cache = new AsyncCache(new AsyncCacheOptions(), new NullCacheManager(), builder,null);
+                cache = new AsyncCache(new AsyncCacheOptions
+                {
+                    UniqueName = "smoketest" 
+                }, new NullCacheManager(), builder,null);
 
                 var keyBasis = new byte[] {6,1,2};
                 var result = await cache.GetOrCreateBytes(keyBasis, (token) =>
@@ -127,7 +133,7 @@ namespace Imazen.HybridCache.Tests
         
         
         [Fact]
-        public async void SmokeTestSyncMissHit()
+        public async Task SmokeTestSyncMissHit()
         {
             var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}");
             Directory.CreateDirectory(path);

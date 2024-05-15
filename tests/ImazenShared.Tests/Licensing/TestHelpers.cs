@@ -5,6 +5,7 @@ using Moq.Protected;
 using Imazen.Common.Issues;
 using Imazen.Common.Licensing;
 using Imazen.Common.Persistence;
+using System.Net.Http;
 
 namespace Imazen.Common.Tests.Licensing
 {

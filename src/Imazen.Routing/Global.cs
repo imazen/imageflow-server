@@ -13,4 +13,5 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("ImageResizer.HybridCache.Benchmark")]
 [assembly: InternalsVisibleTo("Imazen.Routing")]
 [assembly: InternalsVisibleTo("Imazen.Routing.Tests")]
+[assembly: InternalsVisibleTo("Imazen.HybridCache.Tests")]
 

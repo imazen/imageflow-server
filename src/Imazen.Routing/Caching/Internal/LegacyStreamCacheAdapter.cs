@@ -11,7 +11,7 @@ using Microsoft.Extensions.Logging;
 
 #pragma warning disable CS0618 // Type or member is obsolete
 
-namespace Imazen.Routing.Caching;
+namespace Imazen.Routing.Caching.Internal;
 
 internal class StreamCacheAdapterOptions
 {  
@@ -59,7 +59,10 @@ internal class LegacyStreamCacheAdapter : IStreamCache
     /// </summary>
     private BoundedTaskCollection<BlobTaskItem> CurrentWrites {get; }
 
-    
+    public Task AwaitAllCurrentTasks(CancellationToken cancellationToken)
+    {
+        return CurrentWrites.AwaitAllCurrentTasks();
+    }
     public IEnumerable<IIssue> GetIssues()
     {
         return new List<IIssue>();
@@ -82,7 +85,7 @@ internal class LegacyStreamCacheAdapter : IStreamCache
         {
             // We intentionally don't make CreateConsumable cancellable, as an incomplete operation
             // could cause other users to fail.
-            var resultBlob = await result.Unwrap().AddFutureConsumableReference().GetConsumable(reusableBlobFactory, default); 
+            var resultBlob = await result.Unwrap().GetConsumablePromise().IntoConsumableBlob(); 
             
             //TODO: We never dispose the resultBlob. This is a bug.
             return new StreamCacheResult(resultBlob.BorrowStream(DisposalPromise.CallerDisposesStreamThenBlob), resultBlob.Attributes?.ContentType, "Hit");
@@ -106,7 +109,7 @@ internal class LegacyStreamCacheAdapter : IStreamCache
                 throw new InvalidOperationException("Null entry provided by dataProviderCallback");
             if (cacheInputEntry.Bytes.Array == null)
                 throw new InvalidOperationException("Null entry byte array provided by dataProviderCallback");
-            IReusableBlob blobGenerated 
+            var blobGenerated 
                 = new MemoryBlob(cacheInputEntry.Bytes, new BlobAttributes(){
                     ContentType = cacheInputEntry.ContentType}, sw.Elapsed);
             return Result<IBlobWrapper, HttpStatus>.Ok(new BlobWrapper(null, blobGenerated));
@@ -115,7 +118,7 @@ internal class LegacyStreamCacheAdapter : IStreamCache
         var result = await GetOrCreateResult(cacheRequest, wrappedCallback, cancellationToken, retrieveContentType);
         if (result.IsOk)
         {
-            var resultBlob = await result.Unwrap().AddFutureConsumableReference().GetConsumable(reusableBlobFactory, default);
+            var resultBlob = await result.Unwrap().GetConsumablePromise().IntoConsumableBlob();
             //TODO: We never dispose the resultBlob. This is a bug.
             return new StreamCacheResult(resultBlob.BorrowStream(DisposalPromise.CallerDisposesStreamThenBlob), resultBlob.Attributes?.ContentType, "Hit");
         }
@@ -203,7 +206,7 @@ internal class LegacyStreamCacheAdapter : IStreamCache
                             .WithAppend("Error generating image"));
                     }
 
-                    await generatedResult.Unwrap().EnsureReusable(reusableBlobFactory, cancellationToken);
+                    await generatedResult.Unwrap().EnsureReusable(cancellationToken);
                     swDataCreation.Stop();
 
                     //Create AsyncWrite object to enqueue
