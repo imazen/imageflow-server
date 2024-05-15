@@ -13,22 +13,14 @@ using Xunit;
 namespace Imazen.Routing.Tests.Serving;
 
 using TContext = object;
-public class ImageServerTests
+public class ImageServerTests : ReLoggerTestBase
 {
     private readonly ILicenseChecker licenseChecker;
-    private readonly IReLoggerFactory loggerFactory;
-    private readonly IReLogger logger;
-    private readonly IReLogStore logStore;
-    private readonly List<MemoryLogEntry> logList;
     private IImageServerContainer container;
 
-    public ImageServerTests()
+    public ImageServerTests() :base("ImageServerTests")
     {
         licenseChecker = MockLicenseChecker.AlwaysOK();
-        logList = new List<MemoryLogEntry>();
-        logStore = new ReLogStore(new ReLogStoreOptions());
-        loggerFactory = MockHelpers.MakeMemoryLoggerFactory(logList, logStore);
-        logger = loggerFactory.CreateReLogger("ImageServerTests");
         container = new ImageServerContainer(null);
         container.Register<ILicenseChecker>(() => licenseChecker);
         container.Register<IReLoggerFactory>(() => loggerFactory);
