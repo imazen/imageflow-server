@@ -145,7 +145,7 @@ internal class BlobWrapperCore : IDisposable{
         {
             Interlocked.Increment(ref memoryBlobProxies);
             RemoveReference(consumableBlobPromise);
-            return new MemoryBlobProxy(reusable!, this);
+            return  MemoryBlobProxy.CreateWithoutAddingReference(reusable!, this);
         }
         
         var copyref = consumable;
@@ -170,7 +170,7 @@ internal class BlobWrapperCore : IDisposable{
         {
             await EnsureReusable();
         }
-        return new MemoryBlobProxy(reusable!, this);
+        return MemoryBlobProxy.CreateWithoutAddingReference(reusable!, this);
     }
 
 
@@ -219,11 +219,15 @@ internal class BlobWrapperCore : IDisposable{
         private bool proxyDisposed = false;
         private readonly BlobWrapperCore parent;
 
-        public MemoryBlobProxy(MemoryBlob blob, BlobWrapperCore parent)
+        private MemoryBlobProxy(MemoryBlob blob, BlobWrapperCore parent)
         {
             this.parent = parent;
             this.memoryBlob = blob;
-            parent.AddWeakReference(this);
+        }
+        
+        public static MemoryBlobProxy CreateWithoutAddingReference(MemoryBlob blob, BlobWrapperCore parent)
+        {
+            return new MemoryBlobProxy(blob, parent);
         }
 
         public void Dispose()
