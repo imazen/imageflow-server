@@ -20,18 +20,28 @@ internal class StreamCacheAdapterOptions
     public bool WriteSynchronouslyWhenQueueFull { get; set; } = false;
     public bool EvictOnQueueFull { get; set; } = true;
 }
-internal class StreamCacheResult : IStreamCacheResult
+internal class DisposableStreamCacheResult : IStreamCacheResult, IDisposable
 {
-    public StreamCacheResult(Stream data, string? contentType, string status)
+
+    public DisposableStreamCacheResult(IConsumableBlob consumableBlob, string status)
     {
-        Data = data;
-        ContentType = contentType;
+        Data = consumableBlob.BorrowStream(DisposalPromise.CallerDisposesStreamThenBlob);
+        ContentType = consumableBlob.Attributes?.ContentType;
         Status = status;
     }
+
+    public BlobWrapper Blob { get; }
+    
 
     public Stream Data { get; }
     public string? ContentType { get; }
     public string Status { get; }
+    
+    public void Dispose()
+    {
+        Data.Dispose();
+        Blob.Dispose();
+    }
 }
 internal class LegacyStreamCacheAdapter : IStreamCache
 {
@@ -83,12 +93,9 @@ internal class LegacyStreamCacheAdapter : IStreamCache
         var result = await cache.CacheFetch(cacheRequest, cancellationToken);
         if (result.IsOk)
         {
-            // We intentionally don't make CreateConsumable cancellable, as an incomplete operation
-            // could cause other users to fail.
-            var resultBlob = await result.Unwrap().GetConsumablePromise().IntoConsumableBlob(); 
-            
-            //TODO: We never dispose the resultBlob. This is a bug.
-            return new StreamCacheResult(resultBlob.BorrowStream(DisposalPromise.CallerDisposesStreamThenBlob), resultBlob.Attributes?.ContentType, "Hit");
+            using var blobWrapper = result.Unwrap();
+            var consumableBlob = await blobWrapper.GetConsumablePromise().IntoConsumableBlob();
+            return new DisposableStreamCacheResult(consumableBlob, "Hit");
         }
 
         return null;
@@ -100,7 +107,7 @@ internal class LegacyStreamCacheAdapter : IStreamCache
     {
         var cacheRequest = new BlobCacheRequest(BlobGroup.GeneratedCacheEntry, key);
         
-        var wrappedCallback = new Func<CancellationToken, Task<IResult<IBlobWrapper, HttpStatus>>>(async (ct) =>
+        var wrappedCallback = new Func<CancellationToken, Task<IResult<BlobSuccessResult, HttpStatus>>>(async (ct) =>
         {
             var sw = Stopwatch.StartNew();
             var cacheInputEntry = await dataProviderCallback(ct);
@@ -112,24 +119,28 @@ internal class LegacyStreamCacheAdapter : IStreamCache
             var blobGenerated 
                 = new MemoryBlob(cacheInputEntry.Bytes, new BlobAttributes(){
                     ContentType = cacheInputEntry.ContentType}, sw.Elapsed);
-            return Result<IBlobWrapper, HttpStatus>.Ok(new BlobWrapper(null, blobGenerated));
+            return Result<BlobSuccessResult, HttpStatus>.Ok(new BlobSuccessResult(new BlobWrapper(new LatencyTrackingZone("freshCreate", 1000,true), blobGenerated), "Fresh"));
         });
 
         var result = await GetOrCreateResult(cacheRequest, wrappedCallback, cancellationToken, retrieveContentType);
         if (result.IsOk)
         {
-            var resultBlob = await result.Unwrap().GetConsumablePromise().IntoConsumableBlob();
-            //TODO: We never dispose the resultBlob. This is a bug.
-            return new StreamCacheResult(resultBlob.BorrowStream(DisposalPromise.CallerDisposesStreamThenBlob), resultBlob.Attributes?.ContentType, "Hit");
+            using var blobWrapper = result.Unwrap().Blob;
+            
+            var consumableBlob = await blobWrapper.GetConsumablePromise().IntoConsumableBlob();
+            return new DisposableStreamCacheResult(consumableBlob, result.Unwrap().Status);
+            
         }
         else
         {
             throw new InvalidOperationException(result.UnwrapError().ToString());
         }
     }
+    
+    internal record BlobSuccessResult(IBlobWrapper Blob, string Status);
 
-    public async Task<IResult<IBlobWrapper, IBlobCacheFetchFailure>> GetOrCreateResult(IBlobCacheRequest cacheRequest,
-        Func<CancellationToken, Task<IResult<IBlobWrapper, HttpStatus>>> dataProviderCallback,
+    public async Task<IResult<BlobSuccessResult, IBlobCacheFetchFailure>> GetOrCreateResult(IBlobCacheRequest cacheRequest,
+        Func<CancellationToken, Task<IResult<BlobSuccessResult, HttpStatus>>> dataProviderCallback,
         CancellationToken cancellationToken,
         bool retrieveContentType)
     {
@@ -153,7 +164,7 @@ internal class LegacyStreamCacheAdapter : IStreamCache
         var swFileExists = Stopwatch.StartNew();
 
         var fastResult = await cache.CacheFetch(cacheRequest.WithFailFast(true), cancellationToken);
-        if (fastResult.IsOk) return fastResult;
+        if (fastResult.IsOk) return Result<BlobSuccessResult, IBlobCacheFetchFailure>.Ok(new BlobSuccessResult(fastResult.Unwrap(), "DiskHit"));
 
         // Just continue on creating the file. It must have been deleted between the calls
 
@@ -165,7 +176,7 @@ internal class LegacyStreamCacheAdapter : IStreamCache
 
         //Lock execution using relativePath as the sync basis. Ignore casing differences. This prevents duplicate entries in the write queue and wasted CPU/RAM usage.
         var lockResult
-            = await QueueLocks.TryExecuteAsync<IResult<IBlobWrapper, IBlobCacheFetchFailure>
+            = await QueueLocks.TryExecuteAsync<IResult<BlobSuccessResult, IBlobCacheFetchFailure>
                 , IBlobCacheRequest>(cacheRequest.CacheKeyHashString,
                 Options.WaitForIdenticalRequestsTimeoutMs, cancellationToken, cacheRequest,
                 async (IBlobCacheRequest r, CancellationToken ct) =>
@@ -181,8 +192,8 @@ internal class LegacyStreamCacheAdapter : IStreamCache
 
                     if (existingQueuedWrite != null)
                     {
-                        return Result<IBlobWrapper, IBlobCacheFetchFailure>.Ok(
-                            existingQueuedWrite.Blob);
+                        return Result<BlobSuccessResult, IBlobCacheFetchFailure>.Ok(
+                            new BlobSuccessResult(existingQueuedWrite.Blob, "MemoryHit"));
                     }
 
                     if (cancellationToken.IsCancellationRequested)
@@ -191,7 +202,7 @@ internal class LegacyStreamCacheAdapter : IStreamCache
                     swFileExists.Start();
                     // Fast path on disk hit, now that we're in a synchronized state
                     var slowResult = await cache.CacheFetch(cacheRequest.WithFailFast(false), cancellationToken);
-                    if (slowResult.IsOk) return slowResult;
+                    if (slowResult.IsOk) return Result<BlobSuccessResult, IBlobCacheFetchFailure>.Ok(new BlobSuccessResult(slowResult.Unwrap(), "DiskHit"));
 
                     // Just continue on creating the file. It must have been deleted between the calls
 
@@ -202,15 +213,14 @@ internal class LegacyStreamCacheAdapter : IStreamCache
                     var generatedResult = await dataProviderCallback(cancellationToken);
                     if (!generatedResult.IsOk)
                     {
-                        return BlobCacheFetchFailure.ErrorResult(generatedResult.UnwrapError()
-                            .WithAppend("Error generating image"));
+                        return Result<BlobSuccessResult, IBlobCacheFetchFailure>.Err(new BlobCacheFetchFailure() {Status = generatedResult.UnwrapError().WithAppend("Error generating image")});
                     }
 
-                    await generatedResult.Unwrap().EnsureReusable(cancellationToken);
+                    await generatedResult.Unwrap().Blob.EnsureReusable(cancellationToken);
                     swDataCreation.Stop();
 
                     //Create AsyncWrite object to enqueue
-                    var w = new BlobTaskItem(cacheRequest.CacheKeyHashString, generatedResult.Unwrap());
+                    var w = new BlobTaskItem(cacheRequest.CacheKeyHashString, generatedResult.Unwrap().Blob);
 
 
                     var cachePutEvent = CacheEventDetails.CreateFreshResultGeneratedEvent
@@ -240,6 +250,7 @@ internal class LegacyStreamCacheAdapter : IStreamCache
                                 ex.ToString(),
                                 w.Blob.Attributes.BlobStorageReference?.GetFullyQualifiedRepresentation(),
                                 ex.StackTrace);
+                            if (Logger == null) throw;
                         }
 
                     });
@@ -257,13 +268,14 @@ internal class LegacyStreamCacheAdapter : IStreamCache
                                 Logger?.LogError("HybridCache failed to write to disk, {Error} {Event}", putError, 
                                      cachePutEvent);
                                 //cacheResult.Detail = AsyncCacheDetailResult.QueueLockTimeoutAndFailed;
-                                return BlobCacheFetchFailure.ErrorResult(putResult.UnwrapError());
+                                return Result<BlobSuccessResult, IBlobCacheFetchFailure>.Err(new BlobCacheFetchFailure {Status = putError});
                             }
+                            return Result<BlobSuccessResult, IBlobCacheFetchFailure>.Ok(new BlobSuccessResult(w.Blob, "WriteSucceeded"));
                             //cacheResult.Detail = writerDelegateResult;
                         }
                     }
 
-                    return BlobCacheFetchFailure.OkResult(w.Blob);
+                    return Result<BlobSuccessResult, IBlobCacheFetchFailure>.Ok(new BlobSuccessResult(w.Blob, queueResult.ToString()));
                 });
         if (lockResult.IsOk) return lockResult.Unwrap();
 
@@ -273,15 +285,16 @@ internal class LegacyStreamCacheAdapter : IStreamCache
             // We run the callback with no intent of caching
             var generationResult = await dataProviderCallback(cancellationToken);
             if (!generationResult.IsOk)
-                return BlobCacheFetchFailure.ErrorResult(generationResult.UnwrapError());
+                return Result<BlobSuccessResult, IBlobCacheFetchFailure>.Err(new BlobCacheFetchFailure {Status =generationResult.UnwrapError()});
 
             // It's not completely ok, but we can return the bytes
-            return Result<IBlobWrapper, IBlobCacheFetchFailure>.Ok(generationResult.Unwrap());
+            return Result<BlobSuccessResult, IBlobCacheFetchFailure>.Ok(generationResult.Unwrap());
 
         }
         else
         {
-            return BlobCacheFetchFailure.ErrorResult((500, "Queue lock timeout"));
+            return Result<BlobSuccessResult, IBlobCacheFetchFailure>.Err(new BlobCacheFetchFailure {Status = (500, "Queue lock timeout")});
+            
         }
     }
 

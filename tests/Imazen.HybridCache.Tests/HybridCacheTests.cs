@@ -31,7 +31,10 @@ namespace Imazen.HybridCache.Tests
             var database = new MetaStore.MetaStore(new MetaStoreOptions(path), cacheOptions, null);
             HybridCache hybridCache = new HybridCache(database,cacheOptions, null);
             var memoryLogger = MockHelpers.MakeMemoryLoggerFactory(new List<MemoryLogEntry>());
-            var cache = new LegacyStreamCacheAdapter(hybridCache,new StreamCacheAdapterOptions(),null);
+            var cache = new LegacyStreamCacheAdapter(hybridCache,new StreamCacheAdapterOptions()
+            {
+                WriteSynchronouslyWhenQueueFull = true,
+            },null);
             try
             {
                 await cache.StartAsync(cancellationToken);
@@ -45,42 +48,44 @@ namespace Imazen.HybridCache.Tests
                 }
 
                 var result = await cache.GetOrCreateBytes(key, DataProvider, cancellationToken, true);
+                using var rd = result as IDisposable;
                 Assert.Equal("WriteSucceeded", result.Status);
-                result.Data.Dispose();
                 
                 var result2 = await cache.GetOrCreateBytes(key, DataProvider, cancellationToken, true);
+                using var rd2 = result2 as IDisposable;
                 Assert.Equal("DiskHit", result2.Status);
                 Assert.Equal(contentType, result2.ContentType);
                 Assert.NotNull(result2.Data);
                 
                 //Assert.NotNull(((AsyncCache.AsyncCacheResultOld)result2).CreatedAt);
-                result2.Data.Dispose();
                 await cache.AwaitAllCurrentTasks(default);
                 
                 var result3 = await cache.GetOrCreateBytes(key, DataProvider, cancellationToken, true);
+                using var rd3 = result3 as IDisposable;
                 Assert.Equal("DiskHit", result3.Status);
                 Assert.Equal(contentType, result3.ContentType);
                 //Assert.NotNull(((AsyncCache.AsyncCacheResultOld)result3).CreatedAt);
                 Assert.NotNull(result3.Data);
-                result3.Data.Dispose();
                 var key2 = new byte[] {2, 1, 2, 3};
                 Task<IStreamCacheInput> DataProvider2(CancellationToken token)
                 {
                     return Task.FromResult(new StreamCacheInput(null, new ArraySegment<byte>(new byte[4000])).ToIStreamCacheInput());
                 }
                 var result4 = await cache.GetOrCreateBytes(key2, DataProvider2, cancellationToken, true);
+                using var rd4 = result4 as IDisposable;
                 Assert.Equal("WriteSucceeded", result4.Status);
-                result4.Data.Dispose();
+     
                 var result5 = await cache.GetOrCreateBytes(key2, DataProvider, cancellationToken, true);
+                using var rd5 = result5 as IDisposable;
                 Assert.Equal("DiskHit", result5.Status);
                 Assert.Null(result5.ContentType);
                 Assert.NotNull(result5.Data);
-                result5.Data.Dispose();
             }
             finally
             {
                 try
                 {
+                    await cache.AwaitAllCurrentTasks(cancellationToken);
                     await cache.StopAsync(cancellationToken);
                 }
                 finally
