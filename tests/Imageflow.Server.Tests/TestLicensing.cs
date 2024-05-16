@@ -4,6 +4,7 @@ using Imazen.Common.Licensing;
 using Imazen.Common.Tests.Licensing;
 using Imazen.Routing.Layers;
 using Imazen.Routing.Serving;
+using Imazen.Tests.Licensing;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;

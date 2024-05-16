@@ -4,6 +4,7 @@ global using CacheFetchResult = Imazen.Abstractions.Resulting.IResult<Imazen.Abs
 
 using System.Runtime.CompilerServices;
 
+[assembly: InternalsVisibleTo("Imazen.TestingHelpers")]
 [assembly: InternalsVisibleTo("ImazenShared.Tests")]
 [assembly: InternalsVisibleTo("Imageflow.Server")]
 [assembly: InternalsVisibleTo("Imageflow.Server.Tests")]

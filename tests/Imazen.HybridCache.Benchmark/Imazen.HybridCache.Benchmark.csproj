@@ -7,11 +7,12 @@
 
     <ItemGroup>
       <ProjectReference Include="..\..\src\Imazen.HybridCache\Imazen.HybridCache.csproj" />
+      <ProjectReference Include="..\Imazen.TestingHelpers\Imazen.TestingHelpers.csproj" />
     </ItemGroup>
 
     <ItemGroup>
       <PackageReference Include="MELT" Version="0.8.0" />
-      <PackageReference Include="Microsoft.IO.RecyclableMemoryStream" Version="2.2.1" />
+      <PackageReference Include="Microsoft.IO.RecyclableMemoryStream" Version="3.*" />
     </ItemGroup>
 
 </Project>

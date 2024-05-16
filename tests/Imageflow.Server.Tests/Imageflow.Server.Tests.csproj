@@ -31,4 +31,10 @@
         <EmbeddedResource Include="TestFiles\*.gif" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Compile Include="..\ImazenShared.Tests\Licensing\MockHttpLicenseHelpers.cs">
+        <Link>MockHttpLicenseHelpers.cs</Link>
+      </Compile>
+    </ItemGroup>
+
 </Project>

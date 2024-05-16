@@ -1,6 +1,6 @@
 ﻿namespace Imazen.Common.Tests.Licensing
 {
-    static class LicenseStrings
+    public static class LicenseStrings
     {
         public class LicenseSet
         {

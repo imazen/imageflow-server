@@ -1,19 +1,9 @@
 using System.Buffers;
 using System.IO.Pipelines;
-using System.Text;
 using Imazen.Routing.HttpAbstractions;
-using Imazen.Routing.Serving;
 
 namespace Imazen.Routing.Tests.Serving;
 
-[Flags]
-public enum MockResponseStreamType
-{
-    None,
-    Stream,
-    Pipe,
-    BufferWriter
-}
 /// <summary>
 /// We record the final state of everything and return it as a MockResponse
 /// </summary>
@@ -89,29 +79,5 @@ public class MockResponseAdapter(MockResponseStreamType enabledStreams = MockRes
     public async Task<MockResponse> ToMockResponse()
     {
         return new MockResponse(this, await GetBodyBytes());
-    }
-}
-    
-
-public record MockResponse
-{
-    public MockResponse(MockResponseAdapter adapter, byte[] body)
-    {
-        StatusCode = adapter.StatusCode;
-        ContentType = adapter.ContentType;
-        ContentLength = adapter.ContentLength;
-        Headers = adapter.Headers;
-        Body = body;
-    }
-    public MockResponseStreamType EnabledStreams { get; init; }
-    public int StatusCode { get; init; }
-    public string? ContentType { get; init; }
-    public long ContentLength { get; init; }
-    public Dictionary<string, string> Headers { get; init; } = new Dictionary<string, string>();
-    public byte[] Body { get; init; }
-
-    public string DecodeBodyUtf8()
-    {
-        return Encoding.UTF8.GetString(Body);
     }
 }

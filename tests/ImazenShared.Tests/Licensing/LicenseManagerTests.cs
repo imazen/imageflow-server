@@ -3,6 +3,7 @@ using System.Reflection;
 using Imazen.Common.ExtensionMethods;
 using Imazen.Common.Licensing;
 using Imazen.Common.Persistence;
+using Imazen.Tests.Licensing;
 using Moq;
 using Xunit;
 using Xunit.Abstractions;

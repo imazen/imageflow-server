@@ -3,7 +3,7 @@ using Imazen.Common.Persistence;
 
 namespace Imazen.Common.Tests.Licensing
 {
-    internal class StringCacheMem : IPersistentStringCache
+    public class StringCacheMem : IPersistentStringCache
     {
         readonly ConcurrentDictionary<string, string> cache = new ConcurrentDictionary<string, string>();
         readonly ConcurrentDictionary<string, DateTime> cacheWrite = new ConcurrentDictionary<string, DateTime>();

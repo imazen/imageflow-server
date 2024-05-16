@@ -66,6 +66,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Imazen.Abstractions", "src\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Imageflow.Server.ExampleModernAPI", "examples\Imageflow.Server.ExampleModernAPI\Imageflow.Server.ExampleModernAPI.csproj", "{4AF9EFF8-5456-4711-B847-6DD31F949B02}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Imazen.TestingHelpers", "tests\Imazen.TestingHelpers\Imazen.TestingHelpers.csproj", "{FBDFC91A-B95A-4F0C-85C4-F436BFDC4720}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -164,6 +166,10 @@ Global
 		{4AF9EFF8-5456-4711-B847-6DD31F949B02}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4AF9EFF8-5456-4711-B847-6DD31F949B02}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4AF9EFF8-5456-4711-B847-6DD31F949B02}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FBDFC91A-B95A-4F0C-85C4-F436BFDC4720}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FBDFC91A-B95A-4F0C-85C4-F436BFDC4720}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FBDFC91A-B95A-4F0C-85C4-F436BFDC4720}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FBDFC91A-B95A-4F0C-85C4-F436BFDC4720}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

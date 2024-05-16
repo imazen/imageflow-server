@@ -19,6 +19,7 @@
     <ItemGroup>
       <ProjectReference Include="..\..\src\Imazen.HybridCache\Imazen.HybridCache.csproj" />
       <ProjectReference Include="..\..\src\Imazen.Routing\Imazen.Routing.csproj" />
+      <ProjectReference Include="..\Imazen.TestingHelpers\Imazen.TestingHelpers.csproj" />
       <ProjectReference Include="..\ImazenShared.Tests\ImazenShared.Tests.csproj" />
     </ItemGroup>
 

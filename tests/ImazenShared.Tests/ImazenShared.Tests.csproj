@@ -20,6 +20,7 @@
     <ProjectReference Include="..\..\src\Imazen.Abstractions\Imazen.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\Imazen.Common\Imazen.Common.csproj" />
     <ProjectReference Include="..\..\src\Imazen.Routing\Imazen.Routing.csproj" />
+    <ProjectReference Include="..\Imazen.TestingHelpers\Imazen.TestingHelpers.csproj" />
 </ItemGroup>
     
 </Project>
