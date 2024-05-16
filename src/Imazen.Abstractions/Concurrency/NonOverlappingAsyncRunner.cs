@@ -23,9 +23,9 @@ public class NonOverlappingAsyncRunner<T>(
     private bool stopped;
     private bool stopping;
     public Task StopAsync(CancellationToken stopWaitingForCancellationToken = default)
-    => StopAsync(Timeout.InfiniteTimeSpan, stopWaitingForCancellationToken);
+        => StopAsync(Timeout.InfiniteTimeSpan, stopWaitingForCancellationToken);
     
-    public async Task StopAsync(TimeSpan timeout, CancellationToken stopWaitingForCancellationToken = default)
+    public async Task StopAsync(TimeSpan stopTimeout, CancellationToken stopWaitingForCancellationToken = default)
     {
         
         try
@@ -56,12 +56,12 @@ public class NonOverlappingAsyncRunner<T>(
                 if (asyncCancelTask != null && asyncCancelTask is { IsCompleted: false })
                 {
                     await Task.WhenAny(asyncCancelTask, 
-                        Task.Delay(timeout, stopWaitingForCancellationToken)).ConfigureAwait(false);
+                        Task.Delay(stopTimeout, stopWaitingForCancellationToken)).ConfigureAwait(false);
                     
                     // This doesn't handle the waiting for activation case.
                 }
                 
-                await RunNonOverlappingAsyncInternal(true, timeout, stopWaitingForCancellationToken)
+                await RunNonOverlappingAsyncInternal(true, stopTimeout, stopWaitingForCancellationToken)
                     .ConfigureAwait(false);
             }
             catch (TaskCanceledException)

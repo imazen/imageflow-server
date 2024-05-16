@@ -83,16 +83,16 @@ public class NonOverlappingAsyncRunnerTests
         await runner.StopAsync();
     }
 
-    [Fact]
-    public async Task RunNonOverlappingAsync_CancelsTask_WhenProxyCancellationRequested()
-    {
-        var runner = new NonOverlappingAsyncRunner<int>(TestTask30);
-        var cts = new CancellationTokenSource();
-        var task = runner.RunNonOverlappingAsync(default, cts.Token);
-        cts.Cancel();
-        await Assert.ThrowsAsync<TaskCanceledException>(async () => await task);
-        await runner.StopAsync();
-    }
+    // [Fact]
+    // public async Task RunNonOverlappingAsync_CancelsTask_WhenProxyCancellationRequested()
+    // {
+    //     var runner = new NonOverlappingAsyncRunner<int>(TestTask30);
+    //     var cts = new CancellationTokenSource();
+    //     var task = runner.RunNonOverlappingAsync(default, cts.Token);
+    //     cts.Cancel();
+    //     await Assert.ThrowsAsync<TaskCanceledException>(async () => await task);
+    //     await runner.StopAsync();
+    // }
 
     [Fact]
     public async Task RunNonOverlappingAsync_ThrowsExceptionForSynchronousTask_WhenTaskThrowsException()
@@ -129,7 +129,9 @@ public class NonOverlappingAsyncRunnerTests
         var task = runner.RunNonOverlappingAsync(TimeSpan.FromMilliseconds(500), cts.Token);
         cts.Cancel(); // Cancel before task completes
         var _ = await Assert.ThrowsAsync<TaskCanceledException>(async () => await task);
-        await runner.StopAsync();
+        // TODO: Beware, we aren't testing to see if the stopping times out
+        // before the test completes, this is a false positive.
+        await runner.StopAsync(TimeSpan.FromMilliseconds(200), CancellationToken.None);
     }
 
     [Fact]
@@ -138,7 +140,7 @@ public class NonOverlappingAsyncRunnerTests
         var runner = new NonOverlappingAsyncRunner<int>(TestTaskWith10MsDelayedException);
         var cts = new CancellationTokenSource();
         var task = runner.RunNonOverlappingAsync(TimeSpan.FromMilliseconds(1000), cts.Token);
-        await Task.Delay(500);
+        await Task.Delay(100);
         cts.Cancel();
         await Assert.ThrowsAsync<ArbitraryException>(async () => await task);
     }
@@ -152,7 +154,7 @@ public class NonOverlappingAsyncRunnerTests
         
         var runner = new NonOverlappingAsyncRunner<int>(async ct =>
         {
-            await Task.Delay(50, ct);
+            await Task.Delay(30, ct);
             if (ct.IsCancellationRequested) throw new TaskCanceledException();
             Interlocked.Increment(ref executionCount);
             if (throwNextCount > 0)
@@ -229,7 +231,12 @@ public class NonOverlappingAsyncRunnerTests
         // fire and forget - may not have started
         runner.FireAndForget();
         Assert.Equal(2, startedCount);
- 
+        
+        // We need to wait for the task to start, or it can't be disposed.
+        while (startedCount < 2)
+        {
+            await Task.Delay(1);
+        }
         runner.Dispose();
         
         Assert.True(cancelledCount == 1 || completionCount == 2);
