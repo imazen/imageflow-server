@@ -1,6 +1,6 @@
 namespace Imazen.Routing.HttpAbstractions;
 
-internal static class HttpHeaderNames
+public static class HttpHeaderNames
 {
     public static readonly string IfNoneMatch = "If-None-Match";
     public static readonly string ETag = "ETag";

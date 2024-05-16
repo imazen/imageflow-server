@@ -1,9 +1,9 @@
 ﻿namespace Imazen.Common.Persistence
 {
     /// <summary>
-    /// The result of the cache write
+    /// The result of the IPersistentStringCache cache write; internal use only.
     /// </summary>
-    internal enum StringCachePutResult
+    public enum StringCachePutResult
     {
         /// <summary>
         /// The in-memory copy is exactly the same; write skipped
