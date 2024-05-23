@@ -9,8 +9,8 @@ namespace Imazen.Routing.Caching.Health;
 /// This class only cancels the background function if StopAsync(CancellationToken ct) is called or it is disposed (it implements async dispose).
 /// If RunNonOverlapping is called, and the background task is not running, it is scheduled with Task.Run
 /// RunNonOverlapping returns a task that completes when the background task completes, fails, or is cancelled. These results are passed through.
-
-public class NonOverlappingAsyncRunner<T>(
+[Obsolete("Doesn't work as expected. Use NonOverlappingCachedRunner instead.")]
+internal class NonOverlappingAsyncRunner<T>(
     Func<CancellationToken, ValueTask<T>> taskFactory,
     TimeSpan taskTimeout = default,
     bool taskResultMustBeDisposed = false,

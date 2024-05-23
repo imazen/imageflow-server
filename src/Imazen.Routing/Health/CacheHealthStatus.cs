@@ -21,7 +21,7 @@ internal class CacheHealthStatus : IHostedService, IDisposable
     private static TimeSpan Timeout => TimeSpan.FromMinutes(3);
 
     // TODO: NonOverlappingAsyncRunner is unreliable, remove or fix.
-    private readonly NonOverlappingAsyncRunner<IBlobCacheHealthDetails>? healthCheckTask;
+    private readonly INonOverlappingRunner<IBlobCacheHealthDetails>? healthCheckTask;
     
     private IReLogger Logger { get;  }
 
@@ -50,7 +50,7 @@ internal class CacheHealthStatus : IHostedService, IDisposable
         SupportsHealthCheck = cache.InitialCacheCapabilities.SupportsHealthCheck;
         Metrics = new CacheHealthMetrics(Cache.InitialCacheCapabilities);
         if (!SupportsHealthCheck) return;
-        healthCheckTask = new NonOverlappingAsyncRunner<IBlobCacheHealthDetails>(
+        healthCheckTask = new NonOverlappingCachedRunner<IBlobCacheHealthDetails>(
             async (ct) =>
             {
                 
@@ -95,7 +95,7 @@ internal class CacheHealthStatus : IHostedService, IDisposable
                     throw;
                 }
 
-            }, false, Timeout);
+            }, Timeout, TimeSpan.FromSeconds(5));
     }
 
     
@@ -129,7 +129,7 @@ internal class CacheHealthStatus : IHostedService, IDisposable
         {
             return Tasks.ValueResult<IBlobCacheHealthDetails?>(null);
         }
-        if (forceFresh || IsStale()) return healthCheckTask!.RunNonOverlappingAsync(timeout, cancellationToken)!;
+        if (forceFresh || IsStale()) return healthCheckTask!.RunAsync(timeout, cancellationToken)!;
         
         if (Metrics.LastHealthCheckException != null)
         {

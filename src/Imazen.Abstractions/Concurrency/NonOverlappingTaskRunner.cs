@@ -10,7 +10,8 @@ using Microsoft.Extensions.Hosting;
 /// Should be thread-safe on all methods
 /// </summary>
 /// <typeparam name="T"></typeparam>
-public class NonOverlappingTaskRunner<T> : IHostedService, IDisposable, INonOverlappingRunner<T>
+[Obsolete("Doesn't work as expected. Use NonOverlappingCachedRunner instead.")]
+internal class NonOverlappingTaskRunner<T> : IHostedService, IDisposable, INonOverlappingRunner<T>
 {
     private readonly Func<CancellationToken, Task<T>> _taskFactory;
     private readonly TimeSpan _timeout;
