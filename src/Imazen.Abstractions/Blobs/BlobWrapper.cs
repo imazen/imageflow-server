@@ -57,6 +57,8 @@ namespace Imazen.Abstractions.Blobs
             core.AddWeakReference(this);
         }
         
+        // maybe internal LatencyTrackingZone? LatencyZone => core?.LatencyZone;
+        
         // /// <summary>
         // /// Sets the blob factory to be used to create a reusable blob from a consumable blob.
         // /// </summary>
