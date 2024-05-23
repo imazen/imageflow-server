@@ -11,10 +11,10 @@ namespace Imazen.Routing.Caching.Health;
 
 public class NonOverlappingAsyncRunner<T>(
     Func<CancellationToken, ValueTask<T>> taskFactory,
-    bool taskMustBeDisposed = false,
-    TimeSpan timeout = default, 
-    CancellationToken cancellationToken = default)
-    : IHostedService, IDisposable, IAsyncDisposable
+    TimeSpan taskTimeout = default,
+    bool taskResultMustBeDisposed = false,
+    CancellationToken cancellationToken = default, ITestLogging? testLogger = default)
+    : IHostedService, IDisposable, IAsyncDisposable, INonOverlappingRunner<T>
 {
     private CancellationTokenSource? taskCancellation;
     private readonly object taskInitLock = new object();
@@ -22,6 +22,7 @@ public class NonOverlappingAsyncRunner<T>(
     private Task? task;
     private bool stopped;
     private bool stopping;
+    private ITestLogging? logger = testLogger;
     public Task StopAsync(CancellationToken stopWaitingForCancellationToken = default)
         => StopAsync(Timeout.InfiniteTimeSpan, stopWaitingForCancellationToken);
     
@@ -271,7 +272,7 @@ public class NonOverlappingAsyncRunner<T>(
     /// <returns></returns>
     /// <exception cref="TaskCanceledException">Thrown when the timeout is reached or the cancellation token is activated</exception>
     /// <exception cref="Exception">Any exceptions thrown by the underlying task</exception>
-    public ValueTask<T> RunNonOverlappingAsync(TimeSpan proxyTimeout = default,
+    public ValueTask<T> RunAsync(TimeSpan proxyTimeout = default,
         CancellationToken proxyCancellation = default)
     {
         
