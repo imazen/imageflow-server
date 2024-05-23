@@ -1,6 +1,6 @@
 namespace Imazen.Abstractions.Blobs.Drafts;
 
-internal interface IBlobSourceProvider
-{
-    
-}
+// internal interface IBlobSourceProvider
+// {
+//     
+// }
