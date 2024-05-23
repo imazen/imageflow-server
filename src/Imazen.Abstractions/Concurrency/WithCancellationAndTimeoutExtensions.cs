@@ -18,7 +18,7 @@ internal static class WithCancellationAndTimeoutExtensions
     {
         ArgumentNullThrowHelper.ThrowIfNull(task, nameof(task));
 
-        if (task.IsCompleted || !cancellationToken.CanBeCanceled)
+        if (task.IsCompleted)
         {
             return task;
         }
@@ -60,19 +60,14 @@ internal static class WithCancellationAndTimeoutExtensions
 
         return WithCancellationAndTimeoutSlow(task, cancellationToken, timeout);
     }
-        private static async Task<T> WithCancellationAndTimeoutSlow<T>(Task<T> task, CancellationToken cancellationToken, TimeSpan timeout)
+    private static async Task<T> WithCancellationAndTimeoutSlow<T>(Task<T> task, CancellationToken cancellationToken, TimeSpan timeout)
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cts.CancelAfter(timeout);
-
-        try
-        {
-            return await task.WithCancellation(cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException ex) when (ex.CancellationToken == cts.Token)
-        {
-            throw new TimeoutException();
-        }
+        
+        
+        return await task.WithCancellation(cts.Token).ConfigureAwait(false);
+        // We can't really distinguish between a timeout and a cancellation here.
     }
 
     private static async Task WithCancellationAndTimeoutSlow(Task task, CancellationToken cancellationToken, TimeSpan timeout)
@@ -93,7 +88,7 @@ internal static class WithCancellationAndTimeoutExtensions
             }
             catch (OperationCanceledException ex) when (ex.CancellationToken == cts.Token)
             {
-                throw new TimeoutException();
+                throw;
             }
         }
     }

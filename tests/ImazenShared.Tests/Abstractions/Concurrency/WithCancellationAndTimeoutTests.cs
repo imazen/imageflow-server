@@ -34,7 +34,7 @@ public class WithCancellationAndTimeoutTests
     }
 
     [Fact]
-    public async Task WithCancellationAndTimeout_TimeoutOccurs_ThrowsTimeoutException()
+    public async Task WithCancellationAndTimeout_TimeoutOccurs_ThrowsOperationCanceledException()
     {
         // Arrange
         var task = Task.Delay(TimeSpan.FromSeconds(1));
@@ -42,7 +42,7 @@ public class WithCancellationAndTimeoutTests
         var timeout = TimeSpan.FromMilliseconds(100);
 
         // Act & Assert
-        await Assert.ThrowsAsync<TimeoutException>(() => task.WithCancellationAndTimeout(cancellationToken, timeout));
+        await Assert.ThrowsAsync<OperationCanceledException>(() => task.WithCancellationAndTimeout(cancellationToken, timeout));
     }
 
     [Fact]
@@ -87,7 +87,7 @@ public class WithCancellationAndTimeoutTests
     }
 
     [Fact]
-    public async Task WithCancellationAndTimeout_TimeoutOccurs_WithDefaultToken_ThrowsTimeoutException()
+    public async Task WithCancellationAndTimeout_TimeoutOccurs_WithDefaultToken_ThrowsOperationCanceledException()
     {
         // Arrange
         var task = Task.Delay(TimeSpan.FromSeconds(1));
@@ -95,7 +95,7 @@ public class WithCancellationAndTimeoutTests
         var timeout = TimeSpan.FromMilliseconds(100);
 
         // Act & Assert
-        await Assert.ThrowsAsync<TimeoutException>(() => task.WithCancellationAndTimeout(cancellationToken, timeout));
+        await Assert.ThrowsAsync<OperationCanceledException>(() => task.WithCancellationAndTimeout(cancellationToken, timeout));
     }
 
     [Fact]
@@ -114,7 +114,7 @@ public class WithCancellationAndTimeoutTests
     }
 
     [Fact]
-    public async Task WithCancellationAndTimeout_TimeoutOccurs_WithNonCancellableToken_ThrowsTimeoutException()
+    public async Task WithCancellationAndTimeout_TimeoutOccurs_WithNonCancellableToken_ThrowsOperationCanceledException()
     {
         // Arrange
         var task = Task.Delay(TimeSpan.FromSeconds(1));
@@ -122,6 +122,6 @@ public class WithCancellationAndTimeoutTests
         var timeout = TimeSpan.FromMilliseconds(100);
 
         // Act & Assert
-        await Assert.ThrowsAsync<TimeoutException>(() => task.WithCancellationAndTimeout(cancellationToken, timeout));
+        await Assert.ThrowsAsync<OperationCanceledException>(() => task.WithCancellationAndTimeout(cancellationToken, timeout));
     }
 }
