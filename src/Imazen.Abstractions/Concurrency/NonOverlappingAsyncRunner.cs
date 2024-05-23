@@ -1,3 +1,4 @@
+using Imazen.Abstractions.Logging;
 using Microsoft.Extensions.Hosting;
 
 namespace Imazen.Routing.Caching.Health;
@@ -36,7 +37,7 @@ public class NonOverlappingAsyncRunner<T>(
             {
                 return;
             }
-            
+            // Maybe don't lock here?
             lock (taskInitLock)
             {
                 stopping = true;
@@ -54,7 +55,7 @@ public class NonOverlappingAsyncRunner<T>(
                 }
                 // We need to respect the stopWaitingForCancellationToken above waiting for the task to complete
                 // but if nothing is running, Task.CompletedTask is returned, so we can't await it.
-                if (asyncCancelTask != null && asyncCancelTask is { IsCompleted: false })
+                if (asyncCancelTask is { IsCompleted: false })
                 {
                     await Task.WhenAny(asyncCancelTask, 
                         Task.Delay(stopTimeout, stopWaitingForCancellationToken)).ConfigureAwait(false);
@@ -78,11 +79,11 @@ public class NonOverlappingAsyncRunner<T>(
         {
              // even if canceled/faulted, we're done
             stopped = true;
-            DisposeTaskAndCancellation();
+            DisposeTaskAndCancellation(true);
         }
     }
 
-    private void DisposeTaskAndCancellation()
+    private void DisposeTaskAndCancellation(bool throwException)
     {
         lock (taskInitLock)
         {
@@ -96,7 +97,7 @@ public class NonOverlappingAsyncRunner<T>(
                         // Dispose says it can be used with Cancel
                         task?.Dispose();
                     }
-                    else if (taskMustBeDisposed)
+                    else if (taskResultMustBeDisposed && throwException)
                     {
                         throw new InvalidOperationException($"Task status was {taskStatusCopy}, and cannot be disposed.");
                     }
@@ -123,20 +124,21 @@ public class NonOverlappingAsyncRunner<T>(
             }
         }
     }
+
     public void Dispose()
     {
         try
         {
             var t = StopAsync();
-            t.Wait(5);
+            t.Wait(15);
         }
         finally
         {
             stopped = true;
-            DisposeTaskAndCancellation();
+            DisposeTaskAndCancellation(false);
         }
     }
-    
+
     public async ValueTask DisposeAsync()
     {
         try
@@ -178,28 +180,52 @@ public class NonOverlappingAsyncRunner<T>(
             
             if (taskCancellation is not { IsCancellationRequested: true })
             {
+                bool taskCancellationWasNull = taskCancellation == null;
                 // Create if missing
                 if (taskCancellation == null)
                 {
                     taskCancellation?.Dispose();
                     taskCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 }
-                // And reset the timer. We reset the cancellation token when we set taskStatus == null, 
-                // which clears the timer.
-                if (timeout != default && timeout != TimeSpan.Zero && timeout != Timeout.InfiniteTimeSpan)
+
+                // And reset the timer. We reset the cancellation token (on .net 6+, otherwise we dispose and null it)
+                // when we set taskStatus == null, which clears the timer.
+                if (taskTimeout != default && taskTimeout != TimeSpan.Zero && taskTimeout != Timeout.InfiniteTimeSpan)
                 {
-                    taskCancellation.CancelAfter(timeout);
+                    taskCancellation.CancelAfter(taskTimeout);
                 }
+
             }
-            
-            ValueTask<T> innerTask = taskFactory(taskCancellation.Token);
-            if (innerTask.IsCompleted)
-            {
-                completedSyncResult = innerTask.Result;
-                ResetCancellationTokenSourceUnsynchronized();
-                return true;
-            }
+            ValueTask<T> innerTask;
             taskStatus = new TaskCompletionSource<T>();
+            bool unknownStatus = true;
+            try
+            {
+                innerTask = taskFactory(taskCancellation.Token);
+                if (innerTask.IsCompleted)
+                {
+                    completedSyncResult = innerTask.Result;
+                    ResetCancellationTokenSourceUnsynchronized();
+                    return true;
+                }
+
+                unknownStatus = false;
+            }
+            catch (Exception ex)
+            {
+                completedSyncResult = default!;
+                taskStatus.TrySetException(ex);
+                unknownStatus = false;
+                return false;
+            }
+            finally
+            {
+                if (unknownStatus)
+                {
+                    taskStatus.TrySetException(new InvalidOperationException());
+                }
+                    
+            }
             task = Task.Run(async () =>
             {
                 if (taskCancellation is { IsCancellationRequested: true })
@@ -207,24 +233,33 @@ public class NonOverlappingAsyncRunner<T>(
                     taskStatus.TrySetCanceled();
                     return;
                 }
+
+                bool setStatus = false;
                 try
                 {
                     
                     var result = await innerTask.ConfigureAwait(false);
                     taskStatus.TrySetResult(result);
+                    setStatus = true;
                 }
                 catch (OperationCanceledException)
                 {
                     taskStatus.TrySetCanceled();
+                    setStatus = true;
                 }
                 catch (Exception ex)
                 {
                     taskStatus.TrySetException(ex);
+                    setStatus = true;
                 }
                 finally
                 {
                     lock (taskInitLock)
                     {
+                        if (!setStatus)
+                        {
+                            // taskStatus.TrySetCanceled();
+                        }
                         taskStatus = null;
                         ResetCancellationTokenSourceUnsynchronized();
                     }
@@ -275,6 +310,10 @@ public class NonOverlappingAsyncRunner<T>(
     public ValueTask<T> RunAsync(TimeSpan proxyTimeout = default,
         CancellationToken proxyCancellation = default)
     {
+        if (cancellationToken is { IsCancellationRequested: true })
+        {
+            return new ValueTask<T>(Task<T>.FromCanceled<T>(cancellationToken));
+        }
         
         if (stopping || stopped) throw new ObjectDisposedException(nameof(NonOverlappingAsyncRunner<T>));
         return RunNonOverlappingAsyncInternal(false, proxyTimeout, proxyCancellation);
