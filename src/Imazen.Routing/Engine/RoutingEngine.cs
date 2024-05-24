@@ -58,6 +58,12 @@ public class RoutingEngine : IBlobRequestRouter, IHasDiagnosticPageSection
     }
     
 
+    /// <summary>
+    /// Errors if the route isn't a cachable blob; returns null if there's no match.
+    /// </summary>
+    /// <param name="request"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
     public async ValueTask<CodeResult<ICacheableBlobPromise>?> RouteToPromiseAsync(MutableRequest request, CancellationToken cancellationToken = default)
     {
         // log info about the request

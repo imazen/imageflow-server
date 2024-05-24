@@ -12,6 +12,7 @@ using Imazen.Common.Instrumentation.Support.InfoAccumulators;
 using Imazen.Common.Licensing;
 using Imazen.Routing.Caching;
 using Imazen.Routing.Engine;
+using Imazen.Routing.Health;
 using Imazen.Routing.Helpers;
 using Imazen.Routing.HttpAbstractions;
 using Imazen.Routing.Layers;
@@ -37,6 +38,7 @@ internal class ImageServer<TRequest, TResponse, TContext> : IImageServer<TReques
     private readonly BoundedTaskCollection<BlobTaskItem> uploadQueue;
     private readonly bool shutdownRegisteredServices;
     private readonly IImageServerContainer container;
+    private readonly CacheHealthTracker cacheHealthTracker;
     public ImageServer(IImageServerContainer container,  
         ILicenseChecker licenseChecker,
         LicenseOptions licenseOptions,
@@ -95,11 +97,15 @@ internal class ImageServer<TRequest, TResponse, TContext> : IImageServer<TReques
         }
         
         var allCachesExceptMemory = allCaches?.Where(c => c != memoryCache)?.ToList();
+        
+        cacheHealthTracker = container.GetService<CacheHealthTracker>();
+        cacheHealthTracker ??= new CacheHealthTracker(logger);
 
         var watermarkingLogic = container.GetService<WatermarkingLogicOptions>() ??
                                 new WatermarkingLogicOptions(null, null);
         var sourceCacheOptions = new CacheEngineOptions
         {
+            HealthTracker = cacheHealthTracker,
             SeriesOfCacheGroups =
             [
                 ..new[] { [memoryCache], allCachesExceptMemory ?? [] }
@@ -304,9 +310,10 @@ internal class ImageServer<TRequest, TResponse, TContext> : IImageServer<TReques
         
     }
 
-    public Task StartAsync(CancellationToken cancellationToken)
+    public async Task StartAsync(CancellationToken cancellationToken)
     {
-        return uploadQueue.StartAsync(cancellationToken);
+        await uploadQueue.StartAsync(cancellationToken);
+        await cacheHealthTracker.StartAsync(cancellationToken);
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
@@ -314,6 +321,7 @@ internal class ImageServer<TRequest, TResponse, TContext> : IImageServer<TReques
         //TODO: error handling or no?
         //await uploadCancellationTokenSource.CancelAsync();
         await uploadQueue.StopAsync(cancellationToken);
+        await cacheHealthTracker.StopAsync(cancellationToken);
         if (shutdownRegisteredServices)
         {
             var services = this.container.GetInstanceOfEverythingLocal<IHostedService>();

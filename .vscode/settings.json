@@ -5,5 +5,10 @@
     ],
     "cSpell.ignoreWords": [
         "sthree"
-    ]
+    ],
+    "editor.fontSize": 14,
+    "window.zoomLevel": 1,
+    "window.zoomPerWindow": true,
+    "editor.mouseWheelZoom": true,
+    "terminal.integrated.mouseWheelZoom": true
 }
