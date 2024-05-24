@@ -24,7 +24,6 @@ namespace Imazen.HybridCache.Tests
             {
                 AsyncCacheOptions = new AsyncCacheOptions
                 {
-                    MaxQueuedBytes = 0,
                     UniqueName = "HybridCache"
                 }
             };

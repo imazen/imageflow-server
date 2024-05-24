@@ -6,11 +6,12 @@ using Imazen.Abstractions.Resulting;
 using Imazen.Common.Extensibility.Support;
 using Imazen.Common.Issues;
 using Imazen.HybridCache.MetaStore;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace Imazen.HybridCache
 {
-    public class HybridCache : IBlobCache
+    public class HybridCache : IBlobCache, IHostedService
     {
         private readonly IReLogger logger;
         private HashBasedPathBuilder PathBuilder { get; }
@@ -97,10 +98,8 @@ namespace Imazen.HybridCache
                 File.Move(from, to);
 #endif
             };
-            options.CleanupManagerOptions.MoveFileOverwriteFunc = options.CleanupManagerOptions.MoveFileOverwriteFunc ??
-                                                                  options.AsyncCacheOptions.MoveFileOverwriteFunc ?? moveFileOverwriteFunc;
-            options.AsyncCacheOptions.MoveFileOverwriteFunc = options.AsyncCacheOptions.MoveFileOverwriteFunc ??
-                                                              options.CleanupManagerOptions.MoveFileOverwriteFunc ?? moveFileOverwriteFunc;
+            options.CleanupManagerOptions.MoveFileOverwriteFunc ??= options.AsyncCacheOptions.MoveFileOverwriteFunc ?? moveFileOverwriteFunc;
+            options.AsyncCacheOptions.MoveFileOverwriteFunc ??= options.CleanupManagerOptions.MoveFileOverwriteFunc ?? moveFileOverwriteFunc;
         }
         
 
@@ -118,7 +117,10 @@ namespace Imazen.HybridCache
         {
             logger?.LogInformation("HybridCache is shutting down...");
             var sw = Stopwatch.StartNew();
-            await SupportData.AwaitBeforeShutdown();
+            if (SupportData != null)
+            {
+                await SupportData.AwaitBeforeShutdown();
+            }
             await Database.StopAsync(cancellationToken);
             sw.Stop();
             logger?.LogInformation("HybridCache shut down in {ShutdownTime}", sw.Elapsed);
