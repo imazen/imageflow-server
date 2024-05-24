@@ -3,10 +3,16 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Imazen.Abstractions.Blobs;
+using Imazen.Abstractions.Logging;
+using Imazen.Abstractions.Resulting;
 using Imazen.Common.Extensibility.StreamCache;
 using Imazen.HybridCache.MetaStore;
+using Imazen.Routing.Promises.Pipelines;
+using Imazen.Routing.Requests;
 using MELT;
 using Microsoft.Extensions.Logging;
 using Microsoft.IO;
@@ -15,6 +21,7 @@ namespace Imazen.HybridCache.Benchmark
 {
     class Program
     {
+        private const string UniqueName = "HybridCache";
         static async Task Main(string[] args)
         {
             var cts = new CancellationTokenSource();
@@ -41,30 +48,38 @@ namespace Imazen.HybridCache.Benchmark
 
 
         }
-        
+        private static HybridCacheAdvancedOptions CreateHybridCacheAdvancedOptions(
+            [CallerMemberName]
+            string uniqueName = "HybridCache", 
+            int subfolders = 1, 
+            long maxCacheBytes = 0, 
+            bool moveFilesIntoPlace = false,
+            TimeSpan minAgeToDelete = default,
+            long minCleanupBytes = 0)
+        {
+            return new HybridCacheAdvancedOptions(uniqueName, "")
+            {
+                Subfolders = subfolders,
+                AsyncCacheOptions = new AsyncCacheOptions()
+                {
+                    UniqueName = uniqueName,
+                    MoveFilesIntoPlace = moveFilesIntoPlace
+                },
+                CleanupManagerOptions = new CleanupManagerOptions()
+                {
+                    MaxCacheBytes = maxCacheBytes,
+                    MinAgeToDelete = minAgeToDelete,
+                    MinCleanupBytes = minCleanupBytes,
+                },
+            };
+        }
+
         private static async Task TestAsyncMediumLimitedCacheWavesMetaStore(CancellationToken cancellationToken)
         {
             var options = new TestParams()
             {
-                CacheOptions = new HybridCacheAdvancedOptions(null)
-                {
-                    Subfolders = 2048,
-                    AsyncCacheOptions = new AsyncCacheOptions()
-                    {
-                        MaxQueuedBytes = 100 * 100 * 1000,
-                        FailRequestsOnEnqueueLockTimeout = true,
-                        WriteSynchronouslyWhenQueueFull = true,
-                        MoveFileOverwriteFunc = (from, to) => File.Move(from,to,true),
-                        MoveFilesIntoPlace = false
-                    },
-                    CleanupManagerOptions = new CleanupManagerOptions()
-                    {
-                        MaxCacheBytes = 409600000, // 1/2th the size of the files we are trying to write
-                        MinAgeToDelete = TimeSpan.Zero,
-                        MinCleanupBytes =  0,
-                    },
-                },
-                MetaStoreOptions = new MetaStoreOptions(null)
+                CacheOptions = CreateHybridCacheAdvancedOptions(UniqueName, 2048, 409600000, moveFilesIntoPlace: false),
+                MetaStoreOptions = new MetaStoreOptions("")
                 {
                     Shards = 32
                 },
@@ -91,24 +106,8 @@ namespace Imazen.HybridCache.Benchmark
         {
             var options = new TestParams()
             {
-                CacheOptions = new HybridCacheAdvancedOptions("HybridCache",null)
-                {
-                    Subfolders = 1,
-                    AsyncCacheOptions = new AsyncCacheOptions()
-                    {
-                        MaxQueuedBytes = 0, //100 * 100 * 1000,
-                        FailRequestsOnEnqueueLockTimeout = true,
-                        WriteSynchronouslyWhenQueueFull = true,
-                        MoveFileOverwriteFunc = (from, to) => File.Move(from,to,true)
-                    },
-                    CleanupManagerOptions = new CleanupManagerOptions()
-                    {
-                        MaxCacheBytes = 8192000, // 1/50th the size of the files we are trying to write
-                        MinAgeToDelete = TimeSpan.Zero,
-                        MinCleanupBytes =  0,
-                    },
-                },
-                MetaStoreOptions = new MetaStoreOptions(null)
+                CacheOptions = CreateHybridCacheAdvancedOptions("HybridCache", 1, 8192000),
+                MetaStoreOptions = new MetaStoreOptions("")
                 {
                     Shards = 1
                 },
@@ -133,24 +132,9 @@ namespace Imazen.HybridCache.Benchmark
         {
             var options = new TestParams()
             {
-                CacheOptions = new HybridCacheAdvancedOptions(null)
-                {
-                    AsyncCacheOptions = new AsyncCacheOptions()
-                    {
-                        MaxQueuedBytes = 0,
-                        FailRequestsOnEnqueueLockTimeout = true,
-                        WriteSynchronouslyWhenQueueFull = true,
-                    },
-                    CleanupManagerOptions = new CleanupManagerOptions()
-                    {
-                        MaxCacheBytes = (long)4096 * 2 * 1000 * 1000, // 1/2th the size of the files we are trying to write
-                        MinAgeToDelete = TimeSpan.Zero,
-                        MinCleanupBytes =  0, //1 * 1000 * 1000,
-                        
-                    }
-                },
                 FileSize = 0,
                 FileCount = 6000000,
+                CacheOptions = CreateHybridCacheAdvancedOptions(maxCacheBytes: (long)4096 * 2 * 1000 * 1000),
                 RequestCountPerWave = 20000,
                 RequestWaves = 1,
                 UseMetaStore = true,
@@ -169,22 +153,7 @@ namespace Imazen.HybridCache.Benchmark
         {
             var options = new TestParams()
             {
-                CacheOptions = new HybridCacheAdvancedOptions(null)
-                {
-                    AsyncCacheOptions = new AsyncCacheOptions()
-                    {
-                        MaxQueuedBytes = 0,
-                        FailRequestsOnEnqueueLockTimeout = true,
-                        WriteSynchronouslyWhenQueueFull = true,
-                    },
-                    CleanupManagerOptions = new CleanupManagerOptions()
-                    {
-                        MaxCacheBytes = (long)4096 * 2 * 1000 * 1000, // 1/2th the size of the files we are trying to write
-                        MinAgeToDelete = TimeSpan.Zero,
-                        MinCleanupBytes =  0, //1 * 1000 * 1000,
-                        
-                    }
-                },
+                CacheOptions = CreateHybridCacheAdvancedOptions(maxCacheBytes: (long)4096 * 2 * 1000 * 1000),
                 FileSize = 64,
                 FileCount = 60000,
                 RequestCountPerWave = 2000,
@@ -202,23 +171,7 @@ namespace Imazen.HybridCache.Benchmark
         {
             var options = new TestParams()
             {
-                CacheOptions = new HybridCacheAdvancedOptions(null)
-                {
-                    AsyncCacheOptions = new AsyncCacheOptions()
-                    {
-                        MaxQueuedBytes = 0,
-                        FailRequestsOnEnqueueLockTimeout = true,
-                        WriteSynchronouslyWhenQueueFull = true,
-                    },
-                    CleanupManagerOptions = new CleanupManagerOptions()
-                    {
-                        MaxCacheBytes = 8192000, // 1/5th the size of the files we are trying to write
-                        MinAgeToDelete = TimeSpan.Zero,
-                        MinCleanupBytes =  0,
-                        
-                    },
-                    Subfolders = 1
-                },
+                CacheOptions = CreateHybridCacheAdvancedOptions(maxCacheBytes: 8192000),
                 FileSize = 81920,
                 FileCount = 500,
                 RequestCountPerWave = 1000,
@@ -236,23 +189,8 @@ namespace Imazen.HybridCache.Benchmark
         {
             var options = new TestParams()
             {
-                CacheOptions = new HybridCacheAdvancedOptions(null)
-                {
-                    AsyncCacheOptions = new AsyncCacheOptions()
-                    {
-                        MaxQueuedBytes = 5 * 1000 * 1000,
-                        FailRequestsOnEnqueueLockTimeout = true,
-                        WriteSynchronouslyWhenQueueFull = true,
-                    },
-                    CleanupManagerOptions = new CleanupManagerOptions()
-                    {
-                        MaxCacheBytes = 4088000, // 1/2th the size of the files we are trying to write
-                        MinAgeToDelete = TimeSpan.Zero,
-                        MinCleanupBytes = 0,
-                        
-                    },
-                    Subfolders = 1
-                },
+                CacheOptions = CreateHybridCacheAdvancedOptions(maxCacheBytes: 4088000),
+                MaxQueuedBytes = 5 * 1000 * 1000,
                 FileSize = 81920,
                 FileCount = 100,
                 RequestCountPerWave = 500,
@@ -270,23 +208,8 @@ namespace Imazen.HybridCache.Benchmark
         {
             var options = new TestParams()
             {
-                CacheOptions = new HybridCacheAdvancedOptions(null)
-                {
-                    AsyncCacheOptions = new AsyncCacheOptions()
-                    {
-                        MaxQueuedBytes = 100 * 1000 * 1000,
-                        FailRequestsOnEnqueueLockTimeout = true,
-                        WriteSynchronouslyWhenQueueFull = true,
-                    },
-                    CleanupManagerOptions = new CleanupManagerOptions()
-                    {
-                        MaxCacheBytes = 8192000, // 1/5th the size of the files we are trying to write
-                        MinAgeToDelete = TimeSpan.Zero,
-                        MinCleanupBytes = 0,
-                        
-                    },
-                    Subfolders = 1
-                },
+                CacheOptions = CreateHybridCacheAdvancedOptions(maxCacheBytes: 8192000),
+                MaxQueuedBytes = 100 * 1000 * 1000,
                 FileSize = 81920,
                 FileCount = 500,
                 RequestCountPerWave = 2000,
@@ -303,22 +226,7 @@ namespace Imazen.HybridCache.Benchmark
         {
             var options = new TestParams()
             {
-                CacheOptions = new HybridCacheAdvancedOptions("HybridCache", null)
-                {
-                    AsyncCacheOptions = new AsyncCacheOptions()
-                    {
-                        MaxQueuedBytes = 0,
-                        FailRequestsOnEnqueueLockTimeout = true,
-                        WriteSynchronouslyWhenQueueFull = true,
-                    },
-                    CleanupManagerOptions = new CleanupManagerOptions()
-                    {
-                        MaxCacheBytes = 8192000, // 1/5th the size of the files we are trying to write
-                        MinAgeToDelete = TimeSpan.Zero,
-                        
-                    },
-                    Subfolders = 1
-                },
+                CacheOptions = CreateHybridCacheAdvancedOptions(maxCacheBytes: 8192000),
                 FileSize = 81920,
                 FileCount = 500,
                 RequestCountPerWave = 2000,
@@ -335,21 +243,7 @@ namespace Imazen.HybridCache.Benchmark
         {
             var options = new TestParams()
             {
-                CacheOptions = new HybridCacheAdvancedOptions(null)
-                {
-                    AsyncCacheOptions = new AsyncCacheOptions()
-                    {
-                        MaxQueuedBytes = 0,
-                        FailRequestsOnEnqueueLockTimeout = true,
-                        WriteSynchronouslyWhenQueueFull = true,
-                    },
-                    CleanupManagerOptions = new CleanupManagerOptions()
-                    {
-                        MaxCacheBytes = 20000000, // Half the size of the files we are trying to write
-                        MinAgeToDelete = TimeSpan.Zero,
-                        
-                    }
-                },
+                CacheOptions = CreateHybridCacheAdvancedOptions(maxCacheBytes: 20000000),
                 FileCount = 500,
                 FileSize = 81920,
                 RequestCountPerWave = 1000,
@@ -365,19 +259,8 @@ namespace Imazen.HybridCache.Benchmark
         {
             var options = new TestParams()
             {
-                CacheOptions = new HybridCacheAdvancedOptions(null)
-                {
-                    AsyncCacheOptions = new AsyncCacheOptions()
-                    {
-                        MaxQueuedBytes = 0,
-                        FailRequestsOnEnqueueLockTimeout = true,
-                        WriteSynchronouslyWhenQueueFull = true,
-                    },
-                    CleanupManagerOptions = new CleanupManagerOptions()
-                    {
-                        MaxCacheBytes = 100000000,
-                    }
-                },
+                CacheOptions = CreateHybridCacheAdvancedOptions(maxCacheBytes: 100000000),
+                
                 RetrieveContentType = getContentType,
                 FileCount = 500,
                 FileSize = 81920,
@@ -391,6 +274,9 @@ namespace Imazen.HybridCache.Benchmark
 
         private class TestParams
         {
+            internal int MaxQueuedBytes { get; set; } = 0;
+            internal bool WriteSynchronouslyWhenQueueFull { get; set; } = true;
+            internal bool FailRequestsOnEnqueueLockTimeout { get; set;} = true;
 
             internal int FileSize { get; set; } = 81920;
             internal int FileCount { get; set; } = 1000;
@@ -404,7 +290,7 @@ namespace Imazen.HybridCache.Benchmark
             internal bool RetrieveContentType { get; set; }
             
             internal bool DisplayLog { get; set; }
-            internal HybridCacheAdvancedOptions CacheOptions { get; set; } = new HybridCacheAdvancedOptions(null);
+            internal HybridCacheAdvancedOptions CacheOptions { get; set; } = new HybridCacheAdvancedOptions("","");
 
             internal bool UseMetaStore { get; set; }
             public int Seed { get; set; }
@@ -413,6 +299,11 @@ namespace Imazen.HybridCache.Benchmark
             public int RebootCount { get; set; } = 1;
             public int MaxLogEntries { get; set; } = 50;
             public bool Synchronous { get; set; }
+        }
+        private static IReLogger CreateReLogger(ITestLoggerFactory loggerFactory)
+        {
+            
+            return new ReLoggerFactory(loggerFactory, new ReLogStore(new ReLogStoreOptions())).CreateReLogger("HybridCache");
         }
         private static async Task TestRandom(TestParams options, CancellationToken cancellationToken)
         {
@@ -431,13 +322,10 @@ namespace Imazen.HybridCache.Benchmark
                 for (var reboot = 0; reboot < options.RebootCount; reboot++)
                 {
                     Console.WriteLine($"------------- Cache Reboot {reboot} ---------------");
-                    
                     var loggerFactory = TestLoggerFactory.Create();
-            
-                    var logger = loggerFactory.CreateLogger<HybridCache>();
-                    
+                    var logger = CreateReLogger(loggerFactory);
                     ICacheDatabase<ICacheDatabaseRecord> database = new MetaStore.MetaStore(options.MetaStoreOptions, options.CacheOptions, logger);
-                    HybridCache cache = new HybridCache(options.CacheOptions,database, logger);
+                    HybridCache cache = new HybridCache(database, options.CacheOptions,logger);
                     try
                     {
                         Console.Write("Starting cache...");
@@ -446,7 +334,7 @@ namespace Imazen.HybridCache.Benchmark
                         swStart.Stop();
                         Console.Write($"ready in {swStart.Elapsed}\r\n");
 
-                        await TestRandomInner(cache, options, loggerFactory, cancellationToken);
+                        await TestRandomInner(cache, options, logger, loggerFactory, cancellationToken);
 
                         if (options.DisplayLog)
                         {
@@ -493,30 +381,48 @@ namespace Imazen.HybridCache.Benchmark
             }
         }
 
-        private static async Task TestRandomInner(HybridCache cache, TestParams options, ITestLoggerFactory loggerFactory, CancellationToken cancellationToken)
+        private static async Task TestRandomInner(HybridCache cache, TestParams options, IReLogger logger, ITestLoggerFactory loggerFactory, CancellationToken cancellationToken)
         {
-
             var data = new byte[options.FileSize];
-            var dataSegment = new ArraySegment<byte>(data);
-            var contentType = "application/octet-stream";
+            var blobAttrs = new BlobAttributes()
+            {
+                ContentType = "application/octet-stream",
+                EstimatedBlobByteCount = options.FileSize
+            };
+            var blob = new MemoryBlob(data,blobAttrs, options.CreationTaskDelay,backingAllocationSize: options.FileSize);
+            
+            var latencyZone = new LatencyTrackingZone("TestBlobProvider", (int)(options.CreationTaskDelay + options.CreationThreadSleep).TotalMilliseconds, true);
+            var blobWrapper = new BlobWrapper(latencyZone, blob);
 
-            async Task<IStreamCacheInput> DataProvider(CancellationToken token)
+            async ValueTask<CodeResult<IBlobWrapper>> BlobProvider(IRequestSnapshot snapshot, CancellationToken token)
             {
                 if (options.CreationTaskDelay.Ticks > 0)
                 {
                     await Task.Delay(options.CreationTaskDelay, cancellationToken);
                 }
+
                 if (options.CreationThreadSleep.Ticks > 0)
                 {
                     Thread.Sleep(options.CreationThreadSleep);
                 }
-                return new StreamCacheInput(contentType, dataSegment).ToIStreamCacheInput();
+
+                return CodeResult<IBlobWrapper>.Ok(blobWrapper.ForkReference());
             }
 
+            // TODO: TestSingleCacheSync is not correct at all 
+            var harnessOptions = BlobCachingTestHarnessOptions.TestSingleCacheSync(cache, 
+                BlobProvider, logger);
+            
+            var harness = new BlobCachingTestHarness(harnessOptions);
+            
+            
+            await harness.StartAsync(cancellationToken);
+            logger.LogInformation("Test harness started");
+            
+   
             var random = new Random(options.Seed);
-            var tasks = new List<Task<Tuple<TimeSpan,string>>>();
-
-
+            var tasks = new List<Task<Tuple<TimeSpan,HttpStatus>>>();
+            
             var swTotal = Stopwatch.StartNew();
             for (var wave = 0; wave < options.RequestWaves; wave++)
             {
@@ -527,27 +433,46 @@ namespace Imazen.HybridCache.Benchmark
                 Console.Write("Wave {0}, {1} requests...", wave + 1, options.RequestCountPerWave);
                 var sw = Stopwatch.StartNew();
                 var memoryStreamManager =
-                    new RecyclableMemoryStreamManager(Math.Max(2, options.FileSize), 2, options.FileSize * 2 + 2);
+                    new RecyclableMemoryStreamManager(new RecyclableMemoryStreamManager.Options(){
+                        BlockSize = Math.Max(2, options.FileSize),
+                        LargeBufferMultiple = 2,
+                        MaximumBufferSize =options.FileSize * 2 + 2
+
+                    });
                 for (var ix = 0; ix < options.RequestCountPerWave; ix++)
                 {
-                    Func<Task<Tuple<TimeSpan,string>>> task = async () =>
+                    Func<Task<Tuple<TimeSpan,HttpStatus>>> task = async () =>
                     {
                         var whichFile = random.Next(options.FileCount);
                         var key = BitConverter.GetBytes(whichFile);
+                        var generatedFileName = "/" + Imazen.Common.Helpers.EncodingUtils.ToBase64U(key);
                         var itemSw = Stopwatch.StartNew();
-                        var cacheResult = await cache.GetOrCreateBytes(key, DataProvider, cancellationToken,
-                            options.RetrieveContentType);
-                        if (cacheResult.Data != null)
+                       
+                        var cacheResult =  await harness.RequestBlobWrapper(generatedFileName, cancellationToken: cancellationToken);
+                        if (cacheResult.TryUnwrapError(out var err))
                         {
-                            await using (cacheResult.Data)
-                            {
-                                await using var ms = memoryStreamManager.GetStream();
-                                await cacheResult.Data.CopyToAsync(ms, cancellationToken);
-                            }
+                            itemSw.Stop();
+                            logger.LogError("Error {0} fetching {1}", err, generatedFileName);
+                            itemSw.Stop();
+                            return new Tuple<TimeSpan, HttpStatus>(itemSw.Elapsed, err);
                         }
+                        else
+                        {
+                            using var blobWrapper = cacheResult.Unwrap();
+                            if (options.RetrieveContentType)
+                            {
+                                var _ = blobWrapper.Attributes.ContentType;
+                            }
+                            
+                            using var ms = memoryStreamManager.GetStream();
+                            using var consumable = await blobWrapper.GetConsumablePromise().IntoConsumableBlob();
+                            using var stream = consumable.BorrowStream(DisposalPromise.CallerDisposesStreamThenBlob);
+                            await stream.CopyToAsync(ms, 81920, cancellationToken);
+                            itemSw.Stop();
+                            return new Tuple<TimeSpan, HttpStatus>(itemSw.Elapsed, HttpStatus.Ok);
 
-                        itemSw.Stop();
-                        return new Tuple<TimeSpan, string>(itemSw.Elapsed, cacheResult.Status);
+                        }
+                        
                     };
                     if (options.Synchronous)
                     {
@@ -556,14 +481,17 @@ namespace Imazen.HybridCache.Benchmark
                     }
                     else
                     {
-                        tasks.Add(Task.Run(task, cancellationToken));
+                        tasks.Add(Task.Run(task,cancellationToken));
                     }
                 }
 
-                await Task.WhenAll(tasks);
+                if (!options.Synchronous)
+                {
+                    await Task.WhenAll(tasks);
+                }
                 sw.Stop();
                 var swAsync = Stopwatch.StartNew();
-                await cache.AwaitEnqueuedTasks();
+                await harness.AwaitEnqueuedTasks();
                 swAsync.Stop();
                 Console.WriteLine("completed in {0}, plus {1} for async tasks. ", sw.Elapsed, swAsync.Elapsed);
                 PrintDiskUtilization(options);
@@ -575,8 +503,8 @@ namespace Imazen.HybridCache.Benchmark
             Console.WriteLine();
 
             // Accumulate results
-            var resultCounts = new Dictionary<string, int>();
-            var resultTimes = new Dictionary<string, List<TimeSpan>>();
+            var resultCounts = new Dictionary<HttpStatus, int>();
+            var resultTimes = new Dictionary<HttpStatus, List<TimeSpan>>();
             foreach (var t in tasks)
             {
                 var key = t.Result.Item2;

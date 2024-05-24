@@ -15,4 +15,8 @@
       <PackageReference Include="Microsoft.IO.RecyclableMemoryStream" Version="3.*" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Compile Remove="BenchHarness.cs" />
+    </ItemGroup>
+
 </Project>
