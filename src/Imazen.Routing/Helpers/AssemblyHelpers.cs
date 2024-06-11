@@ -65,8 +65,14 @@ internal static class AssemblyHelpers
                 var fileVersion = a.TryGetFirstAttribute<AssemblyFileVersionAttribute>(ref error)?.Version;
                 var infoVersion = a.TryGetFirstAttribute<AssemblyInformationalVersionAttribute>(ref error)
                     ?.InformationalVersion;
-                var buildDate = a.TryGetFirstAttribute<BuildDateAttribute>(ref error)?.Value;
-                var commit = a.TryGetFirstAttribute<CommitAttribute>(ref error)?.Value;
+                var buildDate = a.TryGetFirstAttribute<BuildDateAttribute>(ref error)?.Value
+#pragma warning disable CS0618 // Type or member is obsolete
+                                ?? a.TryGetFirstAttribute<Imazen.Common.Licensing.BuildDateAttribute>(ref error)?.Value;
+#pragma warning restore CS0618 // Type or member is obsolete
+                var commit = a.TryGetFirstAttribute<CommitAttribute>(ref error)?.Value 
+#pragma warning disable CS0618 // Type or member is obsolete
+                             ?? a.TryGetFirstAttribute<Imazen.Common.Licensing.CommitAttribute>(ref error)?.Value;
+#pragma warning restore CS0618 // Type or member is obsolete
                 var nugetPackageName = a.TryGetFirstAttribute<NugetPackageAttribute>(ref error)?.PackageName;
                 return new AssemblyVersionInfo
                 {
@@ -283,7 +289,10 @@ internal static class AssemblyHelpers
 
     public static string? GetBuildDate(this Assembly a)
     {
-        return GetFirstAttribute<BuildDateAttribute>(a)?.Value;
+        return GetFirstAttribute<BuildDateAttribute>(a)?.Value 
+#pragma warning disable CS0618 // Type or member is obsolete
+            ?? GetFirstAttribute<Imazen.Common.Licensing.BuildDateAttribute>(a)?.Value;
+#pragma warning restore CS0618 // Type or member is obsolete
     }
 
     public static string[]? GetVersionedWithAssemblies(this Assembly a)
@@ -293,7 +302,10 @@ internal static class AssemblyHelpers
 
     public static string? GetCommit(this Assembly a)
     {
-        return GetFirstAttribute<CommitAttribute>(a)?.Value;
+        return GetFirstAttribute<CommitAttribute>(a)?.Value 
+#pragma warning disable CS0618 // Type or member is obsolete
+               ?? GetFirstAttribute<Imazen.Common.Licensing.CommitAttribute>(a)?.Value;
+#pragma warning restore CS0618 // Type or member is obsolete
     }
 
     // Get nuget package name for an assembly
