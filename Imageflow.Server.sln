@@ -22,11 +22,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Imazen.Common", "src\Imazen.Common\Imazen.Common.csproj", "{49BDDBEE-3385-4B1D-B7C1-76A893F25C00}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Imazen.DiskCache", "src\Imazen.DiskCache\Imazen.DiskCache.csproj", "{EF8E2C18-430F-4EFB-940C-D6CCB6EBF5E8}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Imageflow.Server", "src\Imageflow.Server\Imageflow.Server.csproj", "{6D0B91A9-A1BC-4E2B-8A74-0F27C176B3F3}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Imageflow.Server.DiskCache", "src\Imageflow.Server.DiskCache\Imageflow.Server.DiskCache.csproj", "{47AE7207-8AF6-43C2-88C0-BC6362840566}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Imageflow.Server.Example", "examples\Imageflow.Server.Example\Imageflow.Server.Example.csproj", "{5EDA87AF-34CE-46BF-A847-C06E546E7CB9}"
 EndProject
@@ -78,18 +74,10 @@ Global
 		{49BDDBEE-3385-4B1D-B7C1-76A893F25C00}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{49BDDBEE-3385-4B1D-B7C1-76A893F25C00}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{49BDDBEE-3385-4B1D-B7C1-76A893F25C00}.Release|Any CPU.Build.0 = Release|Any CPU
-		{EF8E2C18-430F-4EFB-940C-D6CCB6EBF5E8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{EF8E2C18-430F-4EFB-940C-D6CCB6EBF5E8}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{EF8E2C18-430F-4EFB-940C-D6CCB6EBF5E8}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{EF8E2C18-430F-4EFB-940C-D6CCB6EBF5E8}.Release|Any CPU.Build.0 = Release|Any CPU
 		{6D0B91A9-A1BC-4E2B-8A74-0F27C176B3F3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{6D0B91A9-A1BC-4E2B-8A74-0F27C176B3F3}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6D0B91A9-A1BC-4E2B-8A74-0F27C176B3F3}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6D0B91A9-A1BC-4E2B-8A74-0F27C176B3F3}.Release|Any CPU.Build.0 = Release|Any CPU
-		{47AE7207-8AF6-43C2-88C0-BC6362840566}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{47AE7207-8AF6-43C2-88C0-BC6362840566}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{47AE7207-8AF6-43C2-88C0-BC6362840566}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{47AE7207-8AF6-43C2-88C0-BC6362840566}.Release|Any CPU.Build.0 = Release|Any CPU
 		{5EDA87AF-34CE-46BF-A847-C06E546E7CB9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{5EDA87AF-34CE-46BF-A847-C06E546E7CB9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5EDA87AF-34CE-46BF-A847-C06E546E7CB9}.Release|Any CPU.ActiveCfg = Release|Any CPU
