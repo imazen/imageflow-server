@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using Imazen.Abstractions.Internal;
+using Imazen.Routing.Helpers;
 
 namespace Imazen.Routing.Matching;
 
@@ -14,6 +15,50 @@ public record CharacterClass(
     ReadOnlyCollection<CharacterClass.CharRange> Ranges,
     ReadOnlyCollection<char> Characters)
 {
+
+    public CharacterClass ToOrdinalCaseInsensitive()
+    {
+        // For any characters or ranges that are in the ASCII range, we can add the lowercase and uppercase versions
+        var newRanges = new List<CharRange>(Ranges.Count + 1);
+        foreach (var range in Ranges)
+        {
+            if (range.Start >= 'A' && range.End <= 'Z')
+            {
+                newRanges.AddIfUnique(new CharRange((char)(range.Start + 32), (char)(range.End + 32)));
+            }
+            else if (range.Start >= 'a' && range.End <= 'z')
+            {
+                newRanges.AddIfUnique(new CharRange((char)(range.Start - 32), (char)(range.End - 32)));
+            }
+            else
+            {
+                newRanges.AddIfUnique(range);
+            }
+        }
+        // Add the lowercase and uppercase versions of the characters
+        var newChars = new List<char>(Characters.Count * 2);
+        foreach (var c in Characters)
+        {
+            // No need to add if it's covered by a range already
+            if (WithinRanges(c, Ranges))
+            {
+                continue;
+            }
+            if (c >= 'A' && c <= 'Z')
+            {
+                newChars.AddIfUnique((char)(c + 32));
+            }
+            else if (c >= 'a' && c <= 'z')
+            {
+                newChars.AddIfUnique((char)(c - 32));
+            }
+            else
+            {
+                newChars.AddIfUnique(c);
+            }
+        }
+        return new CharacterClass(IsNegated, new ReadOnlyCollection<CharRange>(newRanges), new ReadOnlyCollection<char>(newChars));
+    }
     public override string ToString()
     {
         // 5 is our guess on escaped chars
@@ -58,6 +103,15 @@ public record CharacterClass(
         }
         return false;
     }
+    private static bool WithinRanges(char c, ICollection<CharRange>? ranges)
+    {
+        if (ranges is null) return false;
+        foreach (var range in ranges)
+        {
+            if (c >= range.Start && c <= range.End) return true;
+        }
+        return false;
+    }
  
     
     private static ulong HashSpan(ReadOnlySpan<char> span)
@@ -87,8 +141,15 @@ public record CharacterClass(
         }
         return default;
     }
-    
-    
+
+    public static CharacterClass ParseInterned(string syntax)
+    {
+        if (!TryParseInterned(syntax.AsMemory(), true, out var result, out var error))
+        {
+            throw new ArgumentException($"Failed to parse character class '{syntax}': {error}");
+        }
+        return result!;
+    }
     public static bool TryParseInterned(ReadOnlyMemory<char> syntax, bool storeIfMissing,
         [NotNullWhen(true)] out CharacterClass? result,
         [NotNullWhen(false)] out string? error)
@@ -172,7 +233,21 @@ public record CharacterClass(
     private static readonly char[] SuspiciousCharsToEscape = ['d', 'D', 's', 'S', 'w', 'W', 'b', 'B'];
 
     private static readonly char[] ValidCharsToEscape =
-        ['t', 'n', 'r', 'f', 'v', '0', '[', ']', '\\', '-', '^', ',', '(', ')', '{', '}', '|'];
+        ['t', 'n', 'r', 'f', 'v', '0', '[', ']', '\\', '-', '^', ',', '(', ')', '{', '}', '|', '.','+','*', '/', '?'];
+    
+    private static char MapEscapedChar(char c)
+    {
+        return c switch
+        {
+            't' => '\t',
+            'n' => '\n',
+            'r' => '\r',
+            'f' => '\f',
+            'v' => '\v',
+            '0' => '\0',
+            _ => c
+        };
+    }
 
     private static readonly LexToken ControlDashToken = new LexToken(LexTokenType.ControlDash, '-');
 
@@ -184,9 +259,11 @@ public record CharacterClass(
             var c = syntax.Span[i];
             if (c == '\\')
             {
-                if (i == syntax.Length - 1)
+                if (i + 1 >= syntax.Length)
                 {
                     yield return new LexToken(LexTokenType.DanglingEscape, '\\');
+                    i++;
+                    continue;
                 }
                 var c2 = syntax.Span[i + 1];
 
@@ -199,7 +276,8 @@ public record CharacterClass(
 
                 if (ValidCharsToEscape.Contains(c2))
                 {
-                    yield return new LexToken(LexTokenType.EscapedCharacter, c2);
+                    
+                    yield return new LexToken(LexTokenType.EscapedCharacter, MapEscapedChar(c2));
                     i += 2;
                     continue;
                 }
@@ -245,6 +323,7 @@ public record CharacterClass(
 
         var tokens = LexInner(syntax).ToList();
         // Reject if we have dangling escape, incorrectly escaped character, or suspicious escaped character
+      
         if (tokens.Any(t => t.Type is LexTokenType.DanglingEscape))
         {
             error = "Dangling backslash in character class";
@@ -268,7 +347,13 @@ public record CharacterClass(
             result = default;
             return false;
         }
-
+        // Also if we have a SingleCharacter ] in the middle of the syntax
+        if (tokens.Any(t => t.Type is LexTokenType.SingleCharacter && t.Value == ']'))
+        {
+            error = "Character ']' cannot be used in the middle of a character class unless escaped";
+            result = default;
+            return false;
+        }
         // Search for ranges
         int indexOfDash = tokens.IndexOf(ControlDashToken);
         while (indexOfDash != -1)
@@ -295,7 +380,7 @@ public record CharacterClass(
             }
 
             ranges ??= new List<CharRange>();
-            ranges.Add(new CharRange(start, end));
+            ranges.AddIfUnique(new CharRange(start, end));
             // Mutate the collection and re-search
             tokens.RemoveRange(indexOfDash - 1, 3);
             indexOfDash = tokens.IndexOf(ControlDashToken);
@@ -306,21 +391,20 @@ public record CharacterClass(
         {
             if (token.Type is LexTokenType.SingleCharacter or LexTokenType.EscapedCharacter)
             {
-                characters ??= [];
-                characters.Add(token.Value);
+                characters ??= new List<char>();
+                characters.AddIfUnique(token.Value);
+                
             }
             else if (token.Type is LexTokenType.PredefinedClass)
             {
                 if (token.Value == 'w')
                 {
                     ranges ??= [];
-                    ranges.AddRange(new[]
-                    {
-                        new CharRange('a', 'z'), new CharRange('A', 'Z'),
-                        new CharRange('0', '9')
-                    });
+                    ranges.AddIfUnique(new CharRange('a', 'z'));
+                    ranges.AddIfUnique(new CharRange('A', 'Z'));
+                    ranges.AddIfUnique(new CharRange('0', '9'));
                     characters ??= [];
-                    characters.Add('_');
+                    characters.AddIfUnique('_');
                 }
                 else
                 {
@@ -332,6 +416,12 @@ public record CharacterClass(
                 throw new InvalidOperationException($"Unexpected token type {token.Type}");
             }
         }
+        // We  remove chars that are within ranges
+        if (characters is not null)
+        {
+            characters.RemoveAll(c => WithinRanges(c, ranges));
+        }
+        
 
         characters ??= [];
         ranges ??= [];
