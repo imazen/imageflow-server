@@ -139,11 +139,20 @@ internal static partial class ExpressionParsingHelpers
         for (var i = 0; i < conditionNameEnds; i++)
         {
             var c = text[i];
-            if (c != '_' && c != '-' && c is < 'a' or > 'z')
+            if (i == 0)
             {
-                error = $"Invalid character '{text[i]}' (a-z-_ only) in condition name. Condition expression: '{text.ToString()}'";
-                return false;
+                if (c is >= 'a' and <= 'z')
+                {
+                    continue;
+                }
+            } else if (c is >= 'a' and <= 'z' or >= '0' and <= '9' or '_' or '-')
+            {
+                continue;
             }
+            
+            error = $"Invalid character '{text[i]}' (a-z)(a-z0-9-_ only) in condition name. Condition expression: '{text.ToString()}'";
+            return false;
+            
         }
         error = null;
         return true;
