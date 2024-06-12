@@ -79,7 +79,9 @@ internal static class StringConditionMatchingHelpers
     }
 #if NET6_0_OR_GREATER
     internal static bool IsInt32(this ReadOnlySpan<char> chars) => int.TryParse(chars, out _);
+    internal static bool IsU32(this ReadOnlySpan<char> chars) => uint.TryParse(chars, out _);
     internal static bool IsInt64(this ReadOnlySpan<char> chars) => long.TryParse(chars, out _);
+    internal static bool IsU64(this ReadOnlySpan<char> chars) => ulong.TryParse(chars, out _);
     internal static bool IsInIntegerRangeInclusive(this ReadOnlySpan<char> chars, int? min, int? max)
     {
         if (!int.TryParse(chars, out var value)) return false;
@@ -92,7 +94,9 @@ internal static class StringConditionMatchingHelpers
 #else
     internal static bool IsGuid(this ReadOnlySpan<char> chars) => Guid.TryParse(chars.ToString(), out _);
     internal static bool IsInt32(this ReadOnlySpan<char> chars) => int.TryParse(chars.ToString(), out _);
+    internal static bool IsU32(this ReadOnlySpan<char> chars) => uint.TryParse(chars.ToString(), out _);
     internal static bool IsInt64(this ReadOnlySpan<char> chars) => long.TryParse(chars.ToString(), out _);
+    internal static bool IsU64(this ReadOnlySpan<char> chars) => ulong.TryParse(chars.ToString(), out _);
     internal static bool IsInIntegerRangeInclusive(this ReadOnlySpan<char> chars, int? min, int? max)
     {
         if (!int.TryParse(chars.ToString(), out var value)) return false;

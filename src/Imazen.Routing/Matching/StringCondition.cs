@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using EnumFastToStringGenerated;
@@ -28,6 +29,10 @@ public readonly record struct StringCondition
         this.int1 = int1;
         this.int2 = int2;
     }
+    
+    internal static StringCondition ExcludeForwardSlash = new (StringConditionKind.CharClass, null, null, 
+        new CharacterClass(true, new ReadOnlyCollection<CharacterClass.CharRange>(new CharacterClass.CharRange[]{}), 
+            new ReadOnlyCollection<char>(new[] {'/'})), null, null, null);
     private static StringCondition? TryCreate(out string? error, StringConditionKind stringConditionKind, char? c, string? str, CharacterClass? charClass, string[]? strArray, int? int1, int? int2)
     {
         var condition = new StringCondition(stringConditionKind, c, str, charClass, strArray, int1, int2);
@@ -41,6 +46,11 @@ public readonly record struct StringCondition
             return null;
         }
         return condition;
+    }
+
+    internal static bool IsReservedName(string name)
+    {
+        return TryGetKindsForConditionAlias(name, true, out _);
     }
     private static bool TryGetKindsForConditionAlias(string name, bool useIgnoreCaseVariant, [NotNullWhen(true)] out IReadOnlyCollection<StringConditionKind>? kinds)
     {
@@ -106,7 +116,8 @@ public readonly record struct StringCondition
         var obj = TryParseArg(args[0], wantsFirstArgNumeric, firstOptional, out error);
         if (error != null)
         {
-            throw new InvalidOperationException($"Error parsing 1st argument: {error}");
+            error = $"Error parsing 1st argument: {error}";
+            return null;
         }
         var twoIntArgs = HasFlagsFast(expectedArgs, ExpectedArgs.Int321OrInt322);
         var intArgAndClassArg = HasFlagsFast(expectedArgs, ExpectedArgs.Int321 | ExpectedArgs.CharClass);
@@ -217,7 +228,14 @@ public readonly record struct StringCondition
             error = $"Unexpected char class argument for condition '{name}'; received '{args[0]}'.";
             return null;
         }
-        throw new NotImplementedException("Unexpected argument type");
+
+        if (twoIntArgs && obj is null)
+        {
+            var int2 = obj2 as int?;
+            error = null;
+            return new StringCondition(stringConditionKind, null, null, null, null, null, int2);
+        }
+        throw new NotImplementedException("Unexpected argument type: " + obj?.GetType());
     }
     
     private static string? TryParseString(ReadOnlySpan<char> arg, out string? error)
@@ -351,6 +369,8 @@ public readonly record struct StringCondition
        StringConditionKind.Hexadecimal => text.IsHexadecimal(),
        StringConditionKind.Int32 => text.IsInt32(),
        StringConditionKind.Int64 => text.IsInt64(),
+       StringConditionKind.UInt32 => text.IsU32(),
+       StringConditionKind.UInt64 => text.IsU64(),
        StringConditionKind.EndsWithSupportedImageExtension => context.EndsWithSupportedImageExtension(text),
        StringConditionKind.IntegerRange => text.IsInIntegerRangeInclusive(int1, int2),
        StringConditionKind.Guid => text.IsGuid(),
@@ -377,7 +397,9 @@ public readonly record struct StringCondition
        StringConditionKind.CharClass => text.IsCharClass(charClass!),
        StringConditionKind.StartsWithNCharClass => text.StartsWithNCharClass(charClass!, int1!.Value),
        StringConditionKind.StartsWithCharClass => text.StartsWithCharClass(charClass!),
+       StringConditionKind.StartsWithCharClassIgnoreCase => text.StartsWithCharClass(charClass!), // TODO: doesn't ignore case, but we transform calls
        StringConditionKind.EndsWithCharClass => text.EndsWithCharClass(charClass!),
+       StringConditionKind.EndsWithCharClassIgnoreCase => text.EndsWithCharClass(charClass!), // TODO: doesn't ignore case, but we transform calls
        StringConditionKind.Uninitialized => throw new InvalidOperationException("Uninitialized StringCondition was evaluated"),
        _ => throw new NotImplementedException()
    };
@@ -491,9 +513,13 @@ public readonly record struct StringCondition
               StringConditionKind.Hexadecimal => ExpectedArgs.None,
               StringConditionKind.Int32 => ExpectedArgs.None,
               StringConditionKind.Int64 => ExpectedArgs.None,
+              StringConditionKind.UInt32 => ExpectedArgs.None,
+              StringConditionKind.UInt64 => ExpectedArgs.None,
               StringConditionKind.Guid => ExpectedArgs.None,
               StringConditionKind.StartsWithCharClass => ExpectedArgs.CharClass,
+              StringConditionKind.StartsWithCharClassIgnoreCase => ExpectedArgs.CharClass,
               StringConditionKind.EndsWithCharClass => ExpectedArgs.CharClass,
+              StringConditionKind.EndsWithCharClassIgnoreCase => ExpectedArgs.CharClass,
               StringConditionKind.EndsWithSupportedImageExtension => ExpectedArgs.None,
               StringConditionKind.Uninitialized => ExpectedArgs.None,
               StringConditionKind.True => ExpectedArgs.None,
@@ -504,6 +530,7 @@ public readonly record struct StringCondition
    {
        throw new NotImplementedException();
    }
+   
    
    // ToString should return function call syntax 
    public override string ToString()
@@ -558,10 +585,13 @@ internal static class StringConditionKindAliases
         return name switch
         {
             "int" => "int32",
+            "uint" => "uint32",
             "hexadecimal" => "hex",
             "integer" => "int32",
             "long" => "int64",
             "i32" => "int32",
+            "u32" => "uint32",
+            "u64" => "uint64",
             "i64" => "int64",
             "integer-range" => "range",
             "only" => "allowed-chars",
@@ -616,6 +646,10 @@ public enum StringConditionKind: byte
     Int32,
     [Display(Name = "int64")]
     Int64,
+    [Display(Name = "uint32")]
+    UInt32,
+    [Display(Name = "uint64")]
+    UInt64,
     [Display(Name = "range")]
     IntegerRange,
     [Display(Name = "allowed-chars")]
@@ -641,6 +675,8 @@ public enum StringConditionKind: byte
     [Display(Name = "starts-with")]
     StartsWithCharClass,
     [Display(Name = "starts-with-i")]
+    StartsWithCharClassIgnoreCase,
+    [Display(Name = "starts-with-i")]
     StartsWithOrdinalIgnoreCase,
     [Display(Name = "starts-with")]
     StartsWithAnyOrdinal,
@@ -652,6 +688,8 @@ public enum StringConditionKind: byte
     EndsWithChar,
     [Display(Name = "ends-with")]
     EndsWithCharClass,
+    [Display(Name = "ends-with-i")]
+    EndsWithCharClassIgnoreCase,
     [Display(Name = "ends-with-i")]
     EndsWithOrdinalIgnoreCase,
     [Display(Name = "ends-with")]

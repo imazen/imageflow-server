@@ -5,7 +5,7 @@ using System.Text.RegularExpressions;
 
 namespace Imazen.Routing.Matching;
 
-
+// TODO: split into data used during runtime and during parsing..
 public record MatchingContext
 {
     public bool OrdinalIgnoreCase { get; init; }
@@ -21,6 +21,11 @@ public record MatchingContext
         OrdinalIgnoreCase = false,
         SupportedImageExtensions = new []{"jpg", "jpeg", "png", "gif", "webp"}
     };
+
+    /// <summary>
+    /// If true, all segments will capture the / character by default. If false, segments must specify {:**} to capture slashes.
+    /// </summary>
+    public bool CaptureSlashesByDefault { get; init; }
 }
 
 public partial record class MatchExpression
@@ -181,6 +186,22 @@ public partial record class MatchExpression
         return true;
     }
     
+    public MatchExpressionSuccess MatchOrThrow(in MatchingContext context, in ReadOnlyMemory<char> input)
+    {
+        var matched = this.TryMatchVerbose(context, input, out var result, out var error);
+        if (!matched)
+        {
+            throw new ArgumentException($"Expression {this} incorrectly failed to match {input} with error {error}");
+        }
+        return result!.Value;
+    }
+    
+    public Dictionary<string,string> CaptureDictOrThrow(in MatchingContext context, string input)
+    {
+        var match = MatchOrThrow(context, input.AsMemory());
+        return match.Captures!.ToDictionary(x => x.Name, x => x.Value.ToString());
+    }
+    
     public bool TryMatch(in MatchingContext context, in ReadOnlyMemory<char> input, [NotNullWhen(true)] out MatchExpressionSuccess? result,
         [NotNullWhen(false)] out string? error, [NotNullWhen(false)] out int? failingSegmentIndex)
     {
@@ -206,6 +227,7 @@ public partial record class MatchExpression
             var boundaryStarts = -1;
             var boundaryFinishes = -1;
             var foundBoundaryOrEnd = false;
+            SegmentBoundary foundBoundary = default;
             var closingBoundary = false;
             // No more segments to try?
             if (currentSegment >= Segments.Length)
@@ -215,6 +237,7 @@ public partial record class MatchExpression
                     // We still have an open segment, so we close it and capture it.
                     boundaryStarts = boundaryFinishes = inputSpan.Length;
                     foundBoundaryOrEnd = true;
+                    foundBoundary = default;
                     closingBoundary = true;
                 }else if (remainingInput.Length == 0)
                 {
@@ -282,10 +305,11 @@ public partial record class MatchExpression
                     boundaryStarts = s == -1 ? -1 : charactersConsumed + s;
                     boundaryFinishes = f == -1 ? -1 : charactersConsumed + f;
                     foundBoundaryOrEnd = searchResult;
+                    foundBoundary = searchSegment;
                 }
                 if (!foundBoundaryOrEnd)
                 {
-                    
+                    foundBoundary = default;
                     if (Segments[currentSegment].IsOptional)
                     {
                         // We didn't find the segment, but it's optional, so we can skip it.
@@ -318,7 +342,12 @@ public partial record class MatchExpression
                     var variableStart = openSegment.StartsOn.IncludesMatchingTextInVariable
                         ? openSegmentAbsoluteStart
                         : openSegmentAbsoluteEnd;
-                    var variableEnd = boundaryStarts;
+
+                    var variableEnd = (foundBoundary != default && foundBoundary.IsEndingBoundary &&
+                                       foundBoundary.IncludesMatchingTextInVariable)
+                        ? boundaryFinishes
+                        : boundaryStarts;
+                    
                     var conditionsOk = openSegment.ConditionsMatch(context, inputSpan[variableStart..variableEnd]);
                     if (!conditionsOk)
                     {
@@ -431,9 +460,9 @@ internal readonly record struct
         }
         // it's a literal
         // Check for invalid characters like &
-        if (expr.IndexOfAny(new[] {'*', '?'}) != -1)
+        if (expr.IndexOf('*') != -1 || expr.IndexOf('?') != -1)
         {
-            error = "Literals cannot contain * or ? operators, they must be enclosed in {} such as {name:?} or {name:*:?}";
+            error = "Literals cannot contain * or ? operators, they must be enclosed in {} such as {name:?} or {name:**:?}";
             segment = null;
             return false;
         }
@@ -534,11 +563,20 @@ internal readonly record struct
         var makeOptional = (globChars & ExpressionParsingHelpers.GlobChars.Optional) ==
                            ExpressionParsingHelpers.GlobChars.Optional
                            || conditionSpan.Is("optional");
+        var hasDoubleStar = (globChars & ExpressionParsingHelpers.GlobChars.DoubleStar) ==
+                            ExpressionParsingHelpers.GlobChars.DoubleStar;
         if (makeOptional)
         {
             segmentStartLogic ??= SegmentBoundary.DefaultStart;
             segmentStartLogic = segmentStartLogic.Value.SetOptional(true);
         }
+        if (!hasDoubleStar && context.CaptureSlashesByDefault)
+        {
+            conditions ??= new List<StringCondition>();
+            // exclude '/' from chars
+            conditions.Add(StringCondition.ExcludeForwardSlash);
+        }
+        
 
         // We ignore the glob chars, they don't constrain behavior any.
         if (globChars != ExpressionParsingHelpers.GlobChars.None
@@ -554,6 +592,8 @@ internal readonly record struct
         }
 
         var functionName = functionNameMemory.ToString() ?? throw new InvalidOperationException("Unreachable code");
+
+        
         var conditionConsumed = false;
         if (args is { Count: 1 })
         {
@@ -570,7 +610,7 @@ internal readonly record struct
                 {
                     if (segmentEndLogic is { HasDefaultEndWhen: false })
                     {
-                        error = $"The segment {segmentText.ToString()} has conflicting end conditions; do not mix equals and ends-with and suffix conditions";
+                        error = $"The segment {segmentText.ToString()} has conflicting end conditions; do not mix equals, length, ends-with, and suffix conditions";
                         return false;
                     }
                     segmentEndLogic = sb;
@@ -597,6 +637,7 @@ internal readonly record struct
                 //TODO: add more context to error
                 return false;
             }
+            
             conditions.Add(condition.Value);
         }
         return true;
@@ -657,7 +698,8 @@ internal readonly record struct SegmentBoundary
         IgnoreCase = 16,
         IncludeInVar = 32,
         EndingBoundary = 64,
-        SegmentOptional = 128
+        SegmentOptional = 128,
+        FixedLength = 256
     }
 
     private static SegmentBoundaryFunction FromString(string name, bool useIgnoreCaseVariant, bool segmentOptional)
@@ -669,6 +711,7 @@ internal readonly record struct SegmentBoundary
             "ends_with" or "ends-with" or "ends" => SegmentBoundaryFunction.StartsWith | SegmentBoundaryFunction.IncludeInVar | SegmentBoundaryFunction.EndingBoundary,
             "prefix" => SegmentBoundaryFunction.StartsWith,
             "suffix" => SegmentBoundaryFunction.StartsWith | SegmentBoundaryFunction.EndingBoundary,
+            "len" or "length" => SegmentBoundaryFunction.FixedLength | SegmentBoundaryFunction.EndingBoundary | SegmentBoundaryFunction.IncludeInVar,
             _ => SegmentBoundaryFunction.None
         };
         if (fn == SegmentBoundaryFunction.None)
@@ -681,6 +724,11 @@ internal readonly record struct SegmentBoundary
         }
         if (segmentOptional)
         {
+            if (fn == SegmentBoundaryFunction.FixedLength)
+            {
+                // When a fixed length segment is optional, we don't make a end boundary for it.
+                return SegmentBoundaryFunction.None;
+            }
             fn |= SegmentBoundaryFunction.SegmentOptional;
         }
         return fn;
@@ -688,6 +736,8 @@ internal readonly record struct SegmentBoundary
 
     public static SegmentBoundary Literal(ReadOnlySpan<char> literal, bool ignoreCase) =>
         StringEquals(literal, ignoreCase, false);
+    
+    
 
     public static SegmentBoundary LiteralEnd = new(Flags.EndingBoundary, When.SegmentFullyMatchedByStartBoundary, null, '\0');
 
@@ -745,17 +795,20 @@ internal readonly record struct SegmentBoundary
     private static bool TryCreate(SegmentBoundaryFunction function, ReadOnlySpan<char> arg0, out SegmentBoundary? result)
     {
         var argType = ExpressionParsingHelpers.GetArgType(arg0);
+        
         if ((argType & ExpressionParsingHelpers.ArgType.String) == 0)
         {
             result = null;
             return false;
         }
+
         var includeInVar = (function & SegmentBoundaryFunction.IncludeInVar) == SegmentBoundaryFunction.IncludeInVar;
         var ignoreCase = (function & SegmentBoundaryFunction.IgnoreCase) == SegmentBoundaryFunction.IgnoreCase;
         var startsWith = (function & SegmentBoundaryFunction.StartsWith) == SegmentBoundaryFunction.StartsWith;
         var equals = (function & SegmentBoundaryFunction.Equals) == SegmentBoundaryFunction.Equals;
         var segmentOptional = (function & SegmentBoundaryFunction.SegmentOptional) == SegmentBoundaryFunction.SegmentOptional;
         var endingBoundary = (function & SegmentBoundaryFunction.EndingBoundary) == SegmentBoundaryFunction.EndingBoundary;
+        var segmentFixedLength = (function & SegmentBoundaryFunction.FixedLength) == SegmentBoundaryFunction.FixedLength;
         if (startsWith)
         {
             result = StartWith(arg0, ignoreCase, includeInVar, endingBoundary).SetOptional(segmentOptional);
@@ -766,6 +819,25 @@ internal readonly record struct SegmentBoundary
             if (endingBoundary) throw new InvalidOperationException("Equals cannot be an ending boundary");
             result = StringEquals(arg0, ignoreCase, includeInVar).SetOptional(segmentOptional);
             return true;
+        }
+        if (segmentFixedLength)
+        {
+            if (segmentOptional)
+            {
+                // We don't support optional fixed length segments at this time.
+                result = null;
+                return false;
+            }
+            // len requires a number
+            if ((argType & ExpressionParsingHelpers.ArgType.UnsignedInteger) > 0)
+            {
+                //parse the number into char
+                var len = int.Parse(arg0.ToString());
+                result = FixedLengthEnd(len);
+                return true;
+            }
+            result = null;
+            return false;
         }
         throw new InvalidOperationException("Unreachable code");
     }
@@ -801,7 +873,16 @@ internal readonly record struct SegmentBoundary
         return new(includeInVar ? Flags.IncludeMatchingTextInVariable : Flags.None,
             ordinalIgnoreCase ? When.EqualsOrdinalIgnoreCase : When.EqualsOrdinal, asSpan.ToString(), '\0');
     }
-
+    private static SegmentBoundary FixedLengthEnd(int length)
+    {
+        if (length < 1) throw new ArgumentOutOfRangeException(nameof(length)
+            , "Fixed length must be greater than 0");
+        if (length > char.MaxValue) throw new ArgumentOutOfRangeException(nameof(length)
+            , "Fixed length must be less than or equal to " + char.MaxValue);
+        return new SegmentBoundary(Flags.IncludeMatchingTextInVariable | Flags.EndingBoundary,
+            When.FixedLength
+            , null, (char)length);
+    }
     [Flags]
     private enum Flags : byte
     {
@@ -833,6 +914,7 @@ internal readonly record struct SegmentBoundary
         EqualsOrdinal,
         EqualsChar,
         EqualsOrdinalIgnoreCase,
+        FixedLength,
     }
 
 
@@ -858,6 +940,14 @@ internal readonly record struct SegmentBoundary
         if (text.Length == 0) return false;
         switch (On)
         {
+            case When.FixedLength:
+                if (text.Length >= this.Char)
+                {
+                    start = 0;
+                    end = this.Char;
+                    return true;
+                }
+                return false;
             case When.AtChar or When.EqualsChar:
                 if (text[0] == Char)
                 {
@@ -912,6 +1002,14 @@ internal readonly record struct SegmentBoundary
         if (text.Length == 0) return false;
         switch (On)
         {
+            case When.FixedLength:
+                if (text.Length >= this.Char)
+                {
+                    start = this.Char;
+                    end = this.Char;
+                    return true;
+                }
+                return false;
             case When.AtChar or When.EqualsChar:
                 var index = text.IndexOf(Char);
                 if (index == -1) return false;
@@ -959,10 +1057,15 @@ internal readonly record struct SegmentBoundary
                     ? (isStartBoundary ? "starts-with" : "ends-with")
                     : (isStartBoundary ? "prefix" : "suffix"),
             When.EqualsOrdinal or When.EqualsChar or When.EqualsOrdinalIgnoreCase => "equals",
+            When.FixedLength => $"len",
             _ => throw new InvalidOperationException("Unreachable code")
         };
         var ignoreCase = On is When.AtStringIgnoreCase or When.EqualsOrdinalIgnoreCase ? "-i" : "";
         var optional = (Behavior & Flags.SegmentOptional) != 0 ? "?": "";
+        if (On == When.FixedLength)
+        {
+            return $"{name}({(int)Char}){ignoreCase}{optional}";
+        }
         if (Chars != null)
         {
             name = $"{name}({Chars}){ignoreCase}{optional}";

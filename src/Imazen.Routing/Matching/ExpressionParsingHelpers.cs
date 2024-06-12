@@ -107,11 +107,12 @@ internal static partial class ExpressionParsingHelpers
     {
         if (name.Length == 0)
         {
-            error = "Don't use empty segment names, only null or valid";
+            error = "Don't use empty segment names, only null or valid (internal error, callers should filter empty names)";
             return false;
         }
         if (name.Contains('*') || name.Contains('?'))
         {
+            // Nullified by external logic, actually.
             error =
                 $"Invalid segment expression {{{segmentExpression.ToString()}}} Conditions and modifiers such as * and ? belong after the colon. Ex: {{name:*:?}} ";
             return false;
@@ -119,6 +120,11 @@ internal static partial class ExpressionParsingHelpers
         if (!ValidSegmentName().IsMatch(name))
         {
             error = $"Invalid name '{name}' in segment expression {{{segmentExpression.ToString()}}}. Names must start with a letter or underscore, and contain only letters, numbers, or underscores";
+            return false;
+        }
+        if (StringCondition.IsReservedName(name))
+        {
+            error = $"Did you forget to put : before your condition? '{name}' cannot be used as a variable name in {{{segmentExpression.ToString()}}} (for clarity), since it has a function.";
             return false;
         }
         error = null;
