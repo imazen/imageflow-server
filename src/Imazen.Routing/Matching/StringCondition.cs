@@ -30,9 +30,9 @@ public readonly record struct StringCondition
         this.int2 = int2;
     }
     
-    internal static StringCondition ExcludeForwardSlash = new (StringConditionKind.CharClass, null, null, 
+    internal static StringCondition ExcludeSlashes = new (StringConditionKind.CharClass, null, null, 
         new CharacterClass(true, new ReadOnlyCollection<CharacterClass.CharRange>(new CharacterClass.CharRange[]{}), 
-            new ReadOnlyCollection<char>(new[] {'/'})), null, null, null);
+            new ReadOnlyCollection<char>(new[] {'/','\\'})), null, null, null);
     private static StringCondition? TryCreate(out string? error, StringConditionKind stringConditionKind, char? c, string? str, CharacterClass? charClass, string[]? strArray, int? int1, int? int2)
     {
         var condition = new StringCondition(stringConditionKind, c, str, charClass, strArray, int1, int2);
@@ -594,7 +594,7 @@ internal static class StringConditionKindAliases
             "u64" => "uint64",
             "i64" => "int64",
             "integer-range" => "range",
-            "only" => "allowed-chars",
+            "only" => "allow",
             "starts-with-only" => "starts-with-chars",
             "len" => "length",
             "eq" => "equals",
@@ -655,7 +655,7 @@ public enum StringConditionKind: byte
     UInt64,
     [Display(Name = "range")]
     IntegerRange,
-    [Display(Name = "allowed-chars")]
+    [Display(Name = "allow")]
     CharClass,
     [Display(Name = "starts-with-chars")]
     StartsWithNCharClass,

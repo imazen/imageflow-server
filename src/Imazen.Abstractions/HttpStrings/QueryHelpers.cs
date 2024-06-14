@@ -48,7 +48,7 @@ public static class QueryHelpers
 
         return AddQueryString(uri, (IEnumerable<KeyValuePair<string, string?>>)queryString);
     }
-
+  
     /// <summary>
     /// Append the given query keys and values to the URI.
     /// </summary>
@@ -124,7 +124,7 @@ public static class QueryHelpers
     }
 
     /// <summary>
-    /// Parse a query string into its component key and value parts.
+    /// Parse a query string into its component key and value parts. Case-sensitive.
     /// </summary>
     /// <param name="queryString">The raw query string value, with or without the leading '?'.</param>
     /// <returns>A collection of parsed keys and values.</returns>

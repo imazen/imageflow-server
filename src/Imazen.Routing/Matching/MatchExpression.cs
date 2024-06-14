@@ -1,43 +1,629 @@
 using System.Collections;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.RegularExpressions;
+using Imazen.Abstractions.HttpStrings;
+using Imazen.Routing.Helpers;
+using Imazen.Routing.HttpAbstractions;
 
 namespace Imazen.Routing.Matching;
 
-// TODO: split into data used during runtime and during parsing..
 public record MatchingContext
 {
-    public bool OrdinalIgnoreCase { get; init; }
     public required IReadOnlyCollection<string> SupportedImageExtensions { get; init; }
     
-    internal static MatchingContext DefaultCaseInsensitive => new()
+    public bool VerboseErrors { get; init; } = true;
+    
+    internal static MatchingContext Default => new()
     {
-        OrdinalIgnoreCase = true,
         SupportedImageExtensions = new []{"jpg", "jpeg", "png", "gif", "webp"}
     };
-    internal static MatchingContext DefaultCaseSensitive => new()
-    {
-        OrdinalIgnoreCase = false,
-        SupportedImageExtensions = new []{"jpg", "jpeg", "png", "gif", "webp"}
-    };
+ 
+}
 
+public record ExpressionParsingOptions
+{
+    /// <summary>
+    /// Does not affect character classes.
+    /// </summary>
+    public bool OrdinalIgnoreCase { get; init; } = false;
+    
+    public bool AllowStarLiteral { get; init; } = false;
+    
+    public bool AllowQuestionLiteral { get; init; } = false;
+    // /// <summary>
+    // /// If true, all segments will capture the / character by default. If false, segments must specify {:**} to capture slashes.
+    // /// </summary>
+    // public bool CaptureSlashesByDefault { get; init; } = true;
+    //
+    internal static ExpressionParsingOptions SubtractFromFlags(List<string> flags, ExpressionParsingOptions defaults)
+    {
+        if (flags.Remove("ignore-case"))
+        {
+            defaults = defaults with { OrdinalIgnoreCase = true };
+        }
+        if (flags.Remove("allow-star-literal"))
+        {
+            defaults = defaults with { AllowStarLiteral = true };
+        }
+        if (flags.Remove("allow-question-literal"))
+        {
+            defaults = defaults with { AllowQuestionLiteral = true };
+        }
+        // if (flags.Remove("capture-slashes"))
+        // {
+        //     defaults = defaults with { CaptureSlashesByDefault = true };
+        // }
+        return defaults;
+    }
+    public static ExpressionParsingOptions ParseComplete(ReadOnlyMemory<char> expressionWithFlags, out ReadOnlyMemory<char> remainingExpression)
+    {
+        if (!ExpressionFlags.TryParseFromEnd(expressionWithFlags, out var expression, out var flags, out var error))
+        {
+            throw new ArgumentException(error, nameof(expressionWithFlags));
+        }
+        
+        var context = SubtractFromFlags(flags!, new ExpressionParsingOptions());
+        remainingExpression = expression;
+        if (flags!.Count > 0)
+        {
+            throw new ArgumentException($"Unrecognized flags: {string.Join(", ", flags)}", nameof(expressionWithFlags));
+        }
+        return context;
+    }
+}
+
+public record PathParsingOptions
+{
+    
+    internal ExpressionParsingOptions ToExpressionParsingOptions()
+    {
+        return new()
+        {
+            OrdinalIgnoreCase = OrdinalIgnoreCase,
+            AllowStarLiteral = AllowStarLiteral,
+            AllowQuestionLiteral = false,
+            //CaptureSlashesByDefault = CaptureSlashesByDefault
+        };
+    }
+    /// <summary>
+    /// Does not affect character classes.
+    /// </summary>
+    public bool OrdinalIgnoreCase { get; init; } = false;
+    
+    public bool AllowStarLiteral { get; init; } = false;
     /// <summary>
     /// If true, all segments will capture the / character by default. If false, segments must specify {:**} to capture slashes.
     /// </summary>
-    public bool CaptureSlashesByDefault { get; init; }
+    // public bool CaptureSlashesByDefault { get; init; } = false;
+    //
+    public static PathParsingOptions SubtractFromFlags(List<string> flags, PathParsingOptions defaults)
+    {
+        if (flags.Remove("path-ignore-case"))
+        {
+            defaults = defaults with { OrdinalIgnoreCase = true };
+        }
+        // if (flags.Remove("capture-slashes"))
+        // {
+        //     defaults = defaults with { CaptureSlashesByDefault = true };
+        // }
+        if (flags.Remove("allow-star-literal"))
+        {
+            defaults = defaults with { AllowStarLiteral = true };
+        }
+        return defaults;
+    }
+    
+    public static PathParsingOptions DefaultCaseInsensitive => new()
+    {
+        OrdinalIgnoreCase = true,
+    };
+    public static PathParsingOptions DefaultCaseSensitive => new()
+    {
+        OrdinalIgnoreCase = false,
+    };
 }
 
-public partial record class MatchExpression
+public record QueryParsingOptions
+{
+    public bool KeysOrdinalIgnoreCase { get; init; } = false;
+    public bool ValuesOrdinalIgnoreCase { get; init; } = false;
+    public bool AllowStarLiteral { get; init; } = false;
+    //public bool QueryValuesCaptureSlashes { get; init; } = false;
+    public bool ProhibitExcessQueryKeys { get; init; } = false;
+
+    
+    internal ExpressionParsingOptions ToExpressionParsingOptions()
+    {
+        return new()
+        {
+            OrdinalIgnoreCase = ValuesOrdinalIgnoreCase,
+            AllowStarLiteral = AllowStarLiteral,
+            AllowQuestionLiteral = true,
+            //CaptureSlashesByDefault = QueryValuesCaptureSlashes
+        };
+    }
+    public static QueryParsingOptions DefaultCaseInsensitive => new()
+    {
+        KeysOrdinalIgnoreCase = true,
+        ValuesOrdinalIgnoreCase = true,
+    };
+    
+    public static QueryParsingOptions DefaultCaseSensitive => new()
+    {
+        KeysOrdinalIgnoreCase = false,
+        ValuesOrdinalIgnoreCase = false,
+    };
+
+    public static QueryParsingOptions SubtractFromFlags(List<string> flags, QueryParsingOptions defaults)
+    {
+        if (flags.Remove("query-ignore-case"))
+        {
+            defaults = defaults with { KeysOrdinalIgnoreCase = true, ValuesOrdinalIgnoreCase = true };
+        }
+
+        if (flags.Remove("query-keys-ignore-case"))
+        {
+            defaults = defaults with { KeysOrdinalIgnoreCase = true };
+        }
+
+        if (flags.Remove("query-values-ignore-case"))
+        {
+            defaults = defaults with { ValuesOrdinalIgnoreCase = true };
+        }
+
+        // if (flags.Remove("query-values-capture-slashes"))
+        // {
+        //     defaults = defaults with { QueryValuesCaptureSlashes = true };
+        // }
+
+        if (flags.Remove("query-prohibit-excess"))
+        {
+            defaults = defaults with { ProhibitExcessQueryKeys = true };
+        }
+
+
+        if (flags.Remove("allow-star-literal"))
+        {
+            defaults = defaults with { AllowStarLiteral = true };
+        }
+
+        return defaults;
+    }
+}
+
+public record ReplacementOptions
+{
+    public bool DeleteExcessQueryKeys { get; init; } = false;
+    
+    public static ReplacementOptions SubtractFromFlags(List<string> flags)
+    {
+        var context = new ReplacementOptions();
+        if (flags.Remove("query-delete-excess"))
+        {
+            context = context with { DeleteExcessQueryKeys = true };
+        }
+        return context;
+    }
+    
+}
+public record ParsingOptions
+{
+    /// <summary>
+    /// If true, `?` will be allowed as a literal, and the query and path will be concatenated before being matched, and the combination must be completely captured.
+    /// QueryParsingOptions will be ignored.
+    /// </summary>
+    public bool RawQueryAndPath { get; init; } = false;
+    /// <summary>
+    /// If true, the query keys will be sorted alphabetically before being concatenated and matched.
+    /// </summary>
+    public bool SortRawQueryValuesFirst { get; init; } = false;
+    /// <summary>
+    /// If true, matching will be done for any path. No path match expression is required.
+    /// </summary>
+    public bool IgnorePath { get; init; } = false;
+    
+    /// <summary>
+    /// If no query matcher is specified, query-prohibit-excess will be respected but nothing else.
+    /// 
+    /// </summary>
+    public QueryParsingOptions QueryParsingOptions { get; init; } = new();
+    
+    public PathParsingOptions PathParsingOptions { get; init; } = new();
+
+    
+    public static ParsingOptions DefaultCaseInsensitive => new()
+    {
+        QueryParsingOptions = QueryParsingOptions.DefaultCaseInsensitive,
+        PathParsingOptions = PathParsingOptions.DefaultCaseInsensitive
+    };
+    public static ParsingOptions DefaultCaseSensitive => new()
+    {
+        QueryParsingOptions = QueryParsingOptions.DefaultCaseSensitive,
+        PathParsingOptions = PathParsingOptions.DefaultCaseSensitive
+    };
+
+
+    public static ParsingOptions SubtractFromFlags(List<string> flags)
+    {
+        var context = new ParsingOptions();
+        if (flags.Remove("ignore-case"))
+        {
+            context = context with { QueryParsingOptions = QueryParsingOptions.DefaultCaseInsensitive, PathParsingOptions = PathParsingOptions.DefaultCaseInsensitive };
+        }
+        if (flags.Remove("case-sensitive"))
+        {
+            context = context with { QueryParsingOptions = QueryParsingOptions.DefaultCaseSensitive, PathParsingOptions = PathParsingOptions.DefaultCaseSensitive };
+        }
+        if (flags.Remove("raw"))
+        {
+            context = context with { RawQueryAndPath = true };
+        }
+        if (flags.Remove("sort-raw-query-first"))
+        {
+            context = context with { SortRawQueryValuesFirst = true };
+        }
+        
+        if (flags.Remove("ignore-path"))
+        {
+            context = context with { IgnorePath = true };
+        }
+
+        context = context with
+        {
+            QueryParsingOptions = QueryParsingOptions.SubtractFromFlags(flags, context.QueryParsingOptions)
+        };
+        context = context with
+        {
+            PathParsingOptions = PathParsingOptions.SubtractFromFlags(flags, context.PathParsingOptions)
+        };
+        return context;
+    }
+}
+
+
+public record MultiValueMatcher(
+    MatchExpression? PathMatcher,
+    IReadOnlyDictionary<string, MatchExpression>? QueryValueMatchers,
+    ParsingOptions ParsingOptions,
+    ExpressionFlags? UnusedFlags)
+{
+    public string? GetValidationErrors()
+    {
+        if (ParsingOptions.RawQueryAndPath && PathMatcher == null)
+        {
+            return
+                "No path match expression found; a path match expression is required unless you use [ignore-path], and always if you use" +
+                "[raw-query-and-path]";
+        }
+
+        if (PathMatcher == null && !ParsingOptions.IgnorePath)
+        {
+            return "A path match expression is required unless you use [ignore-path]";
+        }
+
+        if (PathMatcher != null && ParsingOptions is { IgnorePath: true, RawQueryAndPath: true })
+        {
+            return
+                "A path match expression is prohibited with [ignore-path] unless you use [raw-query-and-path], in which case only the query is matched.";
+        }
+
+        if (ParsingOptions.RawQueryAndPath && (ParsingOptions.QueryParsingOptions.ProhibitExcessQueryKeys))
+        {
+            // || ParsingOptions.QueryParsingOptions.DeleteExcessQueryKeys
+            return
+                "[raw-query-and-path] cannot be used with [query-prohibit-excess] or [query-delete-excess], as those only apply to structural query matching with [query]";
+        }
+        
+        if (ParsingOptions is { IgnorePath: true, RawQueryAndPath: false } && QueryValueMatchers == null)
+        {
+            return "[ignore-path] cannot be used unless [raw-query-and-path] is used or a query matcher is specified";
+        }
+        
+        return null;
+    }
+
+    public static MultiValueMatcher Parse(ReadOnlyMemory<char> expressionWithFlags)
+    {
+        if (!MultiValueMatcher.TryParse(expressionWithFlags, out var result, out var error))
+        {
+            throw new ArgumentException(error, nameof(expressionWithFlags));
+        }
+
+        return result!;
+    }
+
+    public static bool TryParse(ReadOnlyMemory<char> expressionWithFlags,
+        [NotNullWhen(true)] out MultiValueMatcher? result, [NotNullWhen(false)] out string? error)
+    {
+        if (!ExpressionFlags.TryParseFromEnd(expressionWithFlags, out var expression, out var flags, out error))
+        {
+            result = null;
+            return false;
+        }
+
+        var allFlags = flags ?? new List<string>();
+        var context = ParsingOptions.SubtractFromFlags(allFlags);
+
+        if (!MatchExpression.TryParseWithSmartQuery(context, expression, out var pathMatcher, out var queryMatchers,
+                out error))
+        {
+            result = null;
+            return false;
+        }
+
+        result = new MultiValueMatcher(pathMatcher, queryMatchers, context,
+            new ExpressionFlags(new ReadOnlyCollection<string>(allFlags)));
+        error = result.GetValidationErrors();
+        if (error != null)
+        {
+            result = null;
+            return false;
+        }
+
+        return true;
+    }
+
+
+    internal MultiMatchResult Match(in MatchingContext context, in string pathAndQuery)
+    {
+        var pathEnd = pathAndQuery.IndexOf('?') > -1 ? pathAndQuery.IndexOf('?') : pathAndQuery.Length;
+        var path = ParsingOptions.IgnorePath ? "" : pathAndQuery[..pathEnd];
+        var query = QueryHelpers.ParseQuery(pathAndQuery[pathEnd..]);
+        var queryWrapper = new DictionaryQueryWrapper(query);
+        ReadOnlyMemory<char>? rawQuery  = pathAndQuery[pathEnd..].AsMemory();
+        ReadOnlyMemory<char>? rawPathAndQuery = pathAndQuery.AsMemory();
+        ReadOnlyMemory<char>? sorted = null;
+        return Match(context, path.AsMemory(), queryWrapper, ref rawQuery, ref rawPathAndQuery, ref sorted);
+    }
+
+    internal MultiMatchResult Match(in MatchingContext context, in ReadOnlyMemory<char> path,
+        IReadOnlyQueryWrapper? query,
+        ref ReadOnlyMemory<char>? rawQuery, ref ReadOnlyMemory<char>? rawPathAndQuery, ref ReadOnlyMemory<char>? pathAndSortedQuery)
+    {
+        var pathInput = ParsingOptions.IgnorePath ? "".AsMemory() : path;
+        if (ParsingOptions.RawQueryAndPath)
+        {
+            if (ParsingOptions.SortRawQueryValuesFirst && query != null)
+            {
+                pathAndSortedQuery ??= QueryHelpers.AddQueryString(pathInput.ToString(),
+                        query.Keys.OrderBy(x => x)
+                            .Select(x => new KeyValuePair<string, string?>(x, query[x].ToString())))
+                    .AsMemory();
+                
+                pathInput = pathAndSortedQuery.Value;
+            }
+            else if (query != null)
+            {
+                rawQuery ??= QueryHelpers.AddQueryString(pathInput.ToString(), query)
+                    .AsMemory();
+                if (rawQuery is { Length: > 0 })
+                {
+                    rawPathAndQuery ??= $"{pathInput}{(rawQuery.Value.Span[0] != '?' ? "?" : "")}{rawQuery.Value}"
+                        .AsMemory();
+                    pathInput = rawPathAndQuery.Value;
+                }
+            }
+        }
+        
+
+        MatchExpression.MatchExpressionSuccess? pathMatchResult = null;
+
+        if (PathMatcher != null)
+        {
+            if (!PathMatcher.TryMatchVerbose(context, pathInput, out pathMatchResult, out var error))
+            {
+                // Return early if the path doesn't match.
+                return new MultiMatchResult { Success = false, Error = context.VerboseErrors ? $"Path '{pathInput}' did not match the expression '{PathMatcher}'" : "Path did not match the expression" };
+            }
+        }
+        var prohibitExcess = ParsingOptions.QueryParsingOptions.ProhibitExcessQueryKeys;
+
+        //If there are no query matchers, but there is input query, we (fail) if prohibitExcess
+        if (QueryValueMatchers == null)
+        {
+            if (query is { Count: > 0 })
+            {
+                if (prohibitExcess)
+                {
+                    return new MultiMatchResult
+                    {
+                        Success = false, Error =
+                            context.VerboseErrors
+                                ? $"[query-prohibit-excess] is set and no querystring is present in the expression, but the input had querystring {query}"
+                                : "Querystring was present, but is not allowed by the expression and [query-prohibit-excess] is set"
+                    };
+                }
+            }
+
+            //return a match with the excess query
+            return new MultiMatchResult
+            {
+                Success = true, ExcessQueryKeys = query is { Count: > 0 } ? query.Keys.ToArray() : null, OriginalQuery = query,
+                Captures = pathMatchResult?.Captures?.ToDictionary(x => x.Name, x => x.Value)
+            };
+        }
+
+        List<string>? matchedKeysList = null;
+        Dictionary<string, ReadOnlyMemory<char>>? captures =
+            pathMatchResult?.Captures?.ToDictionary(x => x.Name, x => x.Value);
+
+        // We have query matchers. Now, some or all may be optional, so we can't short circuit.
+        foreach (var pair in QueryValueMatchers!)
+        {
+            string inputKey = pair.Key;
+            var valueOptional = pair.Value.AllOptional;
+            if (!query!.TryGetValue(pair.Key, out string? inputValue))
+            {
+                if (ParsingOptions.QueryParsingOptions.KeysOrdinalIgnoreCase)
+                {
+                    // TODO, we need a better way. The querystring interface doesn't allow for knowing if we can case-insensitive query tho 
+                    var found = query!.Keys.FirstOrDefault(x =>
+                        x.Equals(pair.Key, StringComparison.OrdinalIgnoreCase));
+                    if (found != null)
+                    {
+                        inputKey = found;
+                        inputValue = query[found];
+                    }
+                }
+            }
+
+            if (inputValue == null)
+            {
+                if (!valueOptional)
+                {
+                    var error = context.VerboseErrors
+                        ? $"Required query key '{pair.Key}' not found in the input. Value should match '{pair.Value}'"
+                        : "The input is missing a required querystring key";
+                    return new MultiMatchResult { Success = false, Error = error };
+                }
+            }
+            else
+            {
+                if (!pair.Value.TryMatchVerbose(context, inputValue.AsMemory(), out var valueMatchResult,
+                        out var valueError))
+                {
+                    var error = context.VerboseErrors
+                        ? $"Query key '{pair.Key}' value '{inputValue}' does not match expression '{pair.Value}'. ${valueError}"
+                        : "A query value did not match its corresponding expression";
+                    return new MultiMatchResult { Success = false, Error = error };
+                }
+
+                //Combine the success captures into the result.
+                captures ??= new Dictionary<string, ReadOnlyMemory<char>>();
+                if (valueMatchResult.Value.Captures != null)
+                {
+                    foreach (var capture in valueMatchResult.Value.Captures)
+                    {
+                        // Will fail on dupe names.
+                        captures.Add(capture.Name, capture.Value);
+                    }
+                }
+
+                //Mark the input query key we processed, so we can later collect the excess.
+                matchedKeysList ??= new List<string>();
+                matchedKeysList.Add(inputKey);
+            }
+
+        }
+
+        // We can subtract matchedKeys from the query keys to get the excess.
+        var excessKeyNames = query == null
+            ? []
+            : (matchedKeysList == null
+                ? query.Keys.ToArray()
+                : query!.Keys.Where(x => !matchedKeysList.Contains(x)).ToArray());
+
+        if (prohibitExcess && excessKeyNames.Length > 0)
+        {
+            return new MultiMatchResult
+            {
+                Success = false,
+                Error = context.VerboseErrors
+                    ? $"Excess query keys found: {string.Join(", ", excessKeyNames)}"
+                    : "Excess query keys found"
+            };
+        }
+
+        return new MultiMatchResult { Success = true, Captures = captures, ExcessQueryKeys = excessKeyNames, OriginalQuery = query };
+    }
+
+}
+
+public record struct MultiMatchResult
+{
+    public bool Success { get; init; }
+    public Dictionary<string, ReadOnlyMemory<char>>? Captures { get; init; }
+    
+    /// <summary>
+    /// These are only populated if [query] is used. 
+    /// </summary>
+    public string[]? ExcessQueryKeys { get; init; }
+    public string? Error { get; init; }
+    
+    public IReadOnlyQueryWrapper? OriginalQuery { get; init; }
+}
+
+public record ExpressionFlags(ReadOnlyCollection<string> Flags)
+{
+    public static bool TryParseFromEnd(ReadOnlyMemory<char> expression,out ReadOnlyMemory<char> remainingExpression, out List<string> result, 
+        [NotNullWhen(false)]
+        out string? error)
+    {
+        var flags = new List<string>();
+        var span = expression.Span;
+        
+        if (span.Length == 0 || span[^1] != ']')
+        {
+            //It's ok for there to be none
+            result = flags;
+            error = null;
+            remainingExpression = expression;
+            return true;
+        }
+        var startAt = span.LastIndexOf('[');
+        if (startAt == -1)
+        {
+            result = flags;
+            error = "Flags must be enclosed in [], only found closing ]";
+            remainingExpression = expression;
+            return false;
+        }
+        remainingExpression = expression[..startAt];
+        var inner = expression[(startAt + 1)..^1];
+        var innerSpan = inner.Span;
+        while (innerSpan.Length > 0)
+        {
+            var commaIndex = innerSpan.IndexOf(',');
+            if (commaIndex == -1)
+            {
+                flags.Add(inner.ToString());
+                break;
+            }
+            flags.Add(inner[..commaIndex].ToString());
+            inner = inner[(commaIndex + 1)..];
+            innerSpan = inner.Span;
+        }
+        // validate only a-z-
+        foreach (var flag in flags)
+        {
+            if (!flag.All(x => x == '-' || (x >= 'a' && x <= 'z')))
+            {
+                result = flags;
+                error = $"Invalid flag '{flag}', only a-z- are allowed";
+                return false;
+            }
+        }
+
+        result = flags;
+        error = null;
+        return true;
+    }
+}
+
+
+
+public partial record MatchExpression
 {
     private MatchExpression(MatchSegment[] segments)
     {
         Segments = segments;
+        AllOptional = segments.All(x => x.IsOptional);
     }
 
     private MatchSegment[] Segments;
+    /// <summary>
+    /// True if all segments are optional
+    /// </summary>
+    public bool AllOptional { get; init;}
     
     public int SegmentCount => Segments.Length;
+    
+    public override string ToString()
+    {
+        return string.Join("", Segments);
+    }
     
     private static bool TryCreate(IReadOnlyCollection<MatchSegment> segments, [NotNullWhen(true)] out MatchExpression? result, [NotNullWhen(false)]out string? error)
     {
@@ -65,13 +651,67 @@ public partial record class MatchExpression
         RegexOptions.CultureInvariant | RegexOptions.Singleline, TimeSpan.FromMilliseconds(50));
     private static Regex SplitSections() => SplitSectionsVar;
     #endif
-    public static MatchExpression Parse(MatchingContext context, string expression)
+    public static MatchExpression Parse(ExpressionParsingOptions options, string expression)
     {
-        if (!TryParse(context, expression, out var result, out var error))
+        if (!TryParse(options, expression.AsMemory(), out var result, out var error))
         {
             throw new ArgumentException(error, nameof(expression));
         }
         return result!;
+    }
+
+    private static IEnumerable<ReadOnlyMemory<char>> SplitQuerystringChars(IEnumerable<ReadOnlyMemory<char>> input)
+    {
+        // return items that start with {, but split the others before and after ?, &, and =
+        // if the item starts with {, return it as a single item.
+        foreach (var item in input)
+        {
+            if (item.Span[0] == '{')
+            {
+                yield return item;
+            }
+            else
+            {
+                // split on ? & and =
+                var consumed = 0;
+                while (consumed < item.Length)
+                {
+                    var next = item.Span[consumed..].IndexOfAny('&', '?', '=');
+                    if (next == -1)
+                    {
+                        if (consumed < item.Length)
+                        {
+                            yield return item[consumed..];
+                        }
+                        break;
+                    }
+
+                    if (next > 0)
+                    {
+                        yield return item.Slice(consumed, next);
+                    }
+                    yield return item.Slice(consumed + next, 1);
+                    consumed += next + 1;
+                }
+            }
+        }
+    }
+
+    private static IEnumerable<List<ReadOnlyMemory<char>>> SplitBy(IEnumerable<ReadOnlyMemory<char>> input, char c)
+    {
+        var current = new List<ReadOnlyMemory<char>>();
+        foreach (var item in input)
+        {
+            if (item.Length == 1 && item.Span[0] == c)
+            {
+                yield return current;
+                current = new List<ReadOnlyMemory<char>>();
+                continue;
+            }
+            current.Add(item);
+        }
+        yield return current;
+        
     }
 
     private static IEnumerable<ReadOnlyMemory<char>>SplitExpressionSections(ReadOnlyMemory<char> input)
@@ -129,37 +769,156 @@ public partial record class MatchExpression
     }
     
     
-    public static bool TryParse(MatchingContext context, string expression,
+    public static bool TryParse(ExpressionParsingOptions options, ReadOnlyMemory<char> expression,
         [NotNullWhen(true)] out MatchExpression? result, 
         [NotNullWhen(false)]out string? error)
     {
-        if (string.IsNullOrWhiteSpace(expression))
+        if (expression.Length == 0 || expression.Span.IsWhiteSpace())
         {
             error = "Match expression cannot be empty";
             result = null;
             return false;
         }
-        // enumerate the segments in expression using SplitSections. 
-        // The entire regex should match. 
-        // If it doesn't, return false and set error to the first unmatched character.
-        // If it does, create a MatchSegment for each match, and add it to the result.
-        // Work right-to-left
-        
-        var matches = SplitExpressionSections(expression.AsMemory()).ToArray();
+        var matches = SplitExpressionSections(expression).ToArray();
+        return TryParseInternal(options, matches, out result, out error);
+    }
+    private static bool TryParseInternal(ExpressionParsingOptions options, ReadOnlyMemory<char>[] expressionSections,
+        [NotNullWhen(true)] out MatchExpression? result, 
+        [NotNullWhen(false)]out string? error)
+    {
         var segments = new Stack<MatchSegment>();
-        for (int i = matches.Length - 1; i >= 0; i--)
+        for (int i = expressionSections.Length - 1; i >= 0; i--)
         {
-            var segment = matches[i];
-            if (segment.Length == 0) throw new InvalidOperationException($"SplitSections returned an empty segment. {matches}");
-            if (!MatchSegment.TryParseSegmentExpression(context, segment, segments, out var parsedSegment, out error))
+            var segment = expressionSections[i];
+            if (segment.Length == 0) throw new InvalidOperationException($"SplitSections returned an empty segment. {expressionSections}");
+            if (!MatchSegment.TryParseSegmentExpression(options, segment, segments, out _,out var parsedSegment, out error))
             {
                 result = null;
                 return false;
             }
             segments.Push(parsedSegment.Value);
         }
-
         return TryCreate(segments, out result, out error);
+    }
+    public static bool TryParseWithSmartQuery(ParsingOptions parsingDefaults,  ReadOnlyMemory<char> expression,
+        out MatchExpression? pathMatcherResult, 
+        out Dictionary<string, MatchExpression>? queryValueMatchersResult,
+        [NotNullWhen(false)]out string? error)
+    {
+        if (expression.Length == 0 || expression.Span.IsWhiteSpace())
+        {
+            error = "Match expression cannot be empty";
+            pathMatcherResult = null;
+            queryValueMatchersResult = null;
+            return false;
+        }
+
+        var context = parsingDefaults;
+        
+        // enumerate the segments in expression using SplitSections. 
+        // The entire regex should match. 
+        // If it doesn't, return false and set error to the first unmatched character.
+        // If it does, create a MatchSegment for each match, and add it to the result.
+        // Work right-to-left
+        
+        var lexed = SplitQuerystringChars(SplitExpressionSections(expression)).ToArray();
+        
+        // Split those before the first ? into path segments
+        var queryStartSegmentIndex = Array.FindIndex(lexed, x => x.Span.Length == 1 && x.Span[0] == '?');
+        var pathSegments = lexed.Take(queryStartSegmentIndex > -1 ? queryStartSegmentIndex : lexed.Length).ToArray();
+        if (!TryParseInternal(context.PathParsingOptions.ToExpressionParsingOptions(), pathSegments, out var pathMatcher, out error))
+        {
+            pathMatcherResult = null;
+            queryValueMatchersResult = null;
+            if (context.IgnorePath && pathSegments.Length == 0)
+            {
+                //We can ignore this error, path is optional
+            }else{
+                return false;
+            }
+        }
+        // No query portion, or just a ? at the end
+        if (queryStartSegmentIndex == -1 || queryStartSegmentIndex == lexed.Length - 1)
+        {
+            pathMatcherResult = pathMatcher;
+            queryValueMatchersResult = null;
+            return true;
+        }
+        // multiple question marks 
+        var nextQuestion = Array.FindIndex(lexed, queryStartSegmentIndex + 1, x => x.Span.Length == 1 && x.Span[0] == '?');
+        if (nextQuestion > -1)
+        {
+            error = "Multiple '?' characters found in expression. Didn't want a query string? Put the optional '?' flag inside the curly braces like {var:?} instead.";
+            pathMatcherResult = null;
+            queryValueMatchersResult = null;
+            return false;
+        }
+        
+        var querySegments = lexed.Skip(pathSegments.Length + 1).ToArray();
+        var pairs = SplitBy(querySegments, '&').ToArray();
+        var queryValueMatchers = new Dictionary<string, MatchExpression>(context.QueryParsingOptions.KeysOrdinalIgnoreCase ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+        foreach (var pair in pairs)
+        {
+            if (pair.Count == 0) continue; // Skip empty &s
+            var keyAndValue = SplitBy(pair, '=').ToArray();
+            if (keyAndValue.Length != 2)
+            {
+                error = $"Query segment '{Stringify(pair)}' does not contain exactly one literal '=' character. Didn't want a query string? Put the optional '?' flag inside the curly braces like {{var:?}} instead.";
+                pathMatcherResult = null;
+                queryValueMatchersResult = null;
+                return false;
+            }
+            var keySegments = keyAndValue[0];
+            if (keySegments.Count != 1 || keySegments[0].Length == 0 || keySegments[0].Span[0] == '{')
+            {
+                error = $"Query key must be a plain literal, found '{Stringify(keySegments)}' in pair '{Stringify(pair)}' in expression {Stringify(querySegments)}). Didn't want a query string? Put the optional '?' flag inside the curly braces like {{var:?}} instead.";
+                pathMatcherResult = null;
+                queryValueMatchersResult = null;
+                return false;
+            }
+            if (keySegments[0].Span[0] == '{')
+            {
+                error = $"Query keys cannot contain expressions: error in '{Stringify(pair)}'";
+                pathMatcherResult = null;
+                queryValueMatchersResult = null;
+                return false;
+            }
+            var key = keySegments[0].ToString();
+            
+            var valueSegments = keyAndValue[1].ToArray();
+            if (!TryParseInternal(context.QueryParsingOptions.ToExpressionParsingOptions(), valueSegments, out var valueMatcher, out error))
+            {
+                error = $"Error parsing query value expression '{Stringify(pair)}': {error}";
+                pathMatcherResult = null;
+                queryValueMatchersResult = null;
+                return false;
+            }
+            queryValueMatchers[key] = valueMatcher;
+        }
+        pathMatcherResult = pathMatcher;
+        
+        queryValueMatchersResult = queryValueMatchers;
+        // TODO: Now look for naming conflicts among them all
+        var allSegments = (pathMatcher?.Segments ?? []).Concat(queryValueMatchers.Values.SelectMany(x => x.Segments))
+            .Where(s => !string.IsNullOrEmpty(s.Name))
+            .Select(s => s.Name).ToArray();
+        
+        if (allSegments.Length != allSegments.Distinct(StringComparer.OrdinalIgnoreCase).Count())
+        {
+            var duplicate = allSegments.GroupBy(x => x, StringComparer.OrdinalIgnoreCase).First(x => x.Count() > 1).Key;
+            error = $"You used {{'{duplicate}'}} more than once; each capture must use a unique variable name.";
+            pathMatcherResult = null;
+            queryValueMatchersResult = null;
+            return false;
+        }
+        
+        
+        error = null;
+        return true;
+    }
+    private static string Stringify(IEnumerable<ReadOnlyMemory<char>> segments)
+    {
+        return string.Join("", segments.Select(x => x.ToString()));
     }
     public readonly record struct MatchExpressionCapture(string Name, ReadOnlyMemory<char> Value);
     public readonly record struct MatchExpressionSuccess(IReadOnlyList<MatchExpressionCapture>? Captures);
@@ -179,8 +938,12 @@ public partial record class MatchExpression
     {
         if (!TryMatch(context, input, out result, out error, out var ix))
         {
-            MatchSegment? segment = ix >= 0 && ix < Segments.Length ? Segments[ix.Value] : null;
-            error = $"{error}. Failing segment[{ix}]: {segment}";
+            if (context.VerboseErrors)
+            {
+                MatchSegment? segment = ix >= 0 && ix < Segments.Length ? Segments[ix.Value] : null;
+                error = $"{error}. Failing segment[{ix}]: {segment}";
+            }
+
             return false;
         }
         return true;
@@ -188,7 +951,8 @@ public partial record class MatchExpression
     
     public MatchExpressionSuccess MatchOrThrow(in MatchingContext context, in ReadOnlyMemory<char> input)
     {
-        var matched = this.TryMatchVerbose(context, input, out var result, out var error);
+        var opts = context with { VerboseErrors = true };
+        var matched = this.TryMatchVerbose(opts, input, out var result, out var error);
         if (!matched)
         {
             throw new ArgumentException($"Expression {this} incorrectly failed to match {input} with error {error}");
@@ -202,7 +966,7 @@ public partial record class MatchExpression
         return match.Captures!.ToDictionary(x => x.Name, x => x.Value.ToString());
     }
     
-    public bool TryMatch(in MatchingContext context, in ReadOnlyMemory<char> input, [NotNullWhen(true)] out MatchExpressionSuccess? result,
+    private bool TryMatch(in MatchingContext context, in ReadOnlyMemory<char> input, [NotNullWhen(true)] out MatchExpressionSuccess? result,
         [NotNullWhen(false)] out string? error, [NotNullWhen(false)] out int? failingSegmentIndex)
     {
         // We scan with SegmentBoundary to establish
@@ -354,7 +1118,7 @@ public partial record class MatchExpression
                         // Even if the segment is optional, we refuse to match it if the conditions don't match.
                         // We could lift this restriction later
                         result = null;
-                        error = $"The text did not meet the conditions of the segment";
+                        error = "The text did not meet the conditions of the segment";
                         failingSegmentIndex = openSegmentIndex;
                         return false;
                     }
@@ -390,6 +1154,7 @@ public partial record class MatchExpression
             }
         }
     }
+
 }
 
     
@@ -397,18 +1162,22 @@ public partial record class MatchExpression
 internal readonly record struct 
     MatchSegment(string? Name, SegmentBoundary StartsOn, SegmentBoundary EndsOn, List<StringCondition>? Conditions)
 {
-    override public string ToString()
+    public override string ToString()
     {
-        if (StartsOn.MatchesEntireSegment && Name == null && EndsOn.AsEndSegmentReliesOnStartSegment)
+        if (Name == null && EndsOn.IsLiteralEnd)
         {
-            return $"'{StartsOn}'";
+            var literal = StartsOn.AsCaseSensitiveLiteral;
+            if (literal != null)
+            {
+                return literal;
+            }
         }
         var conditionsString = Conditions == null ? "" : string.Join(":", Conditions);
         if (conditionsString.Length > 0)
         {
             conditionsString = ":" + conditionsString;
         }
-        return $"{Name ?? ""}:{StartsOn}:{EndsOn}{conditionsString}";
+        return $"{{{Name ?? ""}:{StartsOn}:{EndsOn}{conditionsString}}}";
     }
     public bool ConditionsMatch(MatchingContext context, ReadOnlySpan<char> text)
     {
@@ -423,15 +1192,18 @@ internal readonly record struct
         return true;
     }
     
+    
     public bool IsOptional => StartsOn.IsOptional;
 
-    internal static bool TryParseSegmentExpression(MatchingContext context, 
+    internal static bool TryParseSegmentExpression(ExpressionParsingOptions options, 
         ReadOnlyMemory<char> exprMemory, 
         Stack<MatchSegment> laterSegments, 
+        out bool justALiteral,
         [NotNullWhen(true)]out MatchSegment? segment, 
         [NotNullWhen(false)]out string? error)
     {
         var expr = exprMemory.Span;
+        justALiteral = false;
         if (expr.IsEmpty)
         {
             segment = null;
@@ -455,22 +1227,30 @@ internal readonly record struct
                 segment = null;
                 return false;
             }
-            return TryParseLogicalSegment(context, innerMem, laterSegments, out segment, out error);
+            return TryParseLogicalSegment(options, innerMem, laterSegments, out segment, out error);
 
         }
         // it's a literal
         // Check for invalid characters like &
-        if (expr.IndexOf('*') != -1 || expr.IndexOf('?') != -1)
+        if (!options.AllowStarLiteral && expr.IndexOf('*') != -1)
         {
-            error = "Literals cannot contain * or ? operators, they must be enclosed in {} such as {name:?} or {name:**:?}";
+            error = "Literals cannot contain * operators, they must be enclosed in {} such as {name:**:?}";
             segment = null;
             return false;
         }
-        segment = CreateLiteral(expr, context);
+        if (!options.AllowQuestionLiteral && expr.IndexOf('?') != -1)
+        {
+            error = "Did you forget the [query] flag? Path literals cannot contain ? (optional) operators, they must be enclosed in {} such as {name:?} or {name:**:?}";
+            segment = null;
+            return false;
+        }
+
+        justALiteral = true;
+        segment = CreateLiteral(expr, options);
         return true;
     }
 
-    private static bool TryParseLogicalSegment(MatchingContext context,
+    private static bool TryParseLogicalSegment(ExpressionParsingOptions options,
         in ReadOnlyMemory<char> innerMemory,
         Stack<MatchSegment> laterSegments,
         [NotNullWhen(true)] out MatchSegment? segment,
@@ -487,6 +1267,7 @@ internal readonly record struct
         // Enumerate segments delimited by : (ignoring \:, and breaking on \\:)
         int startsAt = 0;
         int segmentCount = 0;
+        bool doubleStarFound = false;
         while (true)
         {
             int colonIndex = ExpressionParsingHelpers.FindCharNotEscaped(inner[startsAt..], ':', '\\');
@@ -507,7 +1288,7 @@ internal readonly record struct
 
             if (isCondition)
             {
-                if (!TryParseConditionOrSegment(context, colonIndex == -1, thisPartMemory, inner,  ref segmentStartLogic, ref segmentEndLogic, ref conditions, laterSegments, out error))
+                if (!TryParseConditionOrSegment(options, colonIndex == -1, thisPartMemory, inner,  ref segmentStartLogic, ref segmentEndLogic, ref conditions, ref doubleStarFound, laterSegments, out error))
                 {
                     return false;
                 }
@@ -523,6 +1304,15 @@ internal readonly record struct
         segmentStartLogic ??= SegmentBoundary.DefaultStart;
         segmentEndLogic ??= SegmentBoundary.DefaultEnd;
         
+        
+        // if (!doubleStarFound && !options.CaptureSlashesByDefault && !segmentStartLogic.Value.MatchesEntireSegment)
+        // {
+        //     conditions ??= new List<StringCondition>();
+        //     // exclude '/' from chars
+        //     // But what if starts(/) or eq(/) or ends(/) is used? This is clumsy
+        //     conditions.Add(StringCondition.ExcludeSlashes);
+        // }
+        //
 
         segment = new MatchSegment(name, segmentStartLogic.Value, segmentEndLogic.Value, conditions);
 
@@ -547,13 +1337,14 @@ internal readonly record struct
 
 
 
-    private static bool TryParseConditionOrSegment(MatchingContext context,
+    private static bool TryParseConditionOrSegment(ExpressionParsingOptions options,
         bool isFinalCondition,
         in ReadOnlyMemory<char> conditionMemory,
         in ReadOnlySpan<char> segmentText,
         ref SegmentBoundary? segmentStartLogic,
         ref SegmentBoundary? segmentEndLogic,
         ref List<StringCondition>? conditions,
+        ref bool doubleStarFound,
         Stack<MatchSegment> laterSegments,
         [NotNullWhen(false)] out string? error)
     {
@@ -563,20 +1354,16 @@ internal readonly record struct
         var makeOptional = (globChars & ExpressionParsingHelpers.GlobChars.Optional) ==
                            ExpressionParsingHelpers.GlobChars.Optional
                            || conditionSpan.Is("optional");
-        var hasDoubleStar = (globChars & ExpressionParsingHelpers.GlobChars.DoubleStar) ==
-                            ExpressionParsingHelpers.GlobChars.DoubleStar;
+        if ((globChars & ExpressionParsingHelpers.GlobChars.DoubleStar) ==
+            ExpressionParsingHelpers.GlobChars.DoubleStar)
+        {
+            doubleStarFound = true;
+        }
         if (makeOptional)
         {
             segmentStartLogic ??= SegmentBoundary.DefaultStart;
             segmentStartLogic = segmentStartLogic.Value.SetOptional(true);
         }
-        if (!hasDoubleStar && context.CaptureSlashesByDefault)
-        {
-            conditions ??= new List<StringCondition>();
-            // exclude '/' from chars
-            conditions.Add(StringCondition.ExcludeForwardSlash);
-        }
-        
 
         // We ignore the glob chars, they don't constrain behavior any.
         if (globChars != ExpressionParsingHelpers.GlobChars.None
@@ -598,7 +1385,7 @@ internal readonly record struct
         if (args is { Count: 1 })
         {
             var optional = segmentStartLogic?.IsOptional ?? false;
-            if (SegmentBoundary.TryCreate(functionName, context.OrdinalIgnoreCase, optional, args[0].Span, out var sb))
+            if (SegmentBoundary.TryCreate(functionName, options.OrdinalIgnoreCase, optional, args[0].Span, out var sb))
             {
                 if (segmentStartLogic is { MatchesEntireSegment: true })
                 {
@@ -632,7 +1419,7 @@ internal readonly record struct
         if (!conditionConsumed)
         {
             conditions ??= new List<StringCondition>();
-            if (!TryParseCondition(context, conditions, functionName, args, out var condition, out error))
+            if (!TryParseCondition(options, conditions, functionName, args, out var condition, out error))
             {
                 //TODO: add more context to error
                 return false;
@@ -643,11 +1430,11 @@ internal readonly record struct
         return true;
     }
 
-    private static bool TryParseCondition(MatchingContext context, 
+    private static bool TryParseCondition(ExpressionParsingOptions options, 
             List<StringCondition> conditions, string functionName, 
             List<ReadOnlyMemory<char>>? args, [NotNullWhen(true)]out StringCondition? condition, [NotNullWhen(false)] out string? error)
     {
-        var c = StringCondition.TryParse(out var cError, functionName, args, context.OrdinalIgnoreCase);
+        var c = StringCondition.TryParse(out var cError, functionName, args, options.OrdinalIgnoreCase);
         if (c == null)
         {
             condition = null;
@@ -660,10 +1447,10 @@ internal readonly record struct
     }
 
 
-    private static MatchSegment CreateLiteral(ReadOnlySpan<char> literal, MatchingContext context)
+    private static MatchSegment CreateLiteral(ReadOnlySpan<char> literal, ExpressionParsingOptions options)
     {
         return new MatchSegment(null, 
-            SegmentBoundary.Literal(literal, context.OrdinalIgnoreCase), 
+            SegmentBoundary.Literal(literal, options.OrdinalIgnoreCase), 
             SegmentBoundary.LiteralEnd, null);
     }
 }
@@ -767,7 +1554,17 @@ internal readonly record struct SegmentBoundary
     public bool MatchesEntireSegment =>
         On == When.EqualsOrdinal || On == When.EqualsOrdinalIgnoreCase || On == When.EqualsChar;
 
-   
+    public string? AsCaseSensitiveLiteral =>
+        this.Behavior == Flags.None ?
+        On switch
+        {
+            When.EqualsOrdinal => Chars,
+            When.EqualsChar => Char.ToString(),
+            _ => null
+        } : null;
+
+    public bool IsLiteralEnd => Behavior == Flags.EndingBoundary && On == When.SegmentFullyMatchedByStartBoundary &&
+                                Char == '\0' && Chars == null;
     public SegmentBoundary SetOptional(bool optional)
         => new(optional ? Flags.SegmentOptional | Behavior : Behavior ^ Flags.SegmentOptional, On, Chars, Char);
 
@@ -849,30 +1646,32 @@ internal readonly record struct SegmentBoundary
         {
             flags |= Flags.EndingBoundary;
         }
-        
+        var useCaseInsensitive = ordinalIgnoreCase && ExpressionParsingHelpers.HasAzOrNonAsciiLetters(asSpan);
         if (asSpan.Length == 1 &&
-            (!ordinalIgnoreCase || ExpressionParsingHelpers.IsCommonCaseInsensitiveChar(asSpan[0])))
+            !useCaseInsensitive)
         {
             return new(flags,
                 When.AtChar, null, asSpan[0]);
         }
 
         return new(flags,
-            ordinalIgnoreCase ? When.AtStringIgnoreCase : When.AtString, asSpan.ToString(), '\0');
+            useCaseInsensitive ? When.AtStringIgnoreCase : When.AtString, asSpan.ToString(), '\0');
     }
     
     private static SegmentBoundary StringEquals(ReadOnlySpan<char> asSpan, bool ordinalIgnoreCase, bool includeInVar)
     {
-        if (asSpan.Length == 1 &&
-            (!ordinalIgnoreCase || ExpressionParsingHelpers.IsCommonCaseInsensitiveChar(asSpan[0])))
+        var useCaseInsensitive = ordinalIgnoreCase && ExpressionParsingHelpers.HasAzOrNonAsciiLetters(asSpan);
+        if (asSpan.Length == 1 && !useCaseInsensitive)
         {
             return new(includeInVar ? Flags.IncludeMatchingTextInVariable : Flags.None,
                 When.EqualsChar, null, asSpan[0]);
         }
 
         return new(includeInVar ? Flags.IncludeMatchingTextInVariable : Flags.None,
-            ordinalIgnoreCase ? When.EqualsOrdinalIgnoreCase : When.EqualsOrdinal, asSpan.ToString(), '\0');
+            useCaseInsensitive ? When.EqualsOrdinalIgnoreCase : When.EqualsOrdinal, asSpan.ToString(), '\0');
     }
+
+ 
     private static SegmentBoundary FixedLengthEnd(int length)
     {
         if (length < 1) throw new ArgumentOutOfRangeException(nameof(length)
@@ -1049,14 +1848,14 @@ internal readonly record struct SegmentBoundary
         var name = On switch
         {
             When.StartsNow => "now",
-            When.EndOfInput => "unterminated",
+            When.EndOfInput => ">",
             When.SegmentFullyMatchedByStartBoundary => "noop",
-            When.InheritFromNextSegment => "unterminated",
+            When.InheritFromNextSegment => ">",
             When.AtChar or When.AtString or When.AtStringIgnoreCase =>
                 ((Behavior & Flags.IncludeMatchingTextInVariable) != 0)
-                    ? (isStartBoundary ? "starts-with" : "ends-with")
+                    ? (isStartBoundary ? "starts" : "ends")
                     : (isStartBoundary ? "prefix" : "suffix"),
-            When.EqualsOrdinal or When.EqualsChar or When.EqualsOrdinalIgnoreCase => "equals",
+            When.EqualsOrdinal or When.EqualsChar or When.EqualsOrdinalIgnoreCase => "eq",
             When.FixedLength => $"len",
             _ => throw new InvalidOperationException("Unreachable code")
         };
@@ -1064,15 +1863,15 @@ internal readonly record struct SegmentBoundary
         var optional = (Behavior & Flags.SegmentOptional) != 0 ? "?": "";
         if (On == When.FixedLength)
         {
-            return $"{name}({(int)Char}){ignoreCase}{optional}";
+            return $"{name}{ignoreCase}({(int)Char}){optional}";
         }
         if (Chars != null)
         {
-            name = $"{name}({Chars}){ignoreCase}{optional}";
+            name = $"{name}{ignoreCase}({Chars}){optional}";
         }
         else if (Char != '\0')
         {
-            name = $"{name}({Char}){ignoreCase}{optional}";
+            name = $"{name}{ignoreCase}({Char}){optional}";
         }
         return $"{name}{optional}";
     }

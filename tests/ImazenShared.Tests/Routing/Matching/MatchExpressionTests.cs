@@ -1,37 +1,18 @@
 using Imazen.Routing.Matching;
 using Xunit;
-namespace Imazen.Common.Tests.Routing.Matching;
+
+namespace Imazen.Tests.Routing.Matching;
 
 public class MatchExpressionTests
 {
-    private static MatchingContext CaseSensitive = new MatchingContext
-    {
-        OrdinalIgnoreCase = false,
-        SupportedImageExtensions = [],
-    };
-    private static MatchingContext CaseInsensitive = new MatchingContext
-    {
-        OrdinalIgnoreCase = true,
-        SupportedImageExtensions = [],
-    };
-    [Theory]
-    [InlineData(true, true, "/hi")]
-    [InlineData(false, true, "/Hi")]
-    [InlineData(true, false, "/Hi")]
-    public void TestCaseSensitivity(bool isMatch, bool caseSensitive, string path)
-    {
-        var c = caseSensitive ? CaseSensitive : CaseInsensitive;
-        var expr = MatchExpression.Parse(c, "/hi");
-        Assert.Equal(isMatch, expr.IsMatch(c, path));
-    }
     
     [Theory]
     [InlineData(true, "/{name}/{country}{:(/):?}", "/hi/usa", "/hi/usa/")]
     [InlineData(true, "/{name}/{country:ends(/)}", "/hi/usa/")]
-    [InlineData(true, "{int}", "-1300")]
-    [InlineData(false, "{uint}", "-1300")]
-    [InlineData(true, "{int:range(-1000,1000)}", "-1000", "1000")]
-    [InlineData(false, "{int:range(-1000,1000)}", "-1001", "1001")]
+    [InlineData(true, "{:int}", "-1300")]
+    [InlineData(false, "{:uint}", "-1300")]
+    [InlineData(true, "{:int:range(-1000,1000)}", "-1000", "1000")]
+    [InlineData(false, "{:int:range(-1000,1000)}", "-1001", "1001")]
     
     [InlineData(true, "/{name}/{country:suffix(/)}", "/hi/usa/")]
     [InlineData(true, "/{name}/{country}{:eq(/):optional}", "/hi/usa", "/hi/usa/")]
@@ -42,71 +23,81 @@ public class MatchExpressionTests
     [InlineData(true, "/images/{seo_string_ignored}/{sku:guid}/{image_id:integer-range(0,1111111)}{width:integer:prefix(_):optional}.{format:equals(jpg|png|gif)}"
         , "/images/seo-string/12345678-1234-1234-1234-123456789012/12678_300.jpg", "/images/seo-string/12345678-1234-1234-1234-123456789012/12678.png")]
     
-    public void TestAll(bool s, string expr, params string[] inputs)
+    public void TestAll(bool m, string exp, params string[] inputs)
     {
-        var caseSensitive = expr.Contains("(i)");
-        expr = expr.Replace("(i)", "");
-        var c = caseSensitive ? CaseSensitive : CaseInsensitive;
-        var me = MatchExpression.Parse(c, expr);
-        foreach (var path in inputs)
+        var c = MatchingContext.Default;
+        var me = MultiValueMatcher.Parse(exp.AsMemory());
+        foreach (var v in inputs)
         {
-            var matched = me.TryMatchVerbose(c, path.AsMemory(), out var result, out var error);
-            if (matched && !s)
+            var matched = me.Match(c, v);
+            if (matched.Success && !m)
             {
-                Assert.Fail($"False positive! Expression {expr} should not have matched {path}! False positive.");
+                Assert.Fail($"False positive! Expression {exp} should not have matched {v}! False positive.");
             }
-            if (!matched && s)
+            if (!matched.Success && m)
             {
-                Assert.Fail($"Expression {expr} incorrectly failed to match {path} with error {error}");
+                Assert.Fail($"Expression {exp} incorrectly failed to match {v} with error {matched.Error}");
             }
         }
     }
     [Theory]
-    [InlineData("/{name:ends(y)}", "/cody", "name=cody")]
+    [InlineData(true,"/{name:ends(y)}", "/cody", "name=cody")]
     // ints
-    [InlineData("{:int}", "123", "int=123")]
-    [InlineData("{:int}", "-123", "int=-123")]
-    [InlineData("{:int}", "0", "int=0")]
-    [InlineData("{:u64}", "123", "u64=123")]
-    [InlineData("{:u64}", "0", "u64=0")]
-    [InlineData("{:u64}", "-123", null)]
-    [InlineData("/{name}/{country}{:(/):?}", "/hi/usa", "name=hi&country=usa")]
-    [InlineData("/{name}/{country}{:(/):?}",  "/hi/usa/", "name=hi&country=usa")]
-    [InlineData("/{name}/{country}{:eq(/):optional}", "/hi/usa", "name=hi&country=usa")]
-    [InlineData("/{name}/{country:len(3)}", "/hi/usa", "name=hi&country=usa")]
-    [InlineData("/{name}/{country:len(3)}/{state:len(2)}", "/hi/usa/CO", "name=hi&country=usa&state=CO")]
-    [InlineData("{country:len(3)}{state:len(2)}", "USACO", "country=USA&state=CO")]
-    [InlineData("/images/{seo_string_ignored}/{sku:guid}/{image_id:integer-range(0,1111111)}{width:integer:prefix(_):optional}.{format:equals(jpg|png|gif)}"
+    [InlineData(true, "{a:int}", "123", "a=123")]
+    [InlineData(true, "{a:int}", "-123", "a=-123")]
+    [InlineData(true, "{a:int}", "0", "a=0")]
+    [InlineData(true, "{a:u64}?k={v}", "123?k=h&a=b", "a=123&v=h", "a")]
+    [InlineData(true, "{a:u64}", "0", "a=0")]
+    [InlineData(false, "{:u64}", "-123", null)]
+    [InlineData(true, "/{name}/{country}{:eq(/):?}", "/hi/usa", "name=hi&country=usa")]
+    [InlineData(true, "/{name}/{country}{:(/):?}",  "/hi/usa/", "name=hi&country=usa")]
+    [InlineData(true, "/{name}/{country}{:eq(/):optional}", "/hi/usa", "name=hi&country=usa")]
+    [InlineData(true, "/{name}/{country:len(3)}", "/hi/usa", "name=hi&country=usa")]
+    [InlineData(true, "/{name}/{country:len(3)}/{state:len(2)}", "/hi/usa/CO", "name=hi&country=usa&state=CO")]
+    [InlineData(true, "{country:len(3)}{state:len(2)}", "USACO", "country=USA&state=CO")]
+    [InlineData(true, "/images/{seo_string_ignored}/{sku:guid}/{image_id:integer-range(0,1111111)}{width:integer:prefix(_):optional}.{format:equals(jpg|png|gif)}"
         , "/images/seo-string/12345678-1234-1234-1234-123456789012/12678_300.jpg", "seo_string_ignored=seo-string&sku=12345678-1234-1234-1234-123456789012&image_id=12678&width=300&format=jpg")]
-    [InlineData("/images/{seo_string_ignored}/{sku:guid}/{image_id:integer-range(0,1111111)}{width:integer:prefix(_):optional}.{format:equals(jpg|png|gif)}"
+    [InlineData(true, "/images/{seo_string_ignored}/{sku:guid}/{image_id:integer-range(0,1111111)}{width:integer:prefix(_):optional}.{format:equals(jpg|png|gif)}"
         , "/images/seo-string/12345678-1234-1234-1234-123456789012/12678.jpg", "seo_string_ignored=seo-string&sku=12345678-1234-1234-1234-123456789012&image_id=12678&format=jpg")]
-    [InlineData("/{dir}/{file}.{ext}", "/path/to/file.txt", "dir=path&file=to/file&ext=txt")]
-    [InlineData("/{dir}/{file}.{ext}", "/path/to/nested/dir/file.txt", "dir=path&file=to/nested/dir/file&ext=txt")]
-    public void TestCaptures(string expr, string input, string? expectedCaptures)
+    [InlineData(true, "/{dir}/{file}.{ext}", "/path/file.txt", "dir=path&file=file&ext=txt")]
+    [InlineData(true, "/{dir}/{file:**}.{ext}", "/path/to/nested/dir/file.txt", "dir=path&file=to/nested/dir/file&ext=txt")]
+    public void TestCaptures(bool m, string expr, string input, string? expectedCaptures, string? excessKeys = null)
     {
-        var caseSensitive = expr.Contains("(i)");
-        expr = expr.Replace("(i)", "");
-        var c = caseSensitive ? CaseSensitive : CaseInsensitive;
-        var me = MatchExpression.Parse(c, expr);
-        var path = input;
-        var matched = me.TryMatchVerbose(c, path.AsMemory(), out var result, out var error);
-        if (!matched && expectedCaptures != null)
+        var me = MultiValueMatcher.Parse(expr.AsMemory());
+        var result = me.Match(MatchingContext.Default, input);
+        
+        if (!result.Success && m)
         {
-            Assert.Fail($"Expression {expr} incorrectly failed to match {path} with error {error}");
+            Assert.Fail($"{expr} failed to match '{input}' with error: {result.Error}");
         }
-        if (matched && expectedCaptures == null)
+        if (result.Success && !m)
         {
-            var captureString = result!.Value.Captures == null ? "null" : string.Join("&", result!.Value.Captures.Select(x => $"{x.Name}={x.Value}"));
-            Assert.Fail($"False positive! Expression {expr} should not have matched {path} with captures {captureString}! False positive.");
+            var captureString = result!.Captures == null ? "null" : string.Join("&", result!.Captures.Select(x => $"{x.Key}={x.Value}"));
+            Assert.Fail($"False positive! {expr} should NOT have matched {input} with captures {captureString} and excess query keys {string.Join(",",result.ExcessQueryKeys ?? [])}");
         }
-        var expectedPairs = Imazen.Routing.Helpers.PathHelpers.ParseQuery(expectedCaptures)!
-            .ToDictionary(x => x.Key, x => x.Value.ToString());
-        
-        var actualPairs = result!.Value.Captures!
-            .ToDictionary(x => x.Name, x => x.Value.ToString());
-        
-        Assert.Equal(expectedPairs, actualPairs);
-        
+        if (expectedCaptures == null)
+        {
+            return;
+        }
+
+        if (result.Success)
+        {
+            var expectedPairs = Imazen.Routing.Helpers.PathHelpers.ParseQuery(expectedCaptures)!
+                .ToDictionary(x => x.Key, x => x.Value.ToString());
+
+            var actualPairs = result!.Captures!
+                .ToDictionary(x => x.Key, x => x.Value.ToString());
+
+            Assert.Equal(expectedPairs, actualPairs);
+            
+            // Check excess keys
+            if (excessKeys != null)
+            {
+                var expectedExcessKeys = excessKeys.Split(',');
+                Assert.Equal(expectedExcessKeys, result.ExcessQueryKeys);
+            }
+        }
+
     }
     [Theory]
     [InlineData("{name:starts(foo):ends(bar)?}", false)]
@@ -189,8 +180,8 @@ public class MatchExpressionTests
     [InlineData("{name:range(1,100):?}", true)]
     [InlineData("{name:image-ext-supported}", true)]
     [InlineData("{name:image-ext-supported:?}", true)]
-    [InlineData("{name:allowed-chars([a-zA-Z0-9_\\-])}", true)]
-    [InlineData("{name:allowed-chars([a-zA-Z0-9_\\-]):?}", true)]
+    [InlineData("{name:allow([a-zA-Z0-9_\\-])}", true)]
+    [InlineData("{name:allow([a-zA-Z0-9_\\-]):?}", true)]
     [InlineData("{name:starts-chars(3,[a-zA-Z])}", true)]
     [InlineData("{name:starts-chars(3,[a-zA-Z]):?}", true)]
     [InlineData("{name:ends([$%^])}", true)]
@@ -238,21 +229,32 @@ public class MatchExpressionTests
     [InlineData("{:starts-with(hi)}", true)]
     [InlineData("{:ends-with-i(hi)}", true)]
     [InlineData("{:ends-with(hi)}", true)]
-    public void TestMatchExpressionParsing(string expression, bool shouldParse)
+    public void TestSimpleMatchExpressionParsing(string exp, bool ok)
     {
-        var context = MatchingContext.DefaultCaseInsensitive;
-        var result = MatchExpression.TryParse(context, expression, out var matchExpression, out var error);
+        var context = ExpressionParsingOptions.ParseComplete(exp.AsMemory(), out var remainingExpr);
+        var result = MatchExpression.TryParse(context, remainingExpr, out var matchExpression, out var error);
 
-        if (shouldParse)
+        if (ok)
         {
-            Assert.True(result, $"Expression '{expression}' should parse successfully, but got error: {error}");
+            Assert.True(result, $"Expression '{exp}' should parse successfully, but got error: {error}");
             Assert.NotNull(matchExpression);
         }
         else
         {
-            Assert.False(result, $"Expression '{expression}' should not parse successfully, but it did.");
+            Assert.False(result, $"Expression '{exp}' should not parse successfully, but it did.");
             Assert.Null(matchExpression);
             Assert.NotNull(error);
         }
     }
+    
+    //Test MultiValueMatcher parsing
+    
+    [Theory]
+    [InlineData("{path}?key={value}[query]", true)]
+    [InlineData("{path}?key={value}&key2={value2}[query]", true)]
+    public void TestMultiValueMatcherParsing(string exp, bool ok)
+    {
+        var result = MultiValueMatcher.Parse(exp.AsMemory());
+    }
+    
 }

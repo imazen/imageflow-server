@@ -4,7 +4,7 @@ namespace Imazen.Routing.HttpAbstractions;
 
 
 /// <summary>
-/// Can be created over an IQueryCollection or NameValueCollection or IEnumerable<KeyValuePair<string,StringValues>> or Dictionary<string,string>
+/// Can be created over an IQueryCollection or NameValueCollection or IEnumerable&lt;KeyValuePair&lt;string,StringValues>> or Dictionary&lt;string,string>
 /// </summary>
 public interface IReadOnlyQueryWrapper : IReadOnlyCollection<KeyValuePair<string,StringValues>>
 {
@@ -13,5 +13,4 @@ public interface IReadOnlyQueryWrapper : IReadOnlyCollection<KeyValuePair<string
     bool ContainsKey(string key);
     StringValues this[string key] { get; }
     IEnumerable<string> Keys { get; }
-    
 }

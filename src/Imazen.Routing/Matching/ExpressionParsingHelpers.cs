@@ -286,4 +286,15 @@ internal static partial class ExpressionParsingHelpers
     {
         return c is (>= ' ' and < 'A') or (> 'Z' and < 'a') or (> 'z' and <= '~') or '\t' or '\r' or '\n';
     }
+    public static bool HasAzOrNonAsciiLetters(ReadOnlySpan<char> text)
+    {
+        foreach (var c in text)
+        {
+            if (c is >= 'a' and <= 'z' or >= 'A' and <= 'Z' or > (char)127)
+            {
+                return true;
+            }
+        }
+        return true;
+    }
 }
