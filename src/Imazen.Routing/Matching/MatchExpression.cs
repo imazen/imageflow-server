@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using Imazen.Abstractions.HttpStrings;
 using Imazen.Routing.Helpers;
 using Imazen.Routing.HttpAbstractions;
+using Microsoft.Extensions.Primitives;
 
 namespace Imazen.Routing.Matching;
 
@@ -225,6 +226,11 @@ public record ParsingOptions
     public bool IgnorePath { get; init; } = false;
     
     /// <summary>
+    /// If true, matching will only succeed if the Accept HTTP header is present and contains 'image/webp'
+    /// </summary>
+    public bool RequireAcceptWebP { get; init; }
+    
+    /// <summary>
     /// If no query matcher is specified, query-prohibit-excess will be respected but nothing else.
     /// 
     /// </summary>
@@ -270,6 +276,11 @@ public record ParsingOptions
             context = context with { IgnorePath = true };
         }
 
+        if (flags.Remove("require-accept-webp"))
+        {
+            context = context with { RequireAcceptWebP = true };
+        }
+
         context = context with
         {
             QueryParsingOptions = QueryParsingOptions.SubtractFromFlags(flags, context.QueryParsingOptions)
@@ -280,6 +291,7 @@ public record ParsingOptions
         };
         return context;
     }
+
 }
 
 
@@ -366,7 +378,7 @@ public record MultiValueMatcher(
     }
 
 
-    internal MultiMatchResult Match(in MatchingContext context, in string pathAndQuery)
+    internal MultiMatchResult Match(in MatchingContext context, in string pathAndQuery, in string? headerAsQuery = null)
     {
         var pathEnd = pathAndQuery.IndexOf('?') > -1 ? pathAndQuery.IndexOf('?') : pathAndQuery.Length;
         var path = ParsingOptions.IgnorePath ? "" : pathAndQuery[..pathEnd];
@@ -375,13 +387,23 @@ public record MultiValueMatcher(
         ReadOnlyMemory<char>? rawQuery  = pathAndQuery[pathEnd..].AsMemory();
         ReadOnlyMemory<char>? rawPathAndQuery = pathAndQuery.AsMemory();
         ReadOnlyMemory<char>? sorted = null;
-        return Match(context, path.AsMemory(), queryWrapper, ref rawQuery, ref rawPathAndQuery, ref sorted);
+        var headers = headerAsQuery != null ? QueryHelpers.ParseQuery(headerAsQuery) : null;
+        return Match(context, path.AsMemory(), queryWrapper, headers, ref rawQuery, ref rawPathAndQuery, ref sorted);
     }
 
     internal MultiMatchResult Match(in MatchingContext context, in ReadOnlyMemory<char> path,
-        IReadOnlyQueryWrapper? query,
+        IReadOnlyQueryWrapper? query, IDictionary<string, StringValues>? headers,
         ref ReadOnlyMemory<char>? rawQuery, ref ReadOnlyMemory<char>? rawPathAndQuery, ref ReadOnlyMemory<char>? pathAndSortedQuery)
     {
+        if (ParsingOptions.RequireAcceptWebP && 
+            (headers == null
+             || !headers.TryGetValue(HttpHeaderNames.Accept, out var accept)
+             || !accept.Any(s => s.Contains("image/webp"))))
+        {
+            return new MultiMatchResult()
+                { Success = false, Error = "'image/webp' was not found in the HTTP Accept header string" };
+        }
+
         var pathInput = ParsingOptions.IgnorePath ? "".AsMemory() : path;
         if (ParsingOptions.RawQueryAndPath)
         {
@@ -640,17 +662,17 @@ public partial record MatchExpression
     }
     
     
-#if NET8_0_OR_GREATER
-    [GeneratedRegex(@"^(([^{]+)|((?<!\\)\{.*(?<!\\)\}))+$",
-        RegexOptions.CultureInvariant | RegexOptions.Singleline)]
-    private static partial Regex SplitSections();
-    #else
-    
-    private static readonly Regex SplitSectionsVar = 
-        new(@"^(([^*{]+)|((?<!\\)\{.*(?<!\\)\}))+$",
-        RegexOptions.CultureInvariant | RegexOptions.Singleline, TimeSpan.FromMilliseconds(50));
-    private static Regex SplitSections() => SplitSectionsVar;
-    #endif
+// #if NET8_0_OR_GREATER
+//     [GeneratedRegex(@"^(([^{]+)|((?<!\\)\{.*(?<!\\)\}))+$",
+//         RegexOptions.CultureInvariant | RegexOptions.Singleline)]
+//     private static partial Regex SplitSections();
+//     #else
+//     
+//     private static readonly Regex SplitSectionsVar = 
+//         new(@"^(([^*{]+)|((?<!\\)\{.*(?<!\\)\}))+$",
+//         RegexOptions.CultureInvariant | RegexOptions.Singleline, TimeSpan.FromMilliseconds(50));
+//     private static Regex SplitSections() => SplitSectionsVar;
+//     #endif
     public static MatchExpression Parse(ExpressionParsingOptions options, string expression)
     {
         if (!TryParse(options, expression.AsMemory(), out var result, out var error))
@@ -898,7 +920,7 @@ public partial record MatchExpression
         pathMatcherResult = pathMatcher;
         
         queryValueMatchersResult = queryValueMatchers;
-        // TODO: Now look for naming conflicts among them all
+        
         var allSegments = (pathMatcher?.Segments ?? []).Concat(queryValueMatchers.Values.SelectMany(x => x.Segments))
             .Where(s => !string.IsNullOrEmpty(s.Name))
             .Select(s => s.Name).ToArray();
@@ -1304,7 +1326,7 @@ internal readonly record struct
         segmentStartLogic ??= SegmentBoundary.DefaultStart;
         segmentEndLogic ??= SegmentBoundary.DefaultEnd;
         
-        
+        // TODO: Throw error on * or **, since they change nothing
         // if (!doubleStarFound && !options.CaptureSlashesByDefault && !segmentStartLogic.Value.MatchesEntireSegment)
         // {
         //     conditions ??= new List<StringCondition>();

@@ -1,7 +1,7 @@
-using System;
 using Imazen.Routing.Matching;
 using Xunit;
 
+namespace Imazen.Tests.Routing.Matching;
 public class CharacterClassTests
 {
     [Theory]

@@ -362,8 +362,8 @@ public record CharacterClass(
             if (indexOfDash == 0 || indexOfDash == tokens.Count - 1 || !tokens[indexOfDash - 1].IsValidCharacter ||
                 !tokens[indexOfDash + 1].IsValidCharacter)
             {
-                //TODO: improve error message
-                error = "Dashes can only be used between single characters in a character class";
+                
+                error = "Invalid dash in character class - escape it \\- or ensure the characters to the left and right are valid characters";
                 result = default;
                 return false;
             }

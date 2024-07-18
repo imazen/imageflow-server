@@ -1,3 +1,4 @@
+using Imazen.Abstractions.Resulting;
 using Imazen.Routing.Matching;
 using Xunit;
 
@@ -248,13 +249,25 @@ public class MatchExpressionTests
     }
     
     //Test MultiValueMatcher parsing
-    
+
     [Theory]
-    [InlineData("{path}?key={value}[query]", true)]
-    [InlineData("{path}?key={value}&key2={value2}[query]", true)]
+    [InlineData("{path}?key={value}", true)]
+    [InlineData("{path}?key={value}&key2={value2}[require-accept-webp]", true)]
+    [InlineData("{path}?key={value}&key2={value2}[raw]", true)]
     public void TestMultiValueMatcherParsing(string exp, bool ok)
     {
-        var result = MultiValueMatcher.Parse(exp.AsMemory());
+        if (ok != MultiValueMatcher.TryParse(exp.AsMemory(), out var result, out var error))
+        {
+            if (ok)
+            {
+                Assert.Null(error);
+                Assert.NotNull(result);
+                Assert.True(result.UnusedFlags == null || result.UnusedFlags.Flags.Count == 0);
+            }
+            if (!ok) Assert.Fail($"Expression {exp} parsed, but should have failed");
+        }
     }
     
+     
+
 }

@@ -16,5 +16,6 @@ public static class HttpHeaderNames
     public static readonly string Date = "Date";
     public static readonly string Connection = "Connection";
     public static readonly string KeepAlive = "Keep-Alive";
+    public static readonly string Accept = "Accept";
     
 }
