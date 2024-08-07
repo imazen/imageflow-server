@@ -1,26 +1,133 @@
 # Design of route matcher syntax
 
+This system never backtracks, ensuring that the matching process is always O(n) in the length of the path. Not all conditions are involved in capturing; many are validated after input is segmented.
+
+
+When a querystring is specified in the expression, it is structurally parsed and matched regardless of 
+how the querystring is arranged, and extra unspecified keys are ignored.
+
+`/images/{sku:int}/{image_id:int}.{format:only(jpg|png|gif)}?w={width:int:?}`
+`/san/productimages/{{image_id}.{{format}}?format=webp&w={{width:default(40)}}`
+
+`/images/{sku:int}/{image_id:int}.{format:only(jpg|png|gif)}?w={w:int:?}&width={width:int:?}&http-accept={:contains(image/webp)}`
+
+
+`/san/productimages/{{image_id}.{{format}}?format=webp&w={{width:or-var(w):default(40)}}`
+
+
+# MatchExpression Syntax Reference
+
+## Segment Boundary Matching
+
+** These affect where captures start and stop, and how the input is divided up **
+
+- `equals(string)`: Matches a segment that equals the specified string.
+- `equals-i(string)`: Matches a segment that equals the specified string, ignoring case.
+- `starts-with(string)`: Matches a segment that starts with the specified string.
+- `starts-with-i(string)`: Matches a segment that starts with the specified string, ignoring case.
+- `ends-with(string)`: Matches a segment that ends with the specified string.
+- `ends-with-i(string)`: Matches a segment that ends with the specified string, ignoring case.
+- `len(int)`: Matches a segment with a fixed length specified by the integer.
+- `equals(char)`: Matches a segment that equals the specified character.
+- `prefix(string)`: Matches a segment that starts with the specified string, not including it in the captured value.
+- `prefix-i(string)`: Matches a segment that starts with the specified string, ignoring case and not including it in the captured value.
+- `suffix(string)`: Matches a segment that ends with the specified string, not including it in the captured value.
+- `suffix-i(string)`: Matches a segment that ends with the specified string, ignoring case and not including it in the captured value.
+
+## After-matching Segment Conditions
+
+** These are validated *after* the input is parsed into matching segments. Thus, they do not affect
+where a capture starts and stops. **
+
+- `alpha()`: Matches a segment that contains only alphabetic characters.
+- `alpha-lower()`: Matches a segment that contains only lowercase alphabetic characters.
+- `alpha-upper()`: Matches a segment that contains only uppercase alphabetic characters.
+- `alphanumeric()`: Matches a segment that contains only alphanumeric characters.
+- `hex()`: Matches a segment that contains only hexadecimal characters.
+- `int32()`: Matches a segment that represents a valid 32-bit integer.
+- `int64()`: Matches a segment that represents a valid 64-bit integer.
+- `guid()`: Matches a segment that represents a valid GUID.
+- `equals(string1|string2|...)`: Matches a segment that equals one of the specified strings.
+- `equals-i(string1|string2|...)`: Matches a segment that equals one of the specified strings, ignoring case.
+- `starts-with(string1|string2|...)`: Matches a segment that starts with one of the specified strings.
+- `starts-with-i(string1|string2|...)`: Matches a segment that starts with one of the specified strings, ignoring case.
+- `ends-with(string1|string2|...)`: Matches a segment that ends with one of the specified strings.
+- `ends-with-i(string1|string2|...)`: Matches a segment that ends with one of the specified strings, ignoring case.
+- `contains(string)`: Matches a segment that contains the specified string.
+- `contains-i(string)`: Matches a segment that contains the specified string, ignoring case.
+- `contains(string1|string2|...)`: Matches a segment that contains one of the specified strings.
+- `contains-i(string1|string2|...)`: Matches a segment that contains one of the specified strings, ignoring case.
+- `range(min,max)`: Matches a segment that represents an integer within the specified range (inclusive).
+- `range(min,)`: Matches a segment that represents an integer greater than or equal to the specified minimum value.
+- `range(,max)`: Matches a segment that represents an integer less than or equal to the specified maximum value.
+- `length(min,max)`: Matches a segment with a length within the specified range (inclusive).
+- `length(min,)`: Matches a segment with a length greater than or equal to the specified minimum length.
+- `length(,max)`: Matches a segment with a length less than or equal to the specified maximum length.
+- `image-ext-supported()`: Matches a segment that represents a supported image file extension.
+- `allowed-chars(CharacterClass)`: Matches a segment that contains only characters from the specified character class.
+- `starts-with-chars(count,CharacterClass)`: Matches a segment that starts with a specified number of characters from the given character class.
+- `image-ext-supported()`: Matches a segment that represents a supported (for image processing) image file extension.
+
+## Optional and Wildcard Segments
+
+- `{segment:condition1:condition2:...:?}`: Marks a segment as optional by appending `?` to the end of the segment conditions.
+- `{?}`: Matches any segment optionally.
+
+## Character Classes
+
+Character classes can be specified using square bracket notation, such as `[a-zA-Z]` to match alphabetic characters or `[0-9]` to match digits. Character classes are not affected by [ignore-case]
+
+## Expression flags
+
+At the end of the match express, you can specify `[flags,commma-separated]`
+
+* `ignore-case` Makes path matching case-insensitive, except for character classes.
+* `case-sensitive` Makes path matching case-sensitive
+* `raw` Matches the raw path and querystring together, rather than structurally parsing and matching the querystring
+* `sort-raw-query-first` Alphabetically sorts the querystring key/value pairs before performing raw matching
+* `ignore-path` Applies the given query matcher to all paths.
+* `require-accept-webp` Only matches if the Accept header is present and includes `image/webp` specifically.
+
+## Escaping Special Characters
+
+Special characters like `{`, `}`, `:`, `?`, `*`, `[`, `]`, `(`, `)`, `|`, and `\` can be escaped using a backslash (`\`) to match them literally in segment conditions or literals.
+
+## URL rewriting and querystring merging
+
+# URL templates
+
+Variables can be inserted in target strings using ${name} or ${name:transform:transform2}
+
+### Transformations
+* `lower` e.g. {var:lower}
+* `upper`
+* more to come
+
+## Flags
+
+* `[stop-here]` - prevents application of further rewrite rules
+* 
+
+
+TODO: sha256/auth stuff
+
+process_image=true
+pass_through=true
+allow_pass_through=true
+stop_here=true
+case_sensitive=true/false (IIS/ASP.NET default to insensitive, but it's a bad default)
+
 
 
 /images/{seo_string_ignored}/{sku:guid}/{image_id:int:range(0,1111111)}{width:int:after(_):optional}.{format:only(jpg|png|gif)}
-/azure/centralstorage/skus/${sku}/images/${image_id}.${format}?format=avif&w=${width}
+/azure/centralstorage/skus/{sku:lower}/images/{image_id}.{format}?format=avif&w={width}
 
-
-/images/{path:*:has_supported_image_type}
-/azure/container/${path}
-
-
+/images/{path:has_supported_image_type}
+/azure/container/{path}
 
 
 
 
-
-
-
-We only want non-backtracking functionality. 
-all conditions are AND, and variable strings are parsed before conditions are applied, with the following exceptions:
-after, until.
-If a condition lacks until, it is taken from the following character.
 
 
 
@@ -33,12 +140,12 @@ They will terminate their matching when the character that follows them is reach
 "/image_{id:int}_seoname"
 "/image_{id:int}_{w:int}_seoname"
 "/image_{id:int}_{w:int:until(_):optional}seoname"
-"/image_{id:int}_{w:int:until(_)}/{**}"
+"/image_{id:int}_{w:int:until(_)}/{}"
 
 A trailing ? means the variable (and its trailing character (leading might be also useful?)) is optional.
 
 Partial matches
-match_path="/images/{path:**}"
+match_path="/images/{path}"
 remove_matched_part_for_children
 
 or
@@ -51,8 +158,6 @@ match_path_and_query
 match_query
 
 
-Variables can be inserted in target strings using ${name:transform}
-where transform can be `lower`, `upper`, `trim`, `trim(a-zA-Z\t\:\\-))
 
 
 ## conditions 
@@ -62,32 +167,6 @@ alpha, alphanumeric, alphalower, alphaupper, guid, hex, int, only([a-zA-Z0-9_\:\
 ends_with(.jpg|.png|.gif), until(), after(), includes(), 
 
 until and after specify trailing and leading characters that are part of the matching group, but are only useful if combined with `optional`.
-
-TODO: sha256/auth stuff
-
-
-respond_400_on_variable_condition_failure=true
-process_image=true
-pass_throgh=true
-allow_pass_through=true
-stop_here=true
-case_sensitive=true/false (IIS/ASP.NET default to insensitive, but it's a bad default)
-
-[routes.accepts_any]
-accept_header_has_type="*/*"
-add_query_value="accepts=*"
-set_query_value="format=auto"
-
-[routes.accepts_webp]
-accept_header_has_type="image/webp"
-add_query_value="accepts=webp"
-set_query_value="format=auto"
-
-[routes.accepts_avif]
-accept_header_has_type="image/avif"
-add_query_value="accepts=avif"
-set_query_value="format=auto"
-
 
 # Escaping characters
 
