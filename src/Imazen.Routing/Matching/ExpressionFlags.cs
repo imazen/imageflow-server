@@ -5,6 +5,14 @@ namespace Imazen.Routing.Matching;
 
 public record ExpressionFlags(ReadOnlyCollection<string> Flags)
 {
+    /// <summary>
+    /// Parses the flags from the end of the expression. Syntax is [flag1,flag2,flag3]
+    /// </summary>
+    /// <param name="expression"></param>
+    /// <param name="remainingExpression"></param>
+    /// <param name="result"></param>
+    /// <param name="error"></param>
+    /// <returns></returns>
     public static bool TryParseFromEnd(ReadOnlyMemory<char> expression,out ReadOnlyMemory<char> remainingExpression, out List<string> result, 
         [NotNullWhen(false)]
         out string? error)

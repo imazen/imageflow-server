@@ -30,10 +30,6 @@ public record PathParsingOptions
         {
             defaults = defaults with { OrdinalIgnoreCase = true };
         }
-        // if (flags.Remove("capture-slashes"))
-        // {
-        //     defaults = defaults with { CaptureSlashesByDefault = true };
-        // }
         if (flags.Remove("allow-star-literal"))
         {
             defaults = defaults with { AllowStarLiteral = true };

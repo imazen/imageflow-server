@@ -287,8 +287,6 @@ internal class MaxResolution : ITomlMetadataProvider, IValidationCapable
 
     }
 }
-
-
 internal class ImageflowConfig : ITomlMetadataProvider, IValidationCapable
 {
     public TomlPropertiesMetadata? PropertiesMetadata { get; set; }
@@ -299,8 +297,6 @@ internal class ImageflowConfig : ITomlMetadataProvider, IValidationCapable
     public AspNetServer? AspnetServer { get; set; }
     // public TomlTable? Vars { get; set; }
     // public Dictionary<string,PresetSection>? Presets { get; set; }
-
-
     public RouteBase? RouteDefaults { get; set; }
 
     //public List<SourceSection>? Sources { get; set; }
