@@ -46,7 +46,7 @@ namespace Imageflow.Server.Tests
 
         
         [Fact]
-        public async void TestLocalFiles()
+        public async Task TestLocalFiles()
         {
             using (var contentRoot = new TempContentRoot(outputHelper)
                 .AddResource("images/fire.jpg", "TestFiles.fire-umbrella-small.jpg")
@@ -165,7 +165,7 @@ namespace Imageflow.Server.Tests
         }
 
         [Fact]
-        public async void TestDiskCache()
+        public async Task TestDiskCache()
         {
             using var contentRoot = new TempContentRoot(outputHelper)
                 .AddResource("images/fire.jpg", "TestFiles.fire-umbrella-small.jpg")
@@ -242,7 +242,7 @@ namespace Imageflow.Server.Tests
         }
 
         [Fact]
-        public async void TestAmazonS3()
+        public async Task TestAmazonS3()
         {
             using var contentRoot = new TempContentRoot(outputHelper)
                 .AddResource("images/fire.jpg", "TestFiles.fire-umbrella-small.jpg")
@@ -296,7 +296,7 @@ namespace Imageflow.Server.Tests
         }
 
         [Fact]
-        public async void TestAmazonS3WithCustomClient()
+        public async Task TestAmazonS3WithCustomClient()
         {
             using (var contentRoot = new TempContentRoot(outputHelper)
                 .AddResource("images/fire.jpg", "TestFiles.fire-umbrella-small.jpg")
@@ -349,7 +349,7 @@ namespace Imageflow.Server.Tests
 
 
         [Fact]
-        public async void TestPresetsExclusive()
+        public async Task TestPresetsExclusive()
         {
             using var contentRoot = new TempContentRoot(outputHelper)
                 .AddResource("images/fire.jpg", "TestFiles.fire-umbrella-small.jpg");
@@ -401,7 +401,7 @@ namespace Imageflow.Server.Tests
         }
 
         [Fact]
-        public async void TestPresets()
+        public async Task TestPresets()
         {
             using (var contentRoot = new TempContentRoot(outputHelper)
                 .AddResource("images/fire.jpg", "TestFiles.fire-umbrella-small.jpg"))
@@ -458,7 +458,7 @@ namespace Imageflow.Server.Tests
         }
         
          [Fact]
-        public async void TestRequestSigning()
+        public async Task TestRequestSigning()
         {
             const string key = "test key";
             using (var contentRoot = new TempContentRoot(outputHelper)
@@ -534,7 +534,7 @@ namespace Imageflow.Server.Tests
         }
         
         [Fact]
-        public async void TestRemoteReaderPlusRequestSigning()
+        public async Task TestRemoteReaderPlusRequestSigning()
         {
             // This is the key we use to encode the remote URL and ensure that we are authorized to fetch the given url
             const string remoteReaderKey = "remoteReaderSigningKey_changeMe";

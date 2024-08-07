@@ -25,12 +25,13 @@ internal class DisposableStreamCacheResult : IStreamCacheResult, IDisposable
 
     public DisposableStreamCacheResult(IConsumableBlob consumableBlob, string status)
     {
+        
         Data = consumableBlob.BorrowStream(DisposalPromise.CallerDisposesStreamThenBlob);
         ContentType = consumableBlob.Attributes?.ContentType;
         Status = status;
     }
 
-    public BlobWrapper Blob { get; }
+    public BlobWrapper? Blob { get; init; }
     
 
     public Stream Data { get; }
@@ -40,7 +41,7 @@ internal class DisposableStreamCacheResult : IStreamCacheResult, IDisposable
     public void Dispose()
     {
         Data.Dispose();
-        Blob.Dispose();
+        Blob?.Dispose();
     }
 }
 internal class LegacyStreamCacheAdapter : IStreamCache

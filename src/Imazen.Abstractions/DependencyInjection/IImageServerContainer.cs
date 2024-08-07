@@ -87,6 +87,7 @@ public class ImageServerContainer(IServiceProvider? outerProvider) : IImageServe
             if (services.TryGetValue(actualServiceType, out var instances))
             {
                 var castMethod = typeof(Enumerable).GetMethod("Cast");
+                //TODO: This won't work for AOT
                 var method = castMethod!.MakeGenericMethod(actualServiceType);
                 return method.Invoke(null, new object[] { instances });
             }

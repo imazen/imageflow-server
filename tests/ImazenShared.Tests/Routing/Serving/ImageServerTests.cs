@@ -69,7 +69,7 @@ public class ImageServerTests : ReLoggerTestBase
     }
 
     [Fact]
-    public async void TestTryHandleRequestAsync()
+    public async Task TestTryHandleRequestAsync()
     {
         var b = new RoutingBuilder();
         b.AddEndpoint(Conditions.PathEquals("/hi"),

@@ -229,7 +229,7 @@ internal static class WithCancellationExtensions
                                         var t2 = (CancelableTaskCompletionSource<T>)s2!;
                                         t2.CancellationTokenRegistration.Dispose();
                                     }
-                                    catch (Exception ex)
+                                    catch (Exception)
                                     {
                                         // Swallow any exception.
                                         //TODO: Report.Fail(ex.Message);

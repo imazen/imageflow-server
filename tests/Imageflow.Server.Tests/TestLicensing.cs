@@ -69,7 +69,7 @@ namespace Imageflow.Server.Tests
         }
         
         [Fact]
-        public async void TestNoLicense()
+        public async Task TestNoLicense()
         {
             using (var contentRoot = new TempContentRoot(output)
                 .AddResource("images/fire.jpg", "TestFiles.fire-umbrella-small.jpg"))
@@ -117,7 +117,7 @@ namespace Imageflow.Server.Tests
         }
         
         [Fact]
-        public async void TestAGPL()
+        public async Task TestAGPL()
         {
             using (var contentRoot = new TempContentRoot(output)
                 .AddResource("images/fire.jpg", "TestFiles.fire-umbrella-small.jpg"))
@@ -152,7 +152,7 @@ namespace Imageflow.Server.Tests
         }
         
         [Fact]
-        public async void TestDomainsLicense()
+        public async Task TestDomainsLicense()
         {
             if ("true".Equals(Environment.GetEnvironmentVariable("CI"), StringComparison.OrdinalIgnoreCase))
             {
@@ -225,7 +225,7 @@ namespace Imageflow.Server.Tests
         }
         
         [Fact]
-        public async void TestSiteLicense()
+        public async Task TestSiteLicense()
         {
             using (var contentRoot = new TempContentRoot(output)
                 .AddResource("images/fire.jpg", "TestFiles.fire-umbrella-small.jpg"))
@@ -288,7 +288,7 @@ namespace Imageflow.Server.Tests
         [InlineData("CancelledImageflow")]
         [InlineData("SoftRevocationImageflow")]
         [InlineData("HardRevocationImageflow")]
-        public async void TestRevocations(string licenseSetName)
+        public async Task TestRevocations(string licenseSetName)
         {
             // Skip this on CI
             var isCi = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("CI"));

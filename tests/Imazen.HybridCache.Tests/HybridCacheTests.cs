@@ -6,13 +6,17 @@ using Imazen.Common.Extensibility.StreamCache;
 using Imazen.HybridCache.MetaStore;
 using Imazen.Routing.Caching.Internal;
 using Imazen.Routing.Tests.Serving;
+using Imazen.Tests.Routing.Serving;
 using Xunit;
+#pragma warning disable CS0618 // Type or member is obsolete
 
 namespace Imazen.HybridCache.Tests
 {
-    public class HybridCacheTests
+    public class HybridCacheTests : ReLoggerTestBase
     {
-        
+        public HybridCacheTests() : base("HybridCacheTests")
+        {
+        }
         
         [Fact]
         public async Task SmokeTest()
@@ -27,13 +31,13 @@ namespace Imazen.HybridCache.Tests
                     UniqueName = "HybridCache"
                 }
             };
-            var database = new MetaStore.MetaStore(new MetaStoreOptions(path), cacheOptions, null);
-            HybridCache hybridCache = new HybridCache(database,cacheOptions, null);
+            var database = new MetaStore.MetaStore(new MetaStoreOptions(path), cacheOptions, logger);
+            HybridCache hybridCache = new HybridCache(database,cacheOptions, logger);
             var memoryLogger = MockHelpers.MakeMemoryLoggerFactory(new List<MemoryLogEntry>());
             var cache = new LegacyStreamCacheAdapter(hybridCache,new StreamCacheAdapterOptions()
             {
                 WriteSynchronouslyWhenQueueFull = true,
-            },null);
+            },logger);
             try
             {
                 await cache.StartAsync(cancellationToken);
@@ -68,7 +72,7 @@ namespace Imazen.HybridCache.Tests
                 var key2 = new byte[] {2, 1, 2, 3};
                 Task<IStreamCacheInput> DataProvider2(CancellationToken token)
                 {
-                    return Task.FromResult(new StreamCacheInput(null, new ArraySegment<byte>(new byte[4000])).ToIStreamCacheInput());
+                    return Task.FromResult(new StreamCacheInput("application/octet-stream", new ArraySegment<byte>(new byte[4000])).ToIStreamCacheInput());
                 }
                 var result4 = await cache.GetOrCreateBytes(key2, DataProvider2, cancellationToken, true);
                 using var rd4 = result4 as IDisposable;

@@ -10,7 +10,7 @@ namespace Imazen.Common.Tests
         /// </summary>
         /// <exception cref="Exception"></exception>
         [Fact]
-        public async void TestActiveLockCount()
+        public async Task TestActiveLockCount()
         {
             var provider = new AsyncLockProvider();
             var task = provider.TryExecuteAsync("1", 1500,CancellationToken.None,  async () =>

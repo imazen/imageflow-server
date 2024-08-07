@@ -38,7 +38,7 @@ public class ConcurrencyHelpersTests
         Assert.Equal(2, result);
     }
     [Fact]
-    public async void WhenAnyMatchesOrDefault_IgnoresFailedTasks()
+    public async Task WhenAnyMatchesOrDefault_IgnoresFailedTasks()
     {
         var tasks = new List<Task<int>>
         {

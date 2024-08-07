@@ -288,7 +288,7 @@ namespace Imazen.Common.Tests.Licensing
             Assert.Equal(4, Interlocked.CompareExchange(ref v, 0, 4));
         }
         [Fact]
-        public void TestInterlockedMax()
+        public async Task TestInterlockedMax()
         {
             long v = 0;
             var tasks = Enumerable.Repeat(0, 30).Select((j) => Task.Run(() =>
@@ -303,7 +303,7 @@ namespace Imazen.Common.Tests.Licensing
         }
 
         [Fact]
-        public void TestInterlockedMin()
+        public async Task TestInterlockedMin()
         {
             long v = 0;
             var tasks = Enumerable.Repeat(0, 30).Select((j) => Task.Run(() =>

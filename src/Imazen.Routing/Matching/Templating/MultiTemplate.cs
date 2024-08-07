@@ -50,12 +50,12 @@ MultiTemplateOptions? Options, ExpressionFlags? UnusedFlags)
 
     private static bool TryParseWithSmartQuery(ParsingOptions context, ReadOnlyMemory<char> expressionWithoutFlags, 
         out StringTemplate? pathTemplate, out IReadOnlyDictionary<string, StringTemplate>? queryTemplates 
-        , out string? error)
+        , [NotNullWhen(false)] out string? error)
     {
         throw new NotImplementedException();
     }
 
-    public string GetValidationErrors()
+    public string? GetValidationErrors()
     {
         
         //TODO: wrong
