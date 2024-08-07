@@ -25,7 +25,7 @@
     </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Imageflow.AllPlatforms" Version="0.13.1" />
+    <PackageReference Include="Imageflow.AllPlatforms" Version="0.13.2" />
     <PackageReference Include="Microsoft.IO.RecyclableMemoryStream" Version="3.0.0" />
   </ItemGroup>
 

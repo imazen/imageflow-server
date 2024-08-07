@@ -14,12 +14,12 @@
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Supernova.Enum.Generators" Version="1.0.15">
+        <PackageReference Include="Supernova.Enum.Generators" Version="1.0.17">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
 
-        <PackageReference Include="Imageflow.Net" Version="0.13.0" />
+        <PackageReference Include="Imageflow.Net" Version="0.13.2" />
         <PackageReference Include="System.Collections.Immutable" Version="6.*" />
         <PackageReference Include="CommunityToolkit.HighPerformance" Version="8.*" />
         <PackageReference Include="System.IO.Pipelines" Version="6.*" />

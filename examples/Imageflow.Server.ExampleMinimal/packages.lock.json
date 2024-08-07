@@ -9,14 +9,14 @@
       },
       "Imageflow.AllPlatforms": {
         "type": "Transitive",
-        "resolved": "0.13.1",
-        "contentHash": "cOuUD9JqwgGqkOwaXe3rjmHdA8F1x1Bqsu4m9x9tgJUGsMqytOeujYHz/trctU+VY8rODoCVw4fStJ8vVELIeQ==",
+        "resolved": "0.13.2",
+        "contentHash": "RAvdU2qaqP+orATtDoy0C1e5ZmxECNkO4LPyYAcRNM4E1p86zyPh3H1mlmnncBrgU0799aXsvginm8/m3IoLBw==",
         "dependencies": {
           "Imageflow.NativeRuntime.osx-x86_64": "2.0.0-preview8",
           "Imageflow.NativeRuntime.ubuntu-x86_64": "2.0.0-preview8",
           "Imageflow.NativeRuntime.win-x86": "2.0.0-preview8",
           "Imageflow.NativeRuntime.win-x86_64": "2.0.0-preview8",
-          "Imageflow.Net": "0.13.1"
+          "Imageflow.Net": "0.13.2"
         }
       },
       "Imageflow.NativeRuntime.osx-x86_64": {
@@ -41,8 +41,8 @@
       },
       "Imageflow.Net": {
         "type": "Transitive",
-        "resolved": "0.13.1",
-        "contentHash": "QHSghMGgiy4DhRloqEgNaaY+AM/28mwSF5Q371B90JyKDGIEtJPYMX+d8AkCmHuuf9Tgc6Zl8v+9ieY5yXGcNw==",
+        "resolved": "0.13.2",
+        "contentHash": "9HGmpQY5NzuoVtsnm3I+6tkCFnPDHqhlQDekBlnpYVL8t/YiMUPdf+rrl5D1RNO7Hor2Vs1Xno0wZEF7ER39tQ==",
         "dependencies": {
           "Microsoft.IO.RecyclableMemoryStream": "[3.0.0, 4.0.0)",
           "System.Text.Json": "6.0.9"
@@ -142,7 +142,7 @@
       "imageflow.server": {
         "type": "Project",
         "dependencies": {
-          "Imageflow.AllPlatforms": "[0.13.1, )",
+          "Imageflow.AllPlatforms": "[0.13.2, )",
           "Imazen.Common": "[0.1.0--notset, )",
           "Imazen.Routing": "[0.1.0--notset, )",
           "Microsoft.IO.RecyclableMemoryStream": "[3.0.0, )"
@@ -168,7 +168,7 @@
         "type": "Project",
         "dependencies": {
           "CommunityToolkit.HighPerformance": "[8.*, )",
-          "Imageflow.Net": "[0.13.0, )",
+          "Imageflow.Net": "[0.13.2, )",
           "Imazen.Abstractions": "[0.1.0--notset, )",
           "Imazen.Common": "[0.1.0--notset, )",
           "System.Collections.Immutable": "[6.*, )",

@@ -4,11 +4,11 @@
     ".NETStandard,Version=v2.0": {
       "AWSSDK.S3": {
         "type": "Direct",
-        "requested": "[3.7.305.31, )",
-        "resolved": "3.7.305.31",
-        "contentHash": "ElvGvXAekMu0FwY7LJSOeaVi47rafgLFEz2C+e7Y5+kHhsO8FIKcum4pLubKUwbd20VPvN/G2m9oBShbz6al+g==",
+        "requested": "[3.7.400.3, )",
+        "resolved": "3.7.400.3",
+        "contentHash": "lxnDAjuQPRAALyzmPyeDzTLVU3t0o5CTS59lywCC4GEW0iHwiJH6JIGJW2yHrd0kuXcrOpyhiAzv7Hcbb24zsQ==",
         "dependencies": {
-          "AWSSDK.Core": "[3.7.302.16, 4.0.0)"
+          "AWSSDK.Core": "[3.7.400.3, 4.0.0)"
         }
       },
       "Microsoft.CodeAnalysis.PublicApiAnalyzers": {
@@ -38,8 +38,8 @@
       },
       "AWSSDK.Core": {
         "type": "Transitive",
-        "resolved": "3.7.302.16",
-        "contentHash": "iR/YHr8gkDqXHlOcSEzPFljboB8B7UhXdm3NfzvMeLGDW+pD3Xfs1+oh98DS1+PfC7rZKGco8jYEjOZgt7vwpw==",
+        "resolved": "3.7.400.3",
+        "contentHash": "Sw88+Hdw1OsA0++zImHbYJa7FA6OznFhtbB9wJjrAA5O4i/LOhqu1Zh7YjLBL4n1hkicbHSAlPmHP6Kgw70Xkg==",
         "dependencies": {
           "Microsoft.Bcl.AsyncInterfaces": "1.1.0"
         }
@@ -57,8 +57,8 @@
       },
       "Imageflow.Net": {
         "type": "Transitive",
-        "resolved": "0.13.0",
-        "contentHash": "nH3P2rLt5rNjPnDlCJ2n1qHLloNc0n+Iym8OVqk6neyW7+Gamuo4iuAXm4daQvcr354qD0St28kyl7j66oMC9g==",
+        "resolved": "0.13.2",
+        "contentHash": "9HGmpQY5NzuoVtsnm3I+6tkCFnPDHqhlQDekBlnpYVL8t/YiMUPdf+rrl5D1RNO7Hor2Vs1Xno0wZEF7ER39tQ==",
         "dependencies": {
           "Microsoft.IO.RecyclableMemoryStream": "[3.0.0, 4.0.0)",
           "System.Buffers": "4.5.1",
@@ -249,7 +249,7 @@
         "type": "Project",
         "dependencies": {
           "CommunityToolkit.HighPerformance": "[8.*, )",
-          "Imageflow.Net": "[0.13.0, )",
+          "Imageflow.Net": "[0.13.2, )",
           "Imazen.Abstractions": "[0.1.0--notset, )",
           "Imazen.Common": "[0.1.0--notset, )",
           "System.Collections.Immutable": "[6.*, )",
@@ -261,11 +261,11 @@
     "net6.0": {
       "AWSSDK.S3": {
         "type": "Direct",
-        "requested": "[3.7.305.31, )",
-        "resolved": "3.7.305.31",
-        "contentHash": "ElvGvXAekMu0FwY7LJSOeaVi47rafgLFEz2C+e7Y5+kHhsO8FIKcum4pLubKUwbd20VPvN/G2m9oBShbz6al+g==",
+        "requested": "[3.7.400.3, )",
+        "resolved": "3.7.400.3",
+        "contentHash": "lxnDAjuQPRAALyzmPyeDzTLVU3t0o5CTS59lywCC4GEW0iHwiJH6JIGJW2yHrd0kuXcrOpyhiAzv7Hcbb24zsQ==",
         "dependencies": {
-          "AWSSDK.Core": "[3.7.302.16, 4.0.0)"
+          "AWSSDK.Core": "[3.7.400.3, 4.0.0)"
         }
       },
       "Microsoft.CodeAnalysis.PublicApiAnalyzers": {
@@ -286,8 +286,8 @@
       },
       "AWSSDK.Core": {
         "type": "Transitive",
-        "resolved": "3.7.302.16",
-        "contentHash": "iR/YHr8gkDqXHlOcSEzPFljboB8B7UhXdm3NfzvMeLGDW+pD3Xfs1+oh98DS1+PfC7rZKGco8jYEjOZgt7vwpw=="
+        "resolved": "3.7.400.3",
+        "contentHash": "Sw88+Hdw1OsA0++zImHbYJa7FA6OznFhtbB9wJjrAA5O4i/LOhqu1Zh7YjLBL4n1hkicbHSAlPmHP6Kgw70Xkg=="
       },
       "CommunityToolkit.HighPerformance": {
         "type": "Transitive",
@@ -296,8 +296,8 @@
       },
       "Imageflow.Net": {
         "type": "Transitive",
-        "resolved": "0.13.0",
-        "contentHash": "nH3P2rLt5rNjPnDlCJ2n1qHLloNc0n+Iym8OVqk6neyW7+Gamuo4iuAXm4daQvcr354qD0St28kyl7j66oMC9g==",
+        "resolved": "0.13.2",
+        "contentHash": "9HGmpQY5NzuoVtsnm3I+6tkCFnPDHqhlQDekBlnpYVL8t/YiMUPdf+rrl5D1RNO7Hor2Vs1Xno0wZEF7ER39tQ==",
         "dependencies": {
           "Microsoft.IO.RecyclableMemoryStream": "[3.0.0, 4.0.0)",
           "System.Text.Json": "6.0.9"
@@ -424,7 +424,7 @@
         "type": "Project",
         "dependencies": {
           "CommunityToolkit.HighPerformance": "[8.*, )",
-          "Imageflow.Net": "[0.13.0, )",
+          "Imageflow.Net": "[0.13.2, )",
           "Imazen.Abstractions": "[0.1.0--notset, )",
           "Imazen.Common": "[0.1.0--notset, )",
           "System.Collections.Immutable": "[6.*, )",
@@ -435,11 +435,11 @@
     "net8.0": {
       "AWSSDK.S3": {
         "type": "Direct",
-        "requested": "[3.7.305.31, )",
-        "resolved": "3.7.305.31",
-        "contentHash": "ElvGvXAekMu0FwY7LJSOeaVi47rafgLFEz2C+e7Y5+kHhsO8FIKcum4pLubKUwbd20VPvN/G2m9oBShbz6al+g==",
+        "requested": "[3.7.400.3, )",
+        "resolved": "3.7.400.3",
+        "contentHash": "lxnDAjuQPRAALyzmPyeDzTLVU3t0o5CTS59lywCC4GEW0iHwiJH6JIGJW2yHrd0kuXcrOpyhiAzv7Hcbb24zsQ==",
         "dependencies": {
-          "AWSSDK.Core": "[3.7.302.16, 4.0.0)"
+          "AWSSDK.Core": "[3.7.400.3, 4.0.0)"
         }
       },
       "Microsoft.CodeAnalysis.PublicApiAnalyzers": {
@@ -460,8 +460,8 @@
       },
       "AWSSDK.Core": {
         "type": "Transitive",
-        "resolved": "3.7.302.16",
-        "contentHash": "iR/YHr8gkDqXHlOcSEzPFljboB8B7UhXdm3NfzvMeLGDW+pD3Xfs1+oh98DS1+PfC7rZKGco8jYEjOZgt7vwpw=="
+        "resolved": "3.7.400.3",
+        "contentHash": "Sw88+Hdw1OsA0++zImHbYJa7FA6OznFhtbB9wJjrAA5O4i/LOhqu1Zh7YjLBL4n1hkicbHSAlPmHP6Kgw70Xkg=="
       },
       "CommunityToolkit.HighPerformance": {
         "type": "Transitive",
@@ -470,8 +470,8 @@
       },
       "Imageflow.Net": {
         "type": "Transitive",
-        "resolved": "0.13.0",
-        "contentHash": "nH3P2rLt5rNjPnDlCJ2n1qHLloNc0n+Iym8OVqk6neyW7+Gamuo4iuAXm4daQvcr354qD0St28kyl7j66oMC9g==",
+        "resolved": "0.13.2",
+        "contentHash": "9HGmpQY5NzuoVtsnm3I+6tkCFnPDHqhlQDekBlnpYVL8t/YiMUPdf+rrl5D1RNO7Hor2Vs1Xno0wZEF7ER39tQ==",
         "dependencies": {
           "Microsoft.IO.RecyclableMemoryStream": "[3.0.0, 4.0.0)",
           "System.Text.Json": "6.0.9"
@@ -598,7 +598,7 @@
         "type": "Project",
         "dependencies": {
           "CommunityToolkit.HighPerformance": "[8.*, )",
-          "Imageflow.Net": "[0.13.0, )",
+          "Imageflow.Net": "[0.13.2, )",
           "Imazen.Abstractions": "[0.1.0--notset, )",
           "Imazen.Common": "[0.1.0--notset, )",
           "System.Collections.Immutable": "[6.*, )",

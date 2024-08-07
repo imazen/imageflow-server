@@ -4,15 +4,15 @@
     "net6.0": {
       "Imageflow.AllPlatforms": {
         "type": "Direct",
-        "requested": "[0.13.1, )",
-        "resolved": "0.13.1",
-        "contentHash": "cOuUD9JqwgGqkOwaXe3rjmHdA8F1x1Bqsu4m9x9tgJUGsMqytOeujYHz/trctU+VY8rODoCVw4fStJ8vVELIeQ==",
+        "requested": "[0.13.2, )",
+        "resolved": "0.13.2",
+        "contentHash": "RAvdU2qaqP+orATtDoy0C1e5ZmxECNkO4LPyYAcRNM4E1p86zyPh3H1mlmnncBrgU0799aXsvginm8/m3IoLBw==",
         "dependencies": {
           "Imageflow.NativeRuntime.osx-x86_64": "2.0.0-preview8",
           "Imageflow.NativeRuntime.ubuntu-x86_64": "2.0.0-preview8",
           "Imageflow.NativeRuntime.win-x86": "2.0.0-preview8",
           "Imageflow.NativeRuntime.win-x86_64": "2.0.0-preview8",
-          "Imageflow.Net": "0.13.1"
+          "Imageflow.Net": "0.13.2"
         }
       },
       "Microsoft.CodeAnalysis.PublicApiAnalyzers": {
@@ -64,8 +64,8 @@
       },
       "Imageflow.Net": {
         "type": "Transitive",
-        "resolved": "0.13.1",
-        "contentHash": "QHSghMGgiy4DhRloqEgNaaY+AM/28mwSF5Q371B90JyKDGIEtJPYMX+d8AkCmHuuf9Tgc6Zl8v+9ieY5yXGcNw==",
+        "resolved": "0.13.2",
+        "contentHash": "9HGmpQY5NzuoVtsnm3I+6tkCFnPDHqhlQDekBlnpYVL8t/YiMUPdf+rrl5D1RNO7Hor2Vs1Xno0wZEF7ER39tQ==",
         "dependencies": {
           "Microsoft.IO.RecyclableMemoryStream": "[3.0.0, 4.0.0)",
           "System.Text.Json": "6.0.9"
@@ -187,7 +187,7 @@
         "type": "Project",
         "dependencies": {
           "CommunityToolkit.HighPerformance": "[8.*, )",
-          "Imageflow.Net": "[0.13.0, )",
+          "Imageflow.Net": "[0.13.2, )",
           "Imazen.Abstractions": "[0.1.0--notset, )",
           "Imazen.Common": "[0.1.0--notset, )",
           "System.Collections.Immutable": "[6.*, )",
@@ -198,15 +198,15 @@
     "net8.0": {
       "Imageflow.AllPlatforms": {
         "type": "Direct",
-        "requested": "[0.13.1, )",
-        "resolved": "0.13.1",
-        "contentHash": "cOuUD9JqwgGqkOwaXe3rjmHdA8F1x1Bqsu4m9x9tgJUGsMqytOeujYHz/trctU+VY8rODoCVw4fStJ8vVELIeQ==",
+        "requested": "[0.13.2, )",
+        "resolved": "0.13.2",
+        "contentHash": "RAvdU2qaqP+orATtDoy0C1e5ZmxECNkO4LPyYAcRNM4E1p86zyPh3H1mlmnncBrgU0799aXsvginm8/m3IoLBw==",
         "dependencies": {
           "Imageflow.NativeRuntime.osx-x86_64": "2.0.0-preview8",
           "Imageflow.NativeRuntime.ubuntu-x86_64": "2.0.0-preview8",
           "Imageflow.NativeRuntime.win-x86": "2.0.0-preview8",
           "Imageflow.NativeRuntime.win-x86_64": "2.0.0-preview8",
-          "Imageflow.Net": "0.13.1"
+          "Imageflow.Net": "0.13.2"
         }
       },
       "Microsoft.CodeAnalysis.PublicApiAnalyzers": {
@@ -223,9 +223,9 @@
       },
       "Microsoft.NET.ILLink.Tasks": {
         "type": "Direct",
-        "requested": "[8.0.2, )",
-        "resolved": "8.0.2",
-        "contentHash": "hKTrehpfVzOhAz0mreaTAZgbz0DrMEbWq4n3hAo8Ks6WdxdqQhNPvzOqn9VygKuWf1bmxPdraqzTaXriO/sn0A=="
+        "requested": "[8.0.5, )",
+        "resolved": "8.0.5",
+        "contentHash": "4ISW1Ndgz86FkIbu5rVlMqhhtojdy5rUlxC/N+9kPh9qbYcvHiCvYbHKzAPVIx9OPYIjT9trXt7JI42Y5Ukq6A=="
       },
       "Microsoft.SourceLink.GitHub": {
         "type": "Direct",
@@ -264,8 +264,8 @@
       },
       "Imageflow.Net": {
         "type": "Transitive",
-        "resolved": "0.13.1",
-        "contentHash": "QHSghMGgiy4DhRloqEgNaaY+AM/28mwSF5Q371B90JyKDGIEtJPYMX+d8AkCmHuuf9Tgc6Zl8v+9ieY5yXGcNw==",
+        "resolved": "0.13.2",
+        "contentHash": "9HGmpQY5NzuoVtsnm3I+6tkCFnPDHqhlQDekBlnpYVL8t/YiMUPdf+rrl5D1RNO7Hor2Vs1Xno0wZEF7ER39tQ==",
         "dependencies": {
           "Microsoft.IO.RecyclableMemoryStream": "[3.0.0, 4.0.0)",
           "System.Text.Json": "6.0.9"
@@ -387,7 +387,7 @@
         "type": "Project",
         "dependencies": {
           "CommunityToolkit.HighPerformance": "[8.*, )",
-          "Imageflow.Net": "[0.13.0, )",
+          "Imageflow.Net": "[0.13.2, )",
           "Imazen.Abstractions": "[0.1.0--notset, )",
           "Imazen.Common": "[0.1.0--notset, )",
           "System.Collections.Immutable": "[6.*, )",

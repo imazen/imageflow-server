@@ -16,9 +16,9 @@
       },
       "Imageflow.Net": {
         "type": "Direct",
-        "requested": "[0.13.0, )",
-        "resolved": "0.13.0",
-        "contentHash": "nH3P2rLt5rNjPnDlCJ2n1qHLloNc0n+Iym8OVqk6neyW7+Gamuo4iuAXm4daQvcr354qD0St28kyl7j66oMC9g==",
+        "requested": "[0.13.2, )",
+        "resolved": "0.13.2",
+        "contentHash": "9HGmpQY5NzuoVtsnm3I+6tkCFnPDHqhlQDekBlnpYVL8t/YiMUPdf+rrl5D1RNO7Hor2Vs1Xno0wZEF7ER39tQ==",
         "dependencies": {
           "Microsoft.IO.RecyclableMemoryStream": "[3.0.0, 4.0.0)",
           "System.Buffers": "4.5.1",
@@ -53,9 +53,9 @@
       },
       "Supernova.Enum.Generators": {
         "type": "Direct",
-        "requested": "[1.0.15, )",
-        "resolved": "1.0.15",
-        "contentHash": "gJkW30TbRBsJspbWkV9bxDaKAsoeEQu1BRZo2gg0m1577E9hB01Tcao644AklJHqfBFsHrm+sjmbyZUHpjuJ7A=="
+        "requested": "[1.0.17, )",
+        "resolved": "1.0.17",
+        "contentHash": "tf4/FzCFGY0Wbld7+bhh3u+OsqJ5qWwZMKyoohbvfC9QoOe4FE8lpem2jO6c1uwuXbzf21JPOAat2Zay1SCgMQ=="
       },
       "System.Collections.Immutable": {
         "type": "Direct",
@@ -249,9 +249,9 @@
       },
       "Imageflow.Net": {
         "type": "Direct",
-        "requested": "[0.13.0, )",
-        "resolved": "0.13.0",
-        "contentHash": "nH3P2rLt5rNjPnDlCJ2n1qHLloNc0n+Iym8OVqk6neyW7+Gamuo4iuAXm4daQvcr354qD0St28kyl7j66oMC9g==",
+        "requested": "[0.13.2, )",
+        "resolved": "0.13.2",
+        "contentHash": "9HGmpQY5NzuoVtsnm3I+6tkCFnPDHqhlQDekBlnpYVL8t/YiMUPdf+rrl5D1RNO7Hor2Vs1Xno0wZEF7ER39tQ==",
         "dependencies": {
           "Microsoft.IO.RecyclableMemoryStream": "[3.0.0, 4.0.0)",
           "System.Text.Json": "6.0.9"
@@ -275,9 +275,9 @@
       },
       "Supernova.Enum.Generators": {
         "type": "Direct",
-        "requested": "[1.0.15, )",
-        "resolved": "1.0.15",
-        "contentHash": "gJkW30TbRBsJspbWkV9bxDaKAsoeEQu1BRZo2gg0m1577E9hB01Tcao644AklJHqfBFsHrm+sjmbyZUHpjuJ7A=="
+        "requested": "[1.0.17, )",
+        "resolved": "1.0.17",
+        "contentHash": "tf4/FzCFGY0Wbld7+bhh3u+OsqJ5qWwZMKyoohbvfC9QoOe4FE8lpem2jO6c1uwuXbzf21JPOAat2Zay1SCgMQ=="
       },
       "System.Collections.Immutable": {
         "type": "Direct",
@@ -408,9 +408,9 @@
       },
       "Imageflow.Net": {
         "type": "Direct",
-        "requested": "[0.13.0, )",
-        "resolved": "0.13.0",
-        "contentHash": "nH3P2rLt5rNjPnDlCJ2n1qHLloNc0n+Iym8OVqk6neyW7+Gamuo4iuAXm4daQvcr354qD0St28kyl7j66oMC9g==",
+        "requested": "[0.13.2, )",
+        "resolved": "0.13.2",
+        "contentHash": "9HGmpQY5NzuoVtsnm3I+6tkCFnPDHqhlQDekBlnpYVL8t/YiMUPdf+rrl5D1RNO7Hor2Vs1Xno0wZEF7ER39tQ==",
         "dependencies": {
           "Microsoft.IO.RecyclableMemoryStream": "[3.0.0, 4.0.0)",
           "System.Text.Json": "6.0.9"
@@ -418,9 +418,9 @@
       },
       "Microsoft.NET.ILLink.Tasks": {
         "type": "Direct",
-        "requested": "[8.0.2, )",
-        "resolved": "8.0.2",
-        "contentHash": "hKTrehpfVzOhAz0mreaTAZgbz0DrMEbWq4n3hAo8Ks6WdxdqQhNPvzOqn9VygKuWf1bmxPdraqzTaXriO/sn0A=="
+        "requested": "[8.0.5, )",
+        "resolved": "8.0.5",
+        "contentHash": "4ISW1Ndgz86FkIbu5rVlMqhhtojdy5rUlxC/N+9kPh9qbYcvHiCvYbHKzAPVIx9OPYIjT9trXt7JI42Y5Ukq6A=="
       },
       "Microsoft.SourceLink.GitHub": {
         "type": "Direct",
@@ -440,9 +440,9 @@
       },
       "Supernova.Enum.Generators": {
         "type": "Direct",
-        "requested": "[1.0.15, )",
-        "resolved": "1.0.15",
-        "contentHash": "gJkW30TbRBsJspbWkV9bxDaKAsoeEQu1BRZo2gg0m1577E9hB01Tcao644AklJHqfBFsHrm+sjmbyZUHpjuJ7A=="
+        "requested": "[1.0.17, )",
+        "resolved": "1.0.17",
+        "contentHash": "tf4/FzCFGY0Wbld7+bhh3u+OsqJ5qWwZMKyoohbvfC9QoOe4FE8lpem2jO6c1uwuXbzf21JPOAat2Zay1SCgMQ=="
       },
       "System.Collections.Immutable": {
         "type": "Direct",
