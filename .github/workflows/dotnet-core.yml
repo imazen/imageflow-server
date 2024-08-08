@@ -129,7 +129,7 @@ jobs:
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       id: nuget-artifact-upload-step
-      if: npack
+      if: success()
       with:
         name: NuGetPackages
         path: NuGetPackages/Release/*.nupkg
