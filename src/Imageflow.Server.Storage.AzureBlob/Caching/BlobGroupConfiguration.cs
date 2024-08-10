@@ -11,7 +11,7 @@ namespace Imageflow.Server.Storage.AzureBlob.Caching
         internal readonly bool UpdateLifecycleRules;
         internal readonly bool CreateContainerIfMissing;
 
-        internal BlobGroupConfiguration(BlobGroupLocation location, BlobGroupLifecycle lifecycle, bool createBucketIfMissing, bool updateLifecycleRules){
+        internal BlobGroupConfiguration(BlobGroupLocation location, BlobGroupLifecycle lifecycle, bool createContainerIfMissing, bool updateLifecycleRules){
             //location cannot be empty
             if (location.ContainerName == null)
             {
@@ -20,7 +20,7 @@ namespace Imageflow.Server.Storage.AzureBlob.Caching
             Location = location;
             Lifecycle = lifecycle;
             
-            this.CreateContainerIfMissing = createBucketIfMissing;
+            this.CreateContainerIfMissing = createContainerIfMissing;
             this.UpdateLifecycleRules = updateLifecycleRules;
         }
     }

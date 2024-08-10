@@ -1,6 +1,6 @@
 namespace Imageflow.Server.Storage.AzureBlob.Caching
 {
-    public enum CacheBucketCreation{
+    public enum CacheContainerCreation{
         DoNotCreateIfMissing,
         CreateIfMissing,
 

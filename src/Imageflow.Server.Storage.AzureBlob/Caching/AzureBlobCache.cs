@@ -7,6 +7,8 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
+using Azure;
 using Imazen.Abstractions.Blobs;
 using Imazen.Abstractions.Resulting;
 
@@ -21,29 +23,9 @@ namespace Imageflow.Server.Storage.AzureBlob.Caching
         private NamedCacheConfiguration config;
         private BlobServiceClient defaultBlobServiceClient;
         private ILogger logger;
-
-        private Tuple<string, bool>[] containerExistenceCache;
-
+        private ContainerExistenceCache containerExists;
         private Dictionary<BlobGroup, BlobServiceClient> serviceClients;
-        private bool GetContainerExistsMaybe(string containerName)
-        {
-            var result = containerExistenceCache.FirstOrDefault(x => x.Item1 == containerName);
-            if (result == null)
-            {
-                return false;
-            }
-            return result.Item2;
-        }
-        private void SetContainerExists(string containerName, bool exists)
-        {
-            for (int i = 0; i < containerExistenceCache.Length; i++)
-            {
-                if (containerExistenceCache[i].Item1 == containerName)
-                {
-                    containerExistenceCache[i] = new Tuple<string, bool>(containerName, exists);
-                }
-            }
-        }
+
 
 // https://devblogs.microsoft.com/azure-sdk/best-practices-for-using-azure-sdk-with-asp-net-core/
 
@@ -60,9 +42,10 @@ namespace Imageflow.Server.Storage.AzureBlob.Caching
             this.defaultBlobServiceClient = blobServiceFactory(null);
             this.logger = loggerFactory.CreateLogger("AzureBlobCache");
 
-            this.containerExistenceCache = config.BlobGroupConfigurations.Values.Select(x => x.Location.ContainerName)
-                .Distinct().Select(x => new Tuple<string, bool>(x, false)).ToArray();
-
+            this.containerExists =
+                new ContainerExistenceCache(config.BlobGroupConfigurations.Values.Select(x => x.Location.ContainerName));
+            
+              
             this.InitialCacheCapabilities = new BlobCacheCapabilities
             {
                 CanFetchMetadata = true,
@@ -70,9 +53,9 @@ namespace Imageflow.Server.Storage.AzureBlob.Caching
                 CanConditionalFetch = false,
                 CanPut = true,
                 CanConditionalPut = false,
-                CanDelete = false,
-                CanSearchByTag = false,
-                CanPurgeByTag = false,
+                CanDelete = true,
+                CanSearchByTag = true,
+                CanPurgeByTag = true,
                 CanReceiveEvents = false,
                 SupportsHealthCheck = false,
                 SubscribesToRecentRequest = false,
@@ -97,7 +80,7 @@ namespace Imageflow.Server.Storage.AzureBlob.Caching
             {
                 return groupConfig;
             }
-            throw new Exception($"No configuration for blob group {group} in cache {UniqueName}");
+            throw new Exception($"No configuration for blob Group {group} in cache {UniqueName}");
         }
 
         internal string TransformKey(string key)
@@ -129,12 +112,13 @@ namespace Imageflow.Server.Storage.AzureBlob.Caching
             // TODO: validate key eventually
             var container = GetClientFor(group).GetBlobContainerClient(groupConfig.Location.ContainerName);
             var blob = container.GetBlobClient(azureKey);
-            if (!GetContainerExistsMaybe(groupConfig.Location.ContainerName) && !groupConfig.CreateContainerIfMissing)
+            
+            if (!containerExists.Maybe(groupConfig.Location.ContainerName) && !groupConfig.CreateContainerIfMissing)
             {
                 try
                 {
                     await container.CreateIfNotExistsAsync();
-                    SetContainerExists(groupConfig.Location.ContainerName, true);
+                    containerExists.Set(groupConfig.Location.ContainerName, true);
                 }
                 catch (Azure.RequestFailedException ex)
                 {
@@ -146,7 +130,14 @@ namespace Imageflow.Server.Storage.AzureBlob.Caching
             {
                 using var consumable = await e.Result.Unwrap().GetConsumablePromise().IntoConsumableBlob();
                 using var data = consumable.BorrowStream(DisposalPromise.CallerDisposesStreamThenBlob);
-                await blob.UploadAsync(data, cancellationToken);
+                var options = new BlobUploadOptions();
+                var tags = e.Result.Unwrap().Attributes.StorageTags;
+                if (tags != null && tags.Count > 0)
+                {
+                    options.Tags = tags.ToDictionary(t => t.Key, t => t.Value);
+                }
+                await blob.UploadAsync(data, options, cancellationToken);
+                
                 return CodeResult.Ok();
             }
             catch (Azure.RequestFailedException ex)
@@ -171,11 +162,11 @@ namespace Imageflow.Server.Storage.AzureBlob.Caching
             var azureKey = GetKeyFor(group, key);
             var container = GetClientFor(group).GetBlobContainerClient(groupConfig.Location.ContainerName);
             var blob = container.GetBlobClient(azureKey);
-            var storage = new AzureBlobStorageReference(container.Uri.AbsoluteUri, azureKey);
+            var storage = new AzureBlobStorageReference(groupConfig.Location.ContainerName, azureKey);
             try
             {
                 var response = await blob.DownloadStreamingAsync(new BlobDownloadOptions(), cancellationToken);
-                SetContainerExists(groupConfig.Location.ContainerName, true);
+                containerExists.Set(groupConfig.Location.ContainerName, true);
                 return BlobCacheFetchFailure.OkResult(new BlobWrapper(null,AzureBlobHelper.CreateConsumableBlob(storage, response)));
 
             }
@@ -192,28 +183,81 @@ namespace Imageflow.Server.Storage.AzureBlob.Caching
         }
     
         
-        public Task<CodeResult> CacheDelete(IBlobStorageReference reference, CancellationToken cancellationToken = default)
+        public async Task<CodeResult> CacheDelete(IBlobStorageReference reference, CancellationToken cancellationToken = default)
         {
-            return Task.FromResult(CodeResult.Err(HttpStatus.NotImplemented));
-           
+            var azureRef = (AzureCacheBlobReference) reference;
+            var client = GetClientFor(azureRef.Group);
+            var container = client.GetBlobContainerClient(azureRef.ContainerName);
+            var blob = container.GetBlobClient(azureRef.BlobName);
+            try
+            {
+                await blob.DeleteIfExistsAsync(DeleteSnapshotsOption.IncludeSnapshots, null, cancellationToken);
+                return CodeResult.Ok();
+            }
+            catch (Azure.RequestFailedException ex)
+            {
+                LogIfSerious(ex, azureRef.ContainerName, azureRef.BlobName);
+                return CodeResult.Err(new HttpStatus(ex.Status).WithAppend(ex.Message));
+            }
         }
         internal void LogIfSerious(Azure.RequestFailedException ex, string containerName, string key)
         {
             // Implement similar logging as in the S3 version, adjusted for Azure exceptions and error codes.
+            logger.LogError(ex, "AzureBlobCache error for {ContainerName}/{Key}: {Message}", containerName, key, ex.Message);
         }
 
   
 
-        public Task<CodeResult<IAsyncEnumerable<IBlobStorageReference>>> CacheSearchByTag(SearchableBlobTag tag, CancellationToken cancellationToken = default)
+        public async Task<CodeResult<IAsyncEnumerable<IBlobStorageReference>>> CacheSearchByTag(SearchableBlobTag tag, CancellationToken cancellationToken = default)
         {
-            return Task.FromResult(CodeResult<IAsyncEnumerable<IBlobStorageReference>>.Err(HttpStatus.NotImplemented));
-        }
-
-        public Task<CodeResult<IAsyncEnumerable<CodeResult<IBlobStorageReference>>>> CachePurgeByTag(SearchableBlobTag tag, CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult(CodeResult<IAsyncEnumerable<CodeResult<IBlobStorageReference>>>.Err(HttpStatus.NotImplemented));
+            return CodeResult<IAsyncEnumerable<IBlobStorageReference>>.Ok(CacheSearchByTagInner(tag, cancellationToken));
         }
         
+        public async IAsyncEnumerable<IBlobStorageReference> CacheSearchByTagInner(SearchableBlobTag tag,
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            foreach (var group in config.BlobGroupConfigurations.Keys)
+            {
+                var client = GetClientFor(group);
+                var accountName = client.AccountName;
+                await foreach (var item in SearchByTag(tag,
+                                   client.GetBlobContainerClient(GetConfigFor(group).Location.ContainerName),
+                                   accountName, cancellationToken))
+                {
+                    yield return item;
+                }
+            }
+        }
+        
+        private static string CreateTagQuery(SearchableBlobTag tag) => $"\"{tag.Key.Replace("\"", "\\\"")}\"='{tag.Value.Replace("'", "\\'")}'";
+
+        private async IAsyncEnumerable<IBlobStorageReference> SearchByTag(SearchableBlobTag tag, BlobContainerClient client, string accountName, [EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            await foreach (var item in client.FindBlobsByTagsAsync(CreateTagQuery(tag), cancellationToken))
+            {
+                yield return AzureCacheBlobReference.FromTaggedBlobItem(item, BlobGroup.GeneratedCacheEntry, accountName);
+            }
+        }
+
+        public async Task<CodeResult<IAsyncEnumerable<CodeResult<IBlobStorageReference>>>> CachePurgeByTag(SearchableBlobTag tag, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                return CodeResult<IAsyncEnumerable<CodeResult<IBlobStorageReference>>>.Ok(CachePurgeByTagInner(tag, cancellationToken));
+            }
+            catch (RequestFailedException ex)
+            {
+                return CodeResult<IAsyncEnumerable<CodeResult<IBlobStorageReference>>>.Err(ex.ToHttpStatus());
+            }
+        }
+        public async IAsyncEnumerable<CodeResult<IBlobStorageReference>> CachePurgeByTagInner(SearchableBlobTag tag,[EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            await foreach(var item in CacheSearchByTagInner(tag, cancellationToken))
+            {
+                var result = await CacheDelete(item, cancellationToken);
+                yield return result.IsOk ? CodeResult<IBlobStorageReference>.Ok(item) : CodeResult<IBlobStorageReference>.Err(result.UnwrapError());
+            }
+        }
         public Task<CodeResult> OnCacheEvent(ICacheEventDetails e, CancellationToken cancellationToken = default)
         {
             return Task.FromResult(CodeResult.Err(HttpStatus.NotImplemented));
@@ -225,4 +269,28 @@ namespace Imageflow.Server.Storage.AzureBlob.Caching
             throw new NotImplementedException();
         }
     }
+    
+    internal record AzureCacheBlobReference(BlobGroup Group, string ContainerName, string BlobName, string FullyQualified) : IBlobStorageReference
+    {
+        public string GetFullyQualifiedRepresentation()
+        {
+            return FullyQualified;
+        }
+
+        public int EstimateAllocatedBytesRecursive => 24 + BlobName.Length * 2 + FullyQualified.Length * 2;
+        
+        public static AzureCacheBlobReference FromTaggedBlobItem(TaggedBlobItem item, BlobGroup group, string accountName)
+        {
+            return new AzureCacheBlobReference(group, item.BlobContainerName, item.BlobName, 
+                   $"azure://{accountName}/{item.BlobContainerName}/{item.BlobName}");
+        }
+    }
+    internal static class HttpStatusFromAzureExtensions
+    {
+        public static HttpStatus ToHttpStatus(this RequestFailedException ex)
+        {
+            return new HttpStatus(ex.Status).WithAppend(ex.Message);
+        }
+    }
+ 
 }

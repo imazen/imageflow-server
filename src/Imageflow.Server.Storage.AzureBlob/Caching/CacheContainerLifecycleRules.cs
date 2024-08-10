@@ -1,6 +1,6 @@
 namespace Imageflow.Server.Storage.AzureBlob.Caching
 {
-    internal enum CacheBucketLifecycleRules{
+    internal enum CacheContainerLifecycleRules{
         DoNotUpdate,
         ConfigureExpiryForCacheFolders
     }
