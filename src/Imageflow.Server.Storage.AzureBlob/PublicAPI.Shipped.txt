@@ -2,8 +2,6 @@
 Imageflow.Server.Storage.AzureBlob.AzureBlobService
 Imageflow.Server.Storage.AzureBlob.AzureBlobServiceExtensions
 Imageflow.Server.Storage.AzureBlob.AzureBlobServiceOptions
-~Imageflow.Server.Storage.AzureBlob.AzureBlobService.AzureBlobService(Imageflow.Server.Storage.AzureBlob.AzureBlobServiceOptions options, Microsoft.Extensions.Logging.ILogger<Imageflow.Server.Storage.AzureBlob.AzureBlobService> logger) -> void
-~Imageflow.Server.Storage.AzureBlob.AzureBlobService.Fetch(string virtualPath) -> System.Threading.Tasks.Task<Imazen.Common.Storage.IBlobData>
 ~Imageflow.Server.Storage.AzureBlob.AzureBlobService.GetPrefixes() -> System.Collections.Generic.IEnumerable<string>
 ~Imageflow.Server.Storage.AzureBlob.AzureBlobService.SupportsPath(string virtualPath) -> bool
 ~Imageflow.Server.Storage.AzureBlob.AzureBlobServiceOptions.AzureBlobServiceOptions(string connectionString, Azure.Storage.Blobs.BlobClientOptions blobClientOptions = null) -> void

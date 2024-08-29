@@ -299,7 +299,7 @@ namespace Imazen.Common.Tests.Licensing
                  }
              })).ToArray();
 
-            Task.WaitAll(tasks);
+            await Task.WhenAll(tasks);
         }
 
         [Fact]
@@ -314,7 +314,7 @@ namespace Imazen.Common.Tests.Licensing
                 }
             })).ToArray();
 
-            Task.WaitAll(tasks);
+            await Task.WhenAll(tasks);
         }
     }
 }

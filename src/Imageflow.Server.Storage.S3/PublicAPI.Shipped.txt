@@ -14,9 +14,7 @@ Imageflow.Server.Storage.S3.S3ServiceExtensions
 Imageflow.Server.Storage.S3.S3ServiceOptions
 Imageflow.Server.Storage.S3.S3ServiceOptions.S3ServiceOptions() -> void
 ~Imageflow.Server.Storage.S3.Caching.NamedCacheConfiguration.NamedCacheConfiguration(string cacheName, Amazon.S3.IAmazonS3 defaultS3Client, string cacheBucketName, Imageflow.Server.Storage.S3.Caching.CacheBucketCreation createIfMissing, Imageflow.Server.Storage.S3.Caching.CacheBucketLifecycleRules updateLifecycleRule, int? slidingExpiryDays) -> void
-~Imageflow.Server.Storage.S3.S3Service.Fetch(string virtualPath) -> System.Threading.Tasks.Task<Imazen.Common.Storage.IBlobData>
 ~Imageflow.Server.Storage.S3.S3Service.GetPrefixes() -> System.Collections.Generic.IEnumerable<string>
-~Imageflow.Server.Storage.S3.S3Service.S3Service(Imageflow.Server.Storage.S3.S3ServiceOptions options, Amazon.S3.IAmazonS3 s3client, Microsoft.Extensions.Logging.ILogger<Imageflow.Server.Storage.S3.S3Service> logger) -> void
 ~Imageflow.Server.Storage.S3.S3Service.SupportsPath(string virtualPath) -> bool
 ~Imageflow.Server.Storage.S3.S3ServiceOptions.MapPrefix(string prefix, Amazon.S3.IAmazonS3 s3Client, string bucket, string blobPrefix, bool ignorePrefixCase, bool lowercaseBlobPath) -> Imageflow.Server.Storage.S3.S3ServiceOptions
 ~Imageflow.Server.Storage.S3.S3ServiceOptions.MapPrefix(string prefix, string bucket) -> Imageflow.Server.Storage.S3.S3ServiceOptions
