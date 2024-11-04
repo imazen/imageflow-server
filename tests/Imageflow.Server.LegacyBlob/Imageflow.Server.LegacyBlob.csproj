@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Title>Imageflow.Server.LegacyBlob - Exercises old blob api, remote reader legacy version</Title>
+    <Description>-</Description>
+  </PropertyGroup>
+  <Import Project="..\TestDefaults.targets" />
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Imazen.Common\Imazen.Common.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.1" />
+  </ItemGroup>
+
+</Project>
