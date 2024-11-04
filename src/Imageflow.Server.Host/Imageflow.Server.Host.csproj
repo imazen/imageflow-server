@@ -27,7 +27,7 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="3.7.301" />
-    <PackageReference Include="Microsoft.Extensions.Http.Polly" Version="8.0.7" />
+    <PackageReference Include="Microsoft.Extensions.Http.Polly" Version="8.0.10" />
   </ItemGroup>
 
   <ItemGroup>

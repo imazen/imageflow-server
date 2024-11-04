@@ -27,6 +27,7 @@
   <ItemGroup>
     <PackageReference Include="Imageflow.AllPlatforms" Version="0.13.2" />
     <PackageReference Include="Microsoft.IO.RecyclableMemoryStream" Version="3.0.0" />
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
   </ItemGroup>
 
   <ItemGroup>

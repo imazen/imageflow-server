@@ -17,8 +17,8 @@
           <PrivateAssets>all</PrivateAssets>
         </PackageReference>
         
-        <PackageReference Include="Azure.Storage.Blobs" Version="12.21.1" />
-        <PackageReference Include="Microsoft.Extensions.Azure" Version="1.7.4" />
+        <PackageReference Include="Azure.Storage.Blobs" Version="12.22.2" />
+        <PackageReference Include="Microsoft.Extensions.Azure" Version="1.7.6" />
     </ItemGroup>
     <ItemGroup>
         <AdditionalFiles Include="PublicAPI.Shipped.txt" />
