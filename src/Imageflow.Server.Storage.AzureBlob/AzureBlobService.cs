@@ -29,6 +29,14 @@ namespace Imageflow.Server.Storage.AzureBlob
                 new LatencyTrackingZone($"azure::blob/{m.Container}", 100)));
         }
 
+        public LatencyTrackingZone GetLatencyZone(string virtualPath)
+        {
+            var mapping = mappings.FirstOrDefault(s => virtualPath.StartsWith(s.UrlPrefix, 
+                s.IgnorePrefixCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal));
+            return new LatencyTrackingZone($"azure::blob/{mapping.Container}", 100);
+        }
+
+
         public AzureBlobService(AzureBlobServiceOptions options, IReLoggerFactory loggerFactory,  BlobServiceClient defaultClient, IAzureClientFactory<BlobServiceClient> clientFactory)
         {
             UniqueName = options.UniqueName ?? "azure-blob";

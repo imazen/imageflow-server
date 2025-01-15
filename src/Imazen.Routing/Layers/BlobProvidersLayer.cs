@@ -108,7 +108,7 @@ public class BlobProvidersLayer : IRoutingLayer
                 ICacheableBlobPromise? promise = null;
                 if (prefix.Provider is IBlobWrapperProvider wp && wp.SupportsPath(request.Path))
                 {
-                    promise = new BlobWrapperProviderPromise(request.ToSnapshot(true), request.Path, wp, latencyZone);
+                    promise = new BlobWrapperProviderPromise(request.ToSnapshot(true), request.Path, wp, (wp as IBlobWrapperProviderZoned)?.GetLatencyZone(request.Path) ?? latencyZone);
                 }else if (prefix.Provider is IBlobProvider p && p.SupportsPath(request.Path))
                 {
                     promise = new BlobProviderPromise(request.ToSnapshot(true), request.Path, p, latencyZone);

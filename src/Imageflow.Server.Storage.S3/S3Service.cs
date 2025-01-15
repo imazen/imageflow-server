@@ -41,6 +41,17 @@ namespace Imageflow.Server.Storage.S3
             return mappings.Select(m => new BlobWrapperPrefixZone(m.Prefix, 
                 new LatencyTrackingZone($"s3::bucket/{m.Bucket}", 100)));
         }
+        
+        public LatencyTrackingZone GetLatencyZone(string virtualPath)
+        {
+            var mapping =  mappings.FirstOrDefault(m => virtualPath.StartsWith(m.Prefix, 
+                m.IgnorePrefixCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal));
+            if (mapping.Prefix == null)
+            {
+                return new LatencyTrackingZone("s3::unknown", 100);
+            }
+            return new LatencyTrackingZone($"s3::bucket/{mapping.Bucket}", 100);
+        }
 
         public IEnumerable<string> GetPrefixes()
         {

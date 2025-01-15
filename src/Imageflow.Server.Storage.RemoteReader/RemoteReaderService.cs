@@ -7,10 +7,14 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
+using Imazen.Abstractions.Blobs;
+using Imazen.Abstractions.Blobs.LegacyProviders;
+using Imazen.Abstractions.Resulting;
+using BlobMissingException = Imazen.Common.Storage.BlobMissingException;
 
 namespace Imageflow.Server.Storage.RemoteReader
 {
-    public class RemoteReaderService : IBlobProvider
+    public class RemoteReaderService : IBlobWrapperProviderZoned
     {
 
         private readonly List<string> prefixes = new List<string>();
@@ -32,6 +36,48 @@ namespace Imageflow.Server.Storage.RemoteReader
             prefixes.AddRange(this.options.Prefixes);
             prefixes.Sort((a, b) => b.Length.CompareTo(a.Length));
         }
+        
+        private record struct ParsedUrl
+        {
+            public string UrlBase64 { get; set; }
+            public string? Url { get; set; }
+            public string Signature { get; set; }
+            public Uri? Uri { get; set; }
+
+            public bool IsEmpty => UrlBase64 == null || Signature == null;
+            
+            public static ParsedUrl Empty = new ParsedUrl();
+        }
+
+        private static ParsedUrl ParseUrl(string virtualPath)
+        {
+            var remote = virtualPath
+                .Split('/')
+                .Last()?
+                .Split('.');
+
+            if (remote == null || remote.Length < 2)
+            {
+                return ParsedUrl.Empty;
+            }
+
+            var urlBase64 = remote[0];
+            var hmac = remote[1];
+            // TODO make fallible?
+            var url = EncodingUtils.FromBase64UToString(urlBase64);
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            {
+                // leave url null
+            }
+
+            return new ParsedUrl
+            {
+                UrlBase64 = urlBase64,
+                Signature = hmac,
+                Url = url,
+                Uri = uri
+            };
+        }
 
         /// <summary>
         /// The remote URL and signature are encoded in the "file" part
@@ -42,26 +88,19 @@ namespace Imageflow.Server.Storage.RemoteReader
         /// <returns></returns>
         public async Task<IBlobData> Fetch(string virtualPath)
         {
-            var remote = virtualPath
-                .Split('/')
-                .Last()?
-                .Split('.');
-
-            if (remote == null || remote.Length < 2)
+            var parsedUrl = ParseUrl(virtualPath);
+            
+            if (parsedUrl.IsEmpty)
             {
                 logger?.LogWarning("Invalid remote path: {VirtualPath}", virtualPath);
                 throw new BlobMissingException($"Invalid remote path: {virtualPath}");
             }
-
-            var urlBase64 = remote[0];
-            var hmac = remote[1];
-
-            var sig = Signatures.SignString(urlBase64, options.SigningKey, 8);
-            if (hmac != sig)
+            var sig = Signatures.SignString(parsedUrl.UrlBase64, options.SigningKey, 8);
+            if (parsedUrl.Signature != sig)
             {
                 //Try the fallback keys
                 if (options.SigningKeys == null ||
-                    !options.SigningKeys.Select(key => Signatures.SignString(urlBase64, key, 8)).Contains(hmac))
+                    !options.SigningKeys.Select(key => Signatures.SignString(parsedUrl.UrlBase64, key, 8)).Contains(parsedUrl.Signature))
                 {
 
                     logger?.LogWarning("Missing or Invalid signature on remote path: {VirtualPath}", virtualPath);
@@ -69,9 +108,9 @@ namespace Imageflow.Server.Storage.RemoteReader
                 }
             }
 
-            var url = EncodingUtils.FromBase64UToString(urlBase64);
-
-            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            var url = parsedUrl.Url;
+            var uri = parsedUrl.Uri;
+            if (uri == null)
             {
                 logger?.LogWarning("RemoteReader blob {VirtualPath} not found. Invalid Uri: {Url}", virtualPath, url);
                 throw new BlobMissingException($"RemoteReader blob \"{virtualPath}\" not found. Invalid Uri: {url}");
@@ -119,7 +158,8 @@ namespace Imageflow.Server.Storage.RemoteReader
             return prefixes.Any(s => virtualPath.StartsWith(s,
                 options.IgnorePrefixCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal));
         }
-        
+
+     
         private static string? SanitizeImageExtension(string extension)
         {
             //TODO: Deduplicate this function when making Imazen.ImageAPI.Client
@@ -152,5 +192,21 @@ namespace Imageflow.Server.Storage.RemoteReader
             var sig = Signatures.SignString(data, key,8);
             return $"{data}.{sig}.{sanitizedExtension}";
         }
-    }
+
+        public string UniqueName { get; } = "RemoteReader";
+        public IEnumerable<BlobWrapperPrefixZone> GetPrefixesAndZones()
+        {
+            return prefixes.Select(p => new BlobWrapperPrefixZone(p, null));
+        }
+
+        public LatencyTrackingZone GetLatencyZone(string virtualPath)
+        {
+            var parsedUrl = ParseUrl(virtualPath);
+            if (parsedUrl.Uri == null)
+            {
+                return new LatencyTrackingZone("UnknownRemote", 1000, true);
+            }
+            return new LatencyTrackingZone("Remote-" + parsedUrl.Uri.Host, 2000, true);
+        }
+    }   
 }

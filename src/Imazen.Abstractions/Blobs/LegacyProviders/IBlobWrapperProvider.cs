@@ -20,5 +20,7 @@ namespace Imazen.Abstractions.Blobs.LegacyProviders
     public interface IBlobWrapperProviderZoned : IUniqueNamed
     {
         IEnumerable<BlobWrapperPrefixZone> GetPrefixesAndZones();
+        
+        LatencyTrackingZone  GetLatencyZone(string virtualPath);
     }
 }
