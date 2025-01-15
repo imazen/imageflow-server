@@ -46,65 +46,66 @@ namespace Imageflow.Server.Storage.AzureBlob.Caching
             // Use BlobServiceClient to create containers if they don't exist
         }
 
-       internal async Task UpdateLifecycleRulesAsync()
-{
-    var client = defaultClient;
-    var lifecycleManagementPolicy = new BlobLifecycleManagementPolicy();
-    var rules = new List<BlobLifecycleRule>();
-
-    foreach (var groupConfig in config.BlobGroupConfigurations.Values)
-    {
-        if (groupConfig.UpdateLifecycleRules == false) continue;
-
-        var containerName = groupConfig.Location.ContainerName;
-        var prefix = groupConfig.Location.BlobPrefix;
-
-        if (groupConfig.Lifecycle.DaysBeforeExpiry.HasValue)
+        internal async Task UpdateLifecycleRulesAsync()
         {
-            var rule = new BlobLifecycleRule
-            {
-                Name = $"Rule-{containerName}-{prefix}",
-                Enabled = true,
-                Definition = new BlobLifecycleRuleDefinition
-                {
-                    Filters = new BlobLifecycleRuleFilter
-                    {
-                        PrefixMatch = new List<string> { $"{containerName}/{prefix}" }
-                    },
-                    Actions = new BlobLifecycleRuleActions
-                    {
-                        BaseBlob = new BlobLifecycleRuleActionBase
-                        {
-                            Delete = new BlobLifecycleRuleActionDelete
-                            {
-                                DaysAfterModificationGreaterThan = groupConfig.Lifecycle.DaysBeforeExpiry.Value
-                            }
-                        }
-                    }
-                }
-            };
-
-            rules.Add(rule);
+            // var client = defaultClient;
+            // var lifecycleManagementPolicy = new BlobLifecycleManagementPolicy();
+            // var rules = new List<BlobLifecycleRule>();
+            //
+            // foreach (var groupConfig in config.BlobGroupConfigurations.Values)
+            // {
+            //     if (groupConfig.UpdateLifecycleRules == false) continue;
+            //
+            //     var containerName = groupConfig.Location.ContainerName;
+            //     var prefix = groupConfig.Location.BlobPrefix;
+            //
+            //     if (groupConfig.Lifecycle.DaysBeforeExpiry.HasValue)
+            //     {
+            //         var rule = new BlobLifecycleRule
+            //         {
+            //             Name = $"Rule-{containerName}-{prefix}",
+            //             Enabled = true,
+            //             Definition = new BlobLifecycleRuleDefinition
+            //             {
+            //                 Filters = new BlobLifecycleRuleFilter
+            //                 {
+            //                     PrefixMatch = new List<string> { $"{containerName}/{prefix}" }
+            //                 },
+            //                 Actions = new BlobLifecycleRuleActions
+            //                 {
+            //                     BaseBlob = new BlobLifecycleRuleActionBase
+            //                     {
+            //                         Delete = new BlobLifecycleRuleActionDelete
+            //                         {
+            //                             DaysAfterModificationGreaterThan = groupConfig.Lifecycle.DaysBeforeExpiry.Value
+            //                         }
+            //                     }
+            //                 }
+            //             }
+            //         };
+            //
+            //         rules.Add(rule);
+            //     }
+            // }
+            //
+            // lifecycleManagementPolicy.Rules = rules;
+            //
+            // try
+            // {
+            //     await client.SetBlobLifecyclePolicyAsync(lifecycleManagementPolicy);
+            //     logger.LogInformation("Updated lifecycle rules for storage account");
+            // }
+            // catch (Exception e)
+            // {
+            //     logger.LogError(e, $"Error updating lifecycle rules for storage account: {e.Message}");
+            // }
         }
-    }
-
-    lifecycleManagementPolicy.Rules = rules;
-
-    try
-    {
-        await client.SetBlobLifecyclePolicyAsync(lifecycleManagementPolicy);
-        logger.LogInformation("Updated lifecycle rules for storage account");
-    }
-    catch (Exception e)
-    {
-        logger.LogError(e, $"Error updating lifecycle rules for storage account: {e.Message}");
-    }
-}
 
         internal async Task<TestFilesResult> CreateAndReadTestFilesAsync(bool forceAll)
         {
             // Implementation similar to S3LifecycleUpdater's CreateAndReadTestFilesAsync
             // Use BlobContainerClient to perform operations on blobs
+            throw new NotImplementedException();
         }
 
         private async Task<CodeResult> TryAzureOperationAsync(string containerName, string blobName, string operationName,

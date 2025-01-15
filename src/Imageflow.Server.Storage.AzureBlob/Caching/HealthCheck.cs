@@ -30,6 +30,7 @@ internal record HealthCheck(IBlobCache Cache, NamedCacheConfiguration Config, IL
 
     public ValueTask<IBlobCacheHealthDetails> CacheHealthCheck(CancellationToken cancellationToken = default)
     {
+        throw new NotImplementedException();
         
     }
     
@@ -37,6 +38,6 @@ internal record HealthCheck(IBlobCache Cache, NamedCacheConfiguration Config, IL
     
     internal ValueTask<BasicHealthDetails> CheckGroup(BlobGroup group, CancellationToken cancellationToken = default)
     {
-        
+        throw new NotImplementedException();
     }
 }
