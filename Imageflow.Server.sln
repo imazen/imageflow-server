@@ -1,23 +1,23 @@
-﻿	
+﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.29503.13
+# Visual Studio Version 17
+VisualStudioVersion = 17.12.35707.178 d17.12
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{A08DA97E-FCD2-4ACD-AC62-413A05BBDB0E}"
 	ProjectSection(SolutionItems) = preProject
 		.gitignore = .gitignore
+		CHANGES.md = CHANGES.md
+		CONFIGURATION.md = CONFIGURATION.md
+		src\design_scratch.md = src\design_scratch.md
+		Directory.Build.props = Directory.Build.props
+		.github\workflows\dockerize_host.yml = .github\workflows\dockerize_host.yml
 		.github\workflows\dotnet-core.yml = .github\workflows\dotnet-core.yml
 		LICENSE.txt = LICENSE.txt
-		README.md = README.md
-		src\NugetPackages.targets = src\NugetPackages.targets
-		Directory.Build.props = Directory.Build.props
-		CONFIGURATION.md = CONFIGURATION.md
 		src\NugetPackageDefaults.targets = src\NugetPackageDefaults.targets
+		src\NugetPackages.targets = src\NugetPackages.targets
 		src\ProjectDefaults.targets = src\ProjectDefaults.targets
-		CHANGES.md = CHANGES.md
+		README.md = README.md
 		tests\TestDefaults.targets = tests\TestDefaults.targets
-		src\design_scratch.md = src\design_scratch.md
-		.github\workflows\dockerize_host.yml = .github\workflows\dockerize_host.yml
 	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Imazen.Common", "src\Imazen.Common\Imazen.Common.csproj", "{49BDDBEE-3385-4B1D-B7C1-76A893F25C00}"
@@ -65,6 +65,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Imazen.TestingHelpers", "tests\Imazen.TestingHelpers\Imazen.TestingHelpers.csproj", "{FBDFC91A-B95A-4F0C-85C4-F436BFDC4720}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Imageflow.Server.LegacyBlob", "tests\Imageflow.Server.LegacyBlob\Imageflow.Server.LegacyBlob.csproj", "{195CAA16-A6A1-49E6-A226-947CEFD4903E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Imageflow.Server.AzureFunctions", "src\Imageflow.Server.AzureFunctions\Imageflow.Server.AzureFunctions.csproj", "{4EEC76B7-6F4D-40E8-9818-91F4A8E7B744}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -164,6 +166,10 @@ Global
 		{195CAA16-A6A1-49E6-A226-947CEFD4903E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{195CAA16-A6A1-49E6-A226-947CEFD4903E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{195CAA16-A6A1-49E6-A226-947CEFD4903E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4EEC76B7-6F4D-40E8-9818-91F4A8E7B744}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4EEC76B7-6F4D-40E8-9818-91F4A8E7B744}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4EEC76B7-6F4D-40E8-9818-91F4A8E7B744}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4EEC76B7-6F4D-40E8-9818-91F4A8E7B744}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
