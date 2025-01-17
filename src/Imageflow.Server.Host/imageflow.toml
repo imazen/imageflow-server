@@ -18,8 +18,8 @@ cache_control = "public, max-age=2592000"
 apply_default_commands = "quality=76&webp.quality=70&f.sharpen=23&down.filter=mitchell"
 
 [[routes]]
-prefix = '/images/'
-map_to_physical_folder='${app.approot}\images\'
+prefix = '/imageflow-test/'
+map_to_physical_folder='${app.approot}\imageflow-test\'
 
 # ======  Caching to disk ======
 [disk_cache] # HybridCache
@@ -82,8 +82,9 @@ cache_control = "no-cache"
 content_type = "text/html" # required
 content = """
 
-<h3>If you see an angry, AI-generated robot below, Imageflow Server is running</h3>
-<p><img src="/images/robotcrush.png?w=300&f.sharpen=30&format=webp&webp.lossless=true"</p>
+<h3>You should see IMAGEFLOW IS RUNNING below</h3>
+<p><img width="400" srcset="/imageflow-test/imageflow-operational.png?format=webp&webp.lossless=true&w=1200 1200w, /imageflow-test/imageflow-operational.png?format=webp&webp.lossless=true&w=800 800w, /imageflow-test/imageflow-operational.png?format=webp&webp.lossless=true&w=400 400w"
+src="/imageflow-test/imageflow-operational.png?format=webp&webp.lossless=true"</p>
 <p><a href="/imageflow.debug">Visit /imageflow.debug for diagnostics</a></p>
 <p><strong>Edit imageflow.toml to delete or modify this default page, then restart the site.</p>
 
@@ -104,3 +105,4 @@ megapixels = 40
 width = 12000
 height = 12000
 megapixels = 80
+

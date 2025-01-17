@@ -21,7 +21,7 @@
     <Content Include="imageflow.toml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="images\robotcrush.png">
+    <Content Include="imageflow-test\imageflow-operational.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
@@ -40,6 +40,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="images/" />
+    <Folder Include="imageflow-test\" />
+
   </ItemGroup>
+
 </Project>
