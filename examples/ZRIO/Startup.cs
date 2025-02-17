@@ -35,8 +35,10 @@ namespace Imageflow.Server.Example
             services.AddAWSService<IAmazonS3>(new AWSOptions 
             {
                 Credentials = new AnonymousAWSCredentials(),
-                Region = RegionEndpoint.USEast1
+                Region = RegionEndpoint.USEast1,
+                DefaultConfigurationMode = DefaultConfigurationMode.Standard
             });
+            
 
 
             //if (e.VirtualPath.StartsWith("/un/", StringComparison.OrdinalIgnoreCase)) e.VirtualPath = "/remote/images.unsplash.com" + e.VirtualPath.Substring(3);
@@ -102,6 +104,8 @@ namespace Imageflow.Server.Example
                 // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
                 app.UseHsts();
             }
+            .UseSetting("https_port", "443")
+
             app.UseHttpsRedirection();
 
             // You have a lot of configuration options

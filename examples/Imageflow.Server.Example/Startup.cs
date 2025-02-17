@@ -35,7 +35,8 @@ namespace Imageflow.Server.Example
             services.AddAWSService<IAmazonS3>(new AWSOptions 
             {
                 Credentials = new AnonymousAWSCredentials(),
-                Region = RegionEndpoint.USEast1
+                Region = RegionEndpoint.USEast1,
+                DefaultConfigurationMode = DefaultConfigurationMode.Standard
             });
 
 
