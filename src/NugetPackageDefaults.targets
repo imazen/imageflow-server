@@ -1,6 +1,6 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
    <PropertyGroup>
-       <TargetFrameworks>net8.0;netstandard2.0;net6.0</TargetFrameworks>
+       <TargetFrameworks>net8.0;netstandard2.0</TargetFrameworks>
        <EnableTrimAnalyzer Condition="'$(TargetFramework)' == 'net8.0'">true</EnableTrimAnalyzer>
        <EnableSingleFileAnalyzer Condition="'$(TargetFramework)' == 'net8.0'">true</EnableSingleFileAnalyzer>
        <EnableAotAnalyzer Condition="'$(TargetFramework)' == 'net8.0'">true</EnableAotAnalyzer>

@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFrameworks>netstandard2.0;net8.0;net6.0</TargetFrameworks>
+        <TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>
         <Title>Imageflow.Server.Storage.S3 - Plugin for fetching source images from S3.</Title>
         <Description>Imageflow.Server plugin for fetching source images from S3.</Description>
         <IsPackable>true</IsPackable>

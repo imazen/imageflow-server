@@ -38,11 +38,11 @@ jobs:
         dotnet --list-sdks >> $GITHUB_ENV
         echo "EOF" >> $GITHUB_ENV
 
-    - name: Setup .NET 6, 7, 8
+    - name: Setup .NET 8,9
       uses: actions/setup-dotnet@v3
-      if: contains(env.DOTNET_VERSION_LIST, '6.0.') == 'false' || contains(env.DOTNET_VERSION_LIST, '7.0.') == 'false' || contains(env.DOTNET_VERSION_LIST, '8.0.') == 'false'
+      if:  contains(env.DOTNET_VERSION_LIST, '9.0.') == 'false' || contains(env.DOTNET_VERSION_LIST, '8.0.') == 'false'
       with:
-        dotnet-version: "6\n7\n8\n"
+        dotnet-version: "8\n9\n"
         
     - name: Setup .NET 4.8.1 if on windows
       uses: actions/setup-dotnet@v3
@@ -85,15 +85,16 @@ jobs:
       run: dotnet build --maxcpucount:1 -c Release
       if: matrix.os == 'windows-latest'
     
-    - name: Build for .NET 8, 6
-      run: dotnet build --maxcpucount:1 -c Release --framework net6.0 net8.0
+    - name: Build for .NET 8, 9
+    #  run: dotnet build --maxcpucount:1 -c Release --framework net8.0 net9.0
+      run: dotnet build --maxcpucount:1 -c Release --framework net8.0
       if: matrix.os != 'windows-latest'
 
-    - name: Test .NET 6, 8 without Coverage
+    - name: Test .NET 8, ? without Coverage
       if: matrix.os != 'windows-latest'
       run: |
-        dotnet test -c Release --framework net6.0
         dotnet test -c Release --framework net8.0
+      # dotnet test -c Release --framework net9.0
 
     - uses: actions/upload-artifact@v3
       if: failure()
@@ -101,11 +102,11 @@ jobs:
         name: TestResults-${{matrix.os}}-${{ env.ARTIFACT_VERSION }}
         path: TestResults/
         
-    - name: Test .NET 8, 6, and 4.8.1 with Coverage
+    - name: Test .NET 8, SKIP 9, and 4.8.1 with Coverage
       if: matrix.os == 'windows-latest'
       run: |
         dotnet test -c Release /p:CollectCoverage=true /p:CoverletOutputFormat=opencover /p:CoverletOutput=./TestResults/coverage.net48.opencover.xml --framework net48
-        dotnet test -c Release /p:CollectCoverage=true /p:CoverletOutputFormat=opencover /p:CoverletOutput=./TestResults/coverage.net6.opencover.xml --framework net6.0
+      #  dotnet test -c Release /p:CollectCoverage=true /p:CoverletOutputFormat=opencover /p:CoverletOutput=./TestResults/coverage.net9.opencover.xml --framework net9.0
         dotnet test -c Release /p:CollectCoverage=true /p:CoverletOutputFormat=opencover /p:CoverletOutput=./TestResults/coverage.net8.opencover.xml --framework net8.0
 
     - name: Upload coverage to Codecov
