@@ -11,7 +11,7 @@
     "window.zoomPerWindow": true,
     "editor.mouseWheelZoom": true,
     "terminal.integrated.mouseWheelZoom": true,
-    "azureFunctions.deploySubpath": "src\\Imageflow.Server.AzureFunctions/bin/Release/net9.0/publish",
+    "azureFunctions.deploySubpath": "src\\Imageflow.Server.AzureFunctions/bin/Release/net8.0/publish",
     "azureFunctions.projectLanguage": "C#",
     "azureFunctions.projectRuntime": "~4",
     "debug.internalConsoleOptions": "neverOpen",

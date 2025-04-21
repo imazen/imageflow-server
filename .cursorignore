@@ -1,5 +1,4 @@
 # Add directories or file patterns to ignore during indexing (e.g. foo/ or *.csv)
-*.txt
 *.dll
 *.pdb
 *.user
@@ -10,13 +9,11 @@
 *.ico
 *.webp
 *.nupkg
-*.json
 *.info
 .idea/
-.vscode/
 bin/
-examples/
 NuGetPackages/
 obj/
 packages/
+*.lock.json
 

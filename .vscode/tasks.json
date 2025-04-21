@@ -107,7 +107,7 @@
             "type": "func",
             "dependsOn": "build (functions)",
             "options": {
-                "cwd": "${workspaceFolder}/src\\Imageflow.Server.AzureFunctions/bin/Debug/net9.0"
+                "cwd": "${workspaceFolder}/src\\Imageflow.Server.AzureFunctions/bin/Debug/net8.0"
             },
             "command": "host start",
             "isBackground": true,

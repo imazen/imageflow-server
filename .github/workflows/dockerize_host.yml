@@ -39,4 +39,4 @@ jobs:
           context: .
           file: ./src/Imageflow.Server.Host/Dockerfile
           push: true
-          tags: your-dockerhub-username/imageflow-server-host:${{ steps.get_version.outputs.version }}
+          tags: imazen/imageflow-server-host:${{ steps.get_version.outputs.version }}

@@ -1,0 +1,15 @@
+{
+    // .NET settings
+    "dotnet.defaultSolution": "wimageflow-dotnet-server.sln",
+    "omnisharp.enableRoslynAnalyzers": true,
+    "omnisharp.enableEditorConfigSupport": true,
+    "omnisharp.enableImportCompletion": true,
+    "dotnet-test-explorer.testProjectPath": "**/*Tests.csproj",
+    "dotnet-test-explorer.autoWatch": true,
+    "editor.formatOnSave": true,
+    "editor.formatOnType": true,
+    "csharp.format.enable": true,
+    "dotnet.completion.showCompletionItemsFromUnimportedNamespaces": true,
+    "omnisharp.useModernNet": true,
+    "problems.showCurrentInStatus": true
+} 
