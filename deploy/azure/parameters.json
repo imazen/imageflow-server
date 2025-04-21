@@ -1,0 +1,46 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+      "dockerImageTag": {
+        "value": "v1.0.0"
+      },
+      "functionAppPackageUrl": {
+        "value": "https://github.com/imazen/imageflow-server/releases/download/v1.0.0/FunctionApp.zip"
+      },
+      "cacheRetentionDays": {
+        "value": 30
+      },
+      "customDomainName": {
+        "value": ""
+      },
+      "enableCdn": {
+        "value": false
+      },
+      "appSettings": {
+        "value": [
+          {
+            "name": "ENV_VAR1",
+            "value": "value1"
+          },
+          {
+            "name": "ENV_VAR2",
+            "value": "value2"
+          }
+        ]
+      },
+      "routeMappings": {
+        "value": ""
+      },
+      "secrets": {
+        "value": []
+      },
+      "resourceTags": {
+        "value": {
+          "Environment": "Production",
+          "Owner": "YourName"
+        }
+      }
+    }
+  }
+  
