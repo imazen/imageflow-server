@@ -1,5 +1,10 @@
+using System;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Imazen.Common.Concurrency;
 using Xunit;
+
 
 namespace Imazen.Common.Tests
 {
@@ -42,12 +47,12 @@ namespace Imazen.Common.Tests
         /// Test that contending callbacks for the same key do not run concurrently
         /// </summary>
         [Fact]
-        public void TestConcurrency()
+        public async Task TestConcurrency()
         {
             var provider = new AsyncLockProvider();
             int sharedValue = 0;
             var tasks = Enumerable.Range(0, 10).Select(async unused =>
-                Assert.True(await provider.TryExecuteAsync("1", 15000, CancellationToken.None, async () =>
+                Assert.True(await provider.TryExecuteAsync("1", 15000, TestContext.Current.CancellationToken, async () =>
                 {
                     var oldValue = sharedValue;
                     sharedValue++;
@@ -56,7 +61,7 @@ namespace Imazen.Common.Tests
                 }))).ToArray();
             Assert.True(provider.MayBeLocked("1"));
             Assert.Equal(1, provider.GetActiveLockCount());
-            Task.WaitAll(tasks);
+            await Task.WhenAll(tasks);
             Assert.Equal(0, sharedValue);
             Assert.Equal(0, provider.GetActiveLockCount());
             

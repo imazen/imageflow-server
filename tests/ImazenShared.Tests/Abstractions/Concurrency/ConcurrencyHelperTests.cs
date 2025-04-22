@@ -1,10 +1,12 @@
 namespace Imazen.Routing.Tests.Helpers;
 
-using Xunit;
+
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using Imazen.Routing.Helpers;
 using System;
+using Xunit;
+using System.Threading;
 
 public class ConcurrencyHelpersTests
 {
@@ -18,7 +20,7 @@ public class ConcurrencyHelpersTests
             Task.FromResult(3)
         };
 
-        var result = await ConcurrencyHelpers.WhenAnyMatchesOrDefault(tasks, i => i > 3);
+        var result = await ConcurrencyHelpers.WhenAnyMatchesOrDefault(tasks, i => i > 3, TestContext.Current.CancellationToken);
 
         Assert.Equal(default(int), result);
     }
@@ -33,7 +35,7 @@ public class ConcurrencyHelpersTests
             Task.FromResult(3)
         };
 
-        var result = await ConcurrencyHelpers.WhenAnyMatchesOrDefault(tasks, i => i == 2);
+        var result = await ConcurrencyHelpers.WhenAnyMatchesOrDefault(tasks, i => i == 2, TestContext.Current.CancellationToken);
 
         Assert.Equal(2, result);
     }
@@ -47,7 +49,7 @@ public class ConcurrencyHelpersTests
             Task.FromException<int>(new Exception("Test exception"))
         };
 
-        var result = await ConcurrencyHelpers.WhenAnyMatchesOrDefault(tasks, i => i == 2);
+        var result = await ConcurrencyHelpers.WhenAnyMatchesOrDefault(tasks, i => i == 2, TestContext.Current.CancellationToken);
 
         Assert.Equal(2, result);
     }
@@ -78,6 +80,6 @@ public class ConcurrencyHelpersTests
             Task.FromException<int>(new Exception("Test exception"))
         };
 
-        Assert.Equal(default, await ConcurrencyHelpers.WhenAnyMatchesOrDefault(tasks, i => true));
+        Assert.Equal(default, await ConcurrencyHelpers.WhenAnyMatchesOrDefault(tasks, i => true, TestContext.Current.CancellationToken));
     }
 }

@@ -9,6 +9,8 @@ using Imazen.Routing.Serving;
 using Imazen.Tests.Routing.Serving;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
+using System.IO;
+using System.Threading.Tasks;
 
 namespace Imazen.Routing.Tests.Serving;
 
@@ -82,7 +84,7 @@ public class ImageServerTests : ReLoggerTestBase
         var request = MockRequest.GetLocalRequest("/hi").ToAdapter();
         var response = new MockResponseAdapter();
         var context = new TContext();
-        var handled = await imageServer.TryHandleRequestAsync(request, response, context);
+        var handled = await imageServer.TryHandleRequestAsync(request, response, context, TestContext.Current.CancellationToken);
         Assert.True(handled);
         var r = await response.ToMockResponse();
         

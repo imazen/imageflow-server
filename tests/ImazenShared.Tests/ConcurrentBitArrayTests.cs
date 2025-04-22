@@ -1,5 +1,7 @@
-using Xunit;
+
+using System;
 using Imazen.Common.Instrumentation.Support;
+using Xunit;
 
 namespace Imazen.Common.Tests
 {

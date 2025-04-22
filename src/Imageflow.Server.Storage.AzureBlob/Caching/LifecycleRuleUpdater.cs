@@ -44,6 +44,7 @@ namespace Imageflow.Server.Storage.AzureBlob.Caching
         {
             // Implementation similar to S3LifecycleUpdater's CreateBucketsAsync
             // Use BlobServiceClient to create containers if they don't exist
+            await Task.CompletedTask;
         }
 
         internal async Task UpdateLifecycleRulesAsync()
@@ -99,12 +100,14 @@ namespace Imageflow.Server.Storage.AzureBlob.Caching
             // {
             //     logger.LogError(e, $"Error updating lifecycle rules for storage account: {e.Message}");
             // }
+            await Task.CompletedTask;
         }
 
         internal async Task<TestFilesResult> CreateAndReadTestFilesAsync(bool forceAll)
         {
             // Implementation similar to S3LifecycleUpdater's CreateAndReadTestFilesAsync
             // Use BlobContainerClient to perform operations on blobs
+            await Task.CompletedTask;
             throw new NotImplementedException();
         }
 

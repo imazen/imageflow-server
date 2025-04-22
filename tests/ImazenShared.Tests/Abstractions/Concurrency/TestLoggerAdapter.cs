@@ -1,6 +1,7 @@
+using System.Threading;
 using Imazen.Abstractions.Logging;
+
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Imazen.Routing.Caching.Health.Tests;
 
@@ -15,6 +16,18 @@ public class TestLoggerAdapter : ITestLogging, ITestOutputHelper
     {
         _output = output;
     }
+
+    public void Write(string message, params object[] args)
+    {
+        Interlocked.Increment(ref _lineCount);
+        _output.Write(message, args);
+    }
+    public void Write(string message)
+    {
+        Interlocked.Increment(ref _lineCount);
+        _output.Write(message);
+    }
+    public string Output => _output.Output;
 
     public void WriteLine(string message)
     {

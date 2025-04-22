@@ -1,8 +1,10 @@
 namespace Imazen.Routing.Tests.Helpers;
 
-using Xunit;
+
 using Imazen.Routing.Helpers;
 using System;
+using Xunit;
+
 
 public class HexHelpersTests
 {

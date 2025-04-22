@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Imazen.Abstractions.Concurrency;
 using Xunit;
 
+
 public class WithCancellationAndTimeoutTests
 {
     [Fact]
@@ -25,7 +26,7 @@ public class WithCancellationAndTimeoutTests
     public async Task WithCancellationAndTimeout_CanceledToken_ReturnsCanceledTask()
     {
         // Arrange
-        var task = Task.Delay(TimeSpan.FromSeconds(1));
+        var task = Task.Delay(TimeSpan.FromSeconds(1),TestContext.Current.CancellationToken);
         var cancellationToken = new CancellationToken(canceled: true);
         var timeout = TimeSpan.FromSeconds(1);
 
@@ -37,7 +38,7 @@ public class WithCancellationAndTimeoutTests
     public async Task WithCancellationAndTimeout_TimeoutOccurs_ThrowsOperationCanceledException()
     {
         // Arrange
-        var task = Task.Delay(TimeSpan.FromSeconds(1));
+        var task = Task.Delay(TimeSpan.FromSeconds(1),TestContext.Current.CancellationToken);
         var cancellationToken = new CancellationToken();
         var timeout = TimeSpan.FromMilliseconds(100);
 
@@ -49,7 +50,7 @@ public class WithCancellationAndTimeoutTests
     public async Task WithCancellationAndTimeout_FastPath_UsesWithCancellation()
     {
         // Arrange
-        var task = Task.Delay(TimeSpan.FromSeconds(1));
+        var task = Task.Delay(TimeSpan.FromSeconds(1),TestContext.Current.CancellationToken);
         var cancellationToken = new CancellationToken(canceled: true);
         var timeout = Timeout.InfiniteTimeSpan;
 
@@ -90,7 +91,7 @@ public class WithCancellationAndTimeoutTests
     public async Task WithCancellationAndTimeout_TimeoutOccurs_WithDefaultToken_ThrowsOperationCanceledException()
     {
         // Arrange
-        var task = Task.Delay(TimeSpan.FromSeconds(1));
+        var task = Task.Delay(TimeSpan.FromSeconds(1),TestContext.Current.CancellationToken);
         var cancellationToken = default(CancellationToken);
         var timeout = TimeSpan.FromMilliseconds(100);
 
@@ -117,7 +118,7 @@ public class WithCancellationAndTimeoutTests
     public async Task WithCancellationAndTimeout_TimeoutOccurs_WithNonCancellableToken_ThrowsOperationCanceledException()
     {
         // Arrange
-        var task = Task.Delay(TimeSpan.FromSeconds(1));
+        var task = Task.Delay(TimeSpan.FromSeconds(1),TestContext.Current.CancellationToken);
         var cancellationToken = CancellationToken.None;
         var timeout = TimeSpan.FromMilliseconds(100);
 

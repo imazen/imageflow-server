@@ -7,7 +7,7 @@ using Imazen.HybridCache.MetaStore;
 using Imazen.Routing.Caching.Internal;
 using Imazen.Routing.Tests.Serving;
 using Imazen.Tests.Routing.Serving;
-using Xunit;
+
 #pragma warning disable CS0618 // Type or member is obsolete
 
 namespace Imazen.HybridCache.Tests

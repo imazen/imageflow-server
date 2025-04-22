@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 using Imazen.Abstractions.Blobs;
 using Imazen.Abstractions.Blobs.LegacyProviders;
 using Imazen.Abstractions.Resulting;
-using BlobMissingException = Imazen.Common.Storage.BlobMissingException;
+using BlobMissingException = Imazen.Abstractions.Blobs.LegacyProviders.BlobMissingException;
 
 namespace Imageflow.Server.Storage.RemoteReader
 {
@@ -86,7 +86,11 @@ namespace Imageflow.Server.Storage.RemoteReader
         /// </summary>
         /// <param name="virtualPath"></param>
         /// <returns></returns>
+#pragma warning disable CS0618 // Type or member is obsolete
+
         public async Task<IBlobData> Fetch(string virtualPath)
+#pragma warning restore CS0618 // Type or member is obsolete
+
         {
             var parsedUrl = ParseUrl(virtualPath);
             
@@ -196,7 +200,8 @@ namespace Imageflow.Server.Storage.RemoteReader
         public string UniqueName { get; } = "RemoteReader";
         public IEnumerable<BlobWrapperPrefixZone> GetPrefixesAndZones()
         {
-            return prefixes.Select(p => new BlobWrapperPrefixZone(p, null));
+            //TODO: make this per DNS/site
+            return prefixes.Select(p => new BlobWrapperPrefixZone(p, new LatencyTrackingZone(p, 2000, true)));
         }
 
         public LatencyTrackingZone GetLatencyZone(string virtualPath)

@@ -4,6 +4,11 @@ using Imazen.Common.Instrumentation.Support;
 using Imazen.Common.Instrumentation.Support.Clamping;
 using Imazen.Common.Instrumentation.Support.PercentileSinks;
 using Imazen.Common.Instrumentation.Support.RateTracking;
+using System.Linq;
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Imazen.Common.Tests.Licensing
 {

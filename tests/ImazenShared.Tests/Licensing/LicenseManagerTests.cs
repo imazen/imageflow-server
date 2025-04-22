@@ -5,8 +5,8 @@ using Imazen.Common.Licensing;
 using Imazen.Common.Persistence;
 using Imazen.Tests.Licensing;
 using Moq;
+
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Imazen.Common.Tests.Licensing
 {

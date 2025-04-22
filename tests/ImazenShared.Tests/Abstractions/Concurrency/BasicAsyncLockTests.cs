@@ -1,12 +1,14 @@
 using Imazen.Abstractions.Concurrency;
 using Imazen.Abstractions.Logging;
 using Imazen.Routing.Caching.Health.Tests;
-using Xunit.Abstractions;
+using Xunit;
 
 namespace Imazen.Tests.Abstractions.Concurrency;
 
+using System;
+using System.Threading;
 using System.Threading.Tasks;
-using Xunit;
+
 using Imazen.Abstractions.Concurrency;
 using Imazen.Abstractions.Logging;
 
@@ -40,7 +42,7 @@ public class BasicAsyncLockTests
         {
 
             await Assert.ThrowsAsync<TaskCanceledException>(async () =>
-                await asyncLock.LockAsyncWithTimeout(timeoutMilliseconds: 100));
+                await asyncLock.LockAsyncWithTimeout(timeoutMilliseconds: 100,TestContext.Current.CancellationToken));
         }
     }
 
@@ -53,10 +55,10 @@ public class BasicAsyncLockTests
         using (await asyncLock.LockAsync())
         {
             // Attempt to acquire the lock with a timeout
-            var lockTask = asyncLock.LockAsyncWithTimeout(100);
+            var lockTask = asyncLock.LockAsyncWithTimeout(100,TestContext.Current.CancellationToken);
 
             // Wait for the timeout
-            await Task.Delay(200);
+            await Task.Delay(200,TestContext.Current.CancellationToken);
 
             // The lock should not be acquired due to the timeout
             Assert.Equal(TaskStatus.Faulted, lockTask.Status);
@@ -80,21 +82,21 @@ public async Task Lock_IsExclusive()
         // Start a separate task that tries to acquire the lock
         var lockTask = Task.Run(async () =>
         {
-            using (await asyncLock.LockAsync())
+            using (await asyncLock.LockAsyncWithTimeout(Timeout.Infinite,TestContext.Current.CancellationToken))
             {
                 lockAcquired = true;
             }
-        });
+        },TestContext.Current.CancellationToken);
 
         // Wait a short time to give the other task a chance to run
-        await Task.Delay(100);
+        await Task.Delay(100,TestContext.Current.CancellationToken);
 
         // The other task should not have acquired the lock yet
         Assert.False(lockAcquired);
     }
 
     // After releasing the lock, the other task should eventually acquire it
-    await Task.Delay(100);
+    await Task.Delay(100,TestContext.Current.CancellationToken);
     Assert.True(lockAcquired);
 }
 
@@ -113,7 +115,7 @@ public async Task Lock_IsExclusive()
             var lockTask = asyncLock.LockAsyncWithTimeout(Timeout.Infinite, cts.Token);
 
             // Wait for the cancellation
-            await Task.Delay(200);
+            await Task.Delay(200,TestContext.Current.CancellationToken);
 
             // The lock should not be acquired due to cancellation
             Assert.Equal(TaskStatus.Canceled, lockTask.Status);
@@ -134,7 +136,7 @@ public async Task Lock_IsExclusive()
         var semaphore = new SemaphoreSlim(0, 1);
 
         // Act
-        var entered = await semaphore.WaitAsync(TimeSpan.FromMilliseconds(50));
+        var entered = await semaphore.WaitAsync(TimeSpan.FromMilliseconds(50),TestContext.Current.CancellationToken);
 
         // Assert
         Assert.False(entered);
@@ -155,7 +157,7 @@ public async Task Lock_IsExclusive()
             var lockTask = asyncLock.LockAsyncWithTimeout(200, cts.Token);
 
             // Wait for the cancellation and timeout
-            await Task.Delay(300);
+            await Task.Delay(300,TestContext.Current.CancellationToken);
 
             // The lock should not be acquired due to cancellation or timeout
             Assert.Equal(TaskStatus.Canceled, lockTask.Status);

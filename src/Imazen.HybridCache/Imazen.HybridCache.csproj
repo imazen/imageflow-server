@@ -14,10 +14,10 @@
 
     
     <ItemGroup>
-      <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="3.3.4">
+      <!-- <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="3.3.4">
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         <PrivateAssets>all</PrivateAssets>
-      </PackageReference>
+      </PackageReference> -->
       
       <PackageReference Include="System.Interactive.Async" Version="6.0.1" />
     </ItemGroup>

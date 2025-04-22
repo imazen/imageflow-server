@@ -2,7 +2,7 @@ using System.Reflection;
 using Imazen.Abstractions.Blobs;
 using Imazen.Abstractions.Logging;
 using Microsoft.Extensions.FileProviders;
-using Xunit.Abstractions;
+using Xunit;
 
 namespace Imageflow.Server.Tests
 {

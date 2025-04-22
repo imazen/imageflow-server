@@ -9,7 +9,7 @@ using Imazen.Common.Concurrency;
 using Imazen.Common.Extensibility.StreamCache;
 using Imazen.Common.Extensibility.Support;
 using Imazen.HybridCache.MetaStore;
-using Xunit;
+
 
 namespace Imazen.HybridCache.Tests
 {

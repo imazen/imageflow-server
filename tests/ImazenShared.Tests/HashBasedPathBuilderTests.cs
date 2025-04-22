@@ -1,6 +1,7 @@
 using Imazen.Common.Extensibility.Support;
 using Xunit;
 
+
 namespace Imazen.HybridCache.Tests
 {
     public class HashBasedPathBuilderTests

@@ -3,6 +3,7 @@ using System.Text;
 using Imazen.Common.Licensing;
 using Xunit;
 
+
 namespace Imazen.Common.Tests.Licensing
 {
     public class LicenseVerifierTests

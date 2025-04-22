@@ -12,8 +12,8 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Imageflow.Server.Tests
 {
@@ -90,77 +90,77 @@ namespace Imageflow.Server.Tests
 
                 
                 // Build and start the IHost
-                using var host = await hostBuilder.StartAsync();
+                using var host = await hostBuilder.StartAsync(TestContext.Current.CancellationToken);
 
                 
                 // Create an HttpClient to send requests to the TestServer
                 using var client = host.GetTestClient();
 
-                using var notFoundResponse = await client.GetAsync("/not_there.jpg");
+                using var notFoundResponse = await client.GetAsync("/not_there.jpg", TestContext.Current.CancellationToken);
                 Assert.Equal(HttpStatusCode.NotFound,notFoundResponse.StatusCode);
                 
-                using var watermarkBrokenResponse = await client.GetAsync("/fire.jpg?watermark=broken");
+                using var watermarkBrokenResponse = await client.GetAsync("/fire.jpg?watermark=broken", TestContext.Current.CancellationToken);
                 Assert.Equal(HttpStatusCode.NotFound,watermarkBrokenResponse.StatusCode);
 
                 await Assert.ThrowsAsync<InvalidOperationException>(async () =>
                 {
-                    using var watermarkInvalidResponse = await client.GetAsync("/fire.jpg?watermark=not-a-watermark");
+                    using var watermarkInvalidResponse = await client.GetAsync("/fire.jpg?watermark=not-a-watermark", TestContext.Current.CancellationToken);
                 });
                 
-                using var watermarkResponse = await client.GetAsync("/fire.jpg?watermark=imazen");
+                using var watermarkResponse = await client.GetAsync("/fire.jpg?watermark=imazen", TestContext.Current.CancellationToken);
                 watermarkResponse.EnsureSuccessStatusCode();
                 
-                using var watermarkResponse2 = await client.GetAsync("/fire.jpg?water=mark");
+                using var watermarkResponse2 = await client.GetAsync("/fire.jpg?water=mark", TestContext.Current.CancellationToken);
                 watermarkResponse2.EnsureSuccessStatusCode();
 
-                using var wrongImageExtension1 = await client.GetAsync("/wrong.webp");
+                using var wrongImageExtension1 = await client.GetAsync("/wrong.webp", TestContext.Current.CancellationToken);
                 wrongImageExtension1.EnsureSuccessStatusCode();
                 Assert.Equal("image/png", wrongImageExtension1.Content.Headers.ContentType?.MediaType);
                 
-                using var wrongImageExtension2 = await client.GetAsync("/wrong.jpg");
+                using var wrongImageExtension2 = await client.GetAsync("/wrong.jpg", TestContext.Current.CancellationToken);
                 wrongImageExtension2.EnsureSuccessStatusCode();
                 Assert.Equal("image/png", wrongImageExtension2.Content.Headers.ContentType?.MediaType);
 
-                using var extensionlessRequest = await client.GetAsync("/extensionless/file");
+                using var extensionlessRequest = await client.GetAsync("/extensionless/file", TestContext.Current.CancellationToken);
                 extensionlessRequest.EnsureSuccessStatusCode();
                 Assert.Equal("image/png", extensionlessRequest.Content.Headers.ContentType?.MediaType);
 
                 
-                using var response2 = await client.GetAsync("/fire.jpg?width=1");
+                using var response2 = await client.GetAsync("/fire.jpg?width=1", TestContext.Current.CancellationToken);
                 response2.EnsureSuccessStatusCode();
-                var responseBytes = await response2.Content.ReadAsByteArrayAsync();
+                var responseBytes = await response2.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken);
                 Assert.True(responseBytes.Length < 1000);
                 
-                using var response3 = await client.GetAsync("/fire umbrella.jpg"); //Works with space...
+                using var response3 = await client.GetAsync("/fire umbrella.jpg", TestContext.Current.CancellationToken); //Works with space...
                 response3.EnsureSuccessStatusCode();
-                responseBytes = await response3.Content.ReadAsByteArrayAsync();
+                responseBytes = await response3.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken);
                 Assert.Equal(contentRoot.GetResourceBytes("TestFiles.fire-umbrella-small.jpg"), responseBytes);
                 
-                using var response4 = await client.GetAsync("/inSenSitive/fire.jpg?width=1");
+                using var response4 = await client.GetAsync("/inSenSitive/fire.jpg?width=1", TestContext.Current.CancellationToken);
                 response4.EnsureSuccessStatusCode();
                 
                 
                 
-                using var response5 = await client.GetAsync("/senSitive/fire.jpg?width=1");
+                using var response5 = await client.GetAsync("/senSitive/fire.jpg?width=1", TestContext.Current.CancellationToken);
                 Assert.Equal(HttpStatusCode.NotFound, response5.StatusCode);
                 
-                using var response6 = await client.GetAsync("/sensitive/fire.jpg?width=1");
+                using var response6 = await client.GetAsync("/sensitive/fire.jpg?width=1", TestContext.Current.CancellationToken);
                 response6.EnsureSuccessStatusCode();
                 
-                using var response7 = await client.GetAsync("/fire.jfif?width=1");
+                using var response7 = await client.GetAsync("/fire.jfif?width=1", TestContext.Current.CancellationToken);
                 response7.EnsureSuccessStatusCode();
-                var responseBytes7 = await response7.Content.ReadAsByteArrayAsync();
+                var responseBytes7 = await response7.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken);
                 Assert.True(responseBytes7.Length < 1000);
                 
-                using var response8 = await client.GetAsync("/imageflow.health");
+                using var response8 = await client.GetAsync("/imageflow.health", TestContext.Current.CancellationToken);
                 response8.EnsureSuccessStatusCode();
-                using var response9 = await client.GetAsync("/imageflow.ready");
+                using var response9 = await client.GetAsync("/imageflow.ready", TestContext.Current.CancellationToken);
                 response9.EnsureSuccessStatusCode();
                 
-                using var response10 = await client.GetAsync("/fire%20umbrella.jpg"); //Works with space...
+                using var response10 = await client.GetAsync("/fire%20umbrella.jpg", TestContext.Current.CancellationToken); //Works with space...
                 response10.EnsureSuccessStatusCode();
                 
-                await host.StopAsync(CancellationToken.None);
+                await host.StopAsync(TestContext.Current.CancellationToken);
             }
         }
 
@@ -205,36 +205,36 @@ namespace Imageflow.Server.Tests
                 // Create an HttpClient to send requests to the TestServer
                 using var client = host.GetTestClient();
 
-                using var response = await client.GetAsync("/not_there.jpg");
+                using var response = await client.GetAsync("/not_there.jpg", TestContext.Current.CancellationToken);
                 Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
 
-                using var response2 = await client.GetAsync("/fire.jpg?width=1");
+                using var response2 = await client.GetAsync("/fire.jpg?width=1", TestContext.Current.CancellationToken);
                 response2.EnsureSuccessStatusCode();
-                var responseBytes = await response2.Content.ReadAsByteArrayAsync();
+                var responseBytes = await response2.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken);
                 Assert.True(responseBytes.Length < 1000);
 
-                using (var response3 = await client.GetAsync("/fire.jpg"))
+                using (var response3 = await client.GetAsync("/fire.jpg", TestContext.Current.CancellationToken))
                 {
                     response3.EnsureSuccessStatusCode();
-                    responseBytes = await response3.Content.ReadAsByteArrayAsync();
+                    responseBytes = await response3.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken);
                     Assert.Equal(contentRoot.GetResourceBytes("TestFiles.fire-umbrella-small.jpg"), responseBytes);
                 }
 
                 {
-                    using var wrongImageExtension1 = await client.GetAsync("/wrong.webp");
+                    using var wrongImageExtension1 = await client.GetAsync("/wrong.webp", TestContext.Current.CancellationToken);
                     wrongImageExtension1.EnsureSuccessStatusCode();
                     Assert.Equal("image/png", wrongImageExtension1.Content.Headers.ContentType?.MediaType);
                 }
 
-                using var wrongImageExtension2 = await client.GetAsync("/wrong.jpg");
+                using var wrongImageExtension2 = await client.GetAsync("/wrong.jpg", TestContext.Current.CancellationToken  );
                 wrongImageExtension2.EnsureSuccessStatusCode();
                 Assert.Equal("image/png", wrongImageExtension2.Content.Headers.ContentType?.MediaType);
 
-                using var extensionlessRequest = await client.GetAsync("/extensionless/file");
+                using var extensionlessRequest = await client.GetAsync("/extensionless/file", TestContext.Current.CancellationToken);
                 extensionlessRequest.EnsureSuccessStatusCode();
                 Assert.Equal("image/png", extensionlessRequest.Content.Headers.ContentType?.MediaType);
             }
-            await host.StopAsync(CancellationToken.None);
+            await host.StopAsync(TestContext.Current.CancellationToken);
             await host.DisposeAsync();
 
             var cacheFiles = Directory.GetFiles(diskCacheDir, "*.jpg", SearchOption.AllDirectories);
@@ -279,13 +279,13 @@ namespace Imageflow.Server.Tests
             // Create an HttpClient to send requests to the TestServer
             using var client = host.GetTestClient();
 
-            using var response = await client.GetAsync("/ri/not_there.jpg");
+            using var response = await client.GetAsync("/ri/not_there.jpg", TestContext.Current.CancellationToken);
             Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
 
-            using var response2 = await client.GetAsync("/ri/imageflow-icon.png?width=1");
+            using var response2 = await client.GetAsync("/ri/imageflow-icon.png?width=1", TestContext.Current.CancellationToken);
             response2.EnsureSuccessStatusCode();
 
-            await host.StopAsync(CancellationToken.None);
+            await host.StopAsync(TestContext.Current.CancellationToken);
 
             // This could be failing because writes are still in the queue, or because no caches are deemed worthy of writing to, or health status reasons
             // TODO: diagnose 
@@ -329,18 +329,18 @@ namespace Imageflow.Server.Tests
                     });
 
                 // Build and start the IHost
-                using var host = await hostBuilder.StartAsync();
+                using var host = await hostBuilder.StartAsync(TestContext.Current.CancellationToken);
 
                 // Create an HttpClient to send requests to the TestServer
                 using var client = host.GetTestClient();
 
-                using var response = await client.GetAsync("/ri/not_there.jpg");
+                using var response = await client.GetAsync("/ri/not_there.jpg", TestContext.Current.CancellationToken);
                 Assert.Equal(HttpStatusCode.NotFound,response.StatusCode);
                 
-                using var response2 = await client.GetAsync("/ri/imageflow-icon.png?width=1");
+                using var response2 = await client.GetAsync("/ri/imageflow-icon.png?width=1", TestContext.Current.CancellationToken);
                 response2.EnsureSuccessStatusCode();
                 
-                await host.StopAsync(CancellationToken.None);
+                await host.StopAsync(TestContext.Current.CancellationToken);
                 
                 var cacheFiles = Directory.GetFiles(diskCacheDir, "*.jpg", SearchOption.AllDirectories);
                 Assert.Single(cacheFiles);
@@ -382,21 +382,21 @@ namespace Imageflow.Server.Tests
             // Create an HttpClient to send requests to the TestServer
             using var client = host.GetTestClient();
 
-            using var notFoundResponse = await client.GetAsync("/not_there.jpg");
+            using var notFoundResponse = await client.GetAsync("/not_there.jpg", TestContext.Current.CancellationToken);
             Assert.Equal(HttpStatusCode.NotFound, notFoundResponse.StatusCode);
 
-            using var foundResponse = await client.GetAsync("/fire.jpg");
+            using var foundResponse = await client.GetAsync("/fire.jpg", TestContext.Current.CancellationToken);
             foundResponse.EnsureSuccessStatusCode();
 
 
-            using var presetValidResponse = await client.GetAsync("/fire.jpg?preset=small");
+            using var presetValidResponse = await client.GetAsync("/fire.jpg?preset=small", TestContext.Current.CancellationToken);
             presetValidResponse.EnsureSuccessStatusCode();
 
 
-            using var watermarkInvalidResponse = await client.GetAsync("/fire.jpg?preset=not-a-preset");
+            using var watermarkInvalidResponse = await client.GetAsync("/fire.jpg?preset=not-a-preset", TestContext.Current.CancellationToken);
             Assert.Equal(HttpStatusCode.BadRequest,watermarkInvalidResponse.StatusCode);
             
-            using var nonPresetResponse = await client.GetAsync("/fire.jpg?width=1");
+            using var nonPresetResponse = await client.GetAsync("/fire.jpg?width=1", TestContext.Current.CancellationToken);
             Assert.Equal(HttpStatusCode.Forbidden, nonPresetResponse.StatusCode);
         }
 
@@ -433,23 +433,23 @@ namespace Imageflow.Server.Tests
                     });
 
                 // Build and start the IHost
-                using var host = await hostBuilder.StartAsync();
+                using var host = await hostBuilder.StartAsync(TestContext.Current.CancellationToken );
 
                 // Create an HttpClient to send requests to the TestServer
                 using var client = host.GetTestClient();
 
-                using var presetValidResponse = await client.GetAsync("/fire.jpg?preset=small&height=35&mode=pad");
+                using var presetValidResponse = await client.GetAsync("/fire.jpg?preset=small&height=35&mode=pad", TestContext.Current.CancellationToken);
                 presetValidResponse.EnsureSuccessStatusCode();
-                var responseBytes = await presetValidResponse.Content.ReadAsByteArrayAsync();
-                var imageResults = await ImageJob.GetImageInfoAsync(new MemorySource(responseBytes), SourceLifetime.NowOwnedAndDisposedByTask);
+                var responseBytes = await presetValidResponse.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken);
+                var imageResults = await ImageJob.GetImageInfoAsync(new MemorySource(responseBytes), SourceLifetime.NowOwnedAndDisposedByTask, TestContext.Current.CancellationToken);
                 Assert.Equal(30,imageResults.ImageWidth);
                 Assert.Equal(35,imageResults.ImageHeight);
                 
                 
-                using var presetTinyResponse = await client.GetAsync("/fire.jpg?preset=tiny&height=35");
+                using var presetTinyResponse = await client.GetAsync("/fire.jpg?preset=tiny&height=35", TestContext.Current.CancellationToken);
                 presetTinyResponse.EnsureSuccessStatusCode();
-                responseBytes = await presetTinyResponse.Content.ReadAsByteArrayAsync();
-                imageResults = await ImageJob.GetImageInfoAsync(new MemorySource(responseBytes), SourceLifetime.NowOwnedAndDisposedByTask);
+                responseBytes = await presetTinyResponse.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken);
+                imageResults = await ImageJob.GetImageInfoAsync(new MemorySource(responseBytes), SourceLifetime.NowOwnedAndDisposedByTask, TestContext.Current.CancellationToken);
                 Assert.Equal(2,imageResults.ImageWidth);
                 Assert.Equal(1,imageResults.ImageHeight);
                 
@@ -492,44 +492,44 @@ namespace Imageflow.Server.Tests
                                 );
                         });
                     });
-                using var host = await hostBuilder.StartAsync();
+                using var host = await hostBuilder.StartAsync(TestContext.Current.CancellationToken);
                 using var client = host.GetTestClient();
                 
-                using var unsignedResponse = await client.GetAsync("/fire umbrella.jpg?width=1");
+                using var unsignedResponse = await client.GetAsync("/fire umbrella.jpg?width=1", TestContext.Current.CancellationToken);
                 Assert.Equal(HttpStatusCode.Forbidden,unsignedResponse.StatusCode);
 
                 var signedUrl = Imazen.Common.Helpers.Signatures.SignRequest("/fire umbrella.jpg?width=1", key);
-                using var signedResponse = await client.GetAsync(signedUrl);
+                using var signedResponse = await client.GetAsync(signedUrl, TestContext.Current.CancellationToken);
                 signedResponse.EnsureSuccessStatusCode();
                 
                 var signedEncodedUnmodifiedUrl = Imazen.Common.Helpers.Signatures.SignRequest("/fire%20umbrella.jpg", key);
-                using var signedEncodedUnmodifiedResponse = await client.GetAsync(signedEncodedUnmodifiedUrl);
+                using var signedEncodedUnmodifiedResponse = await client.GetAsync(signedEncodedUnmodifiedUrl, TestContext.Current.CancellationToken);
                 signedEncodedUnmodifiedResponse.EnsureSuccessStatusCode();
 
                 var unsignedUnmodifiedUrl = "/query/umbrella.jpg";
-                using var unsignedUnmodifiedResponse = await client.GetAsync(unsignedUnmodifiedUrl);
+                using var unsignedUnmodifiedResponse = await client.GetAsync(unsignedUnmodifiedUrl, TestContext.Current.CancellationToken);
                 unsignedUnmodifiedResponse.EnsureSuccessStatusCode();
                 
-                using var unsignedResponse2 = await client.GetAsync("/query/umbrella.jpg?width=1");
+                using var unsignedResponse2 = await client.GetAsync("/query/umbrella.jpg?width=1", TestContext.Current.CancellationToken);
                 Assert.Equal(HttpStatusCode.Forbidden,unsignedResponse2.StatusCode);
 
                 var unsignedUnmodifiedUrl2 = "/never/umbrella.jpg";
-                using var unsignedUnmodifiedResponse2 = await client.GetAsync(unsignedUnmodifiedUrl2);
+                using var unsignedUnmodifiedResponse2 = await client.GetAsync(unsignedUnmodifiedUrl2, TestContext.Current.CancellationToken);
                 unsignedUnmodifiedResponse2.EnsureSuccessStatusCode();
                 
                 var unsignedModifiedUrl = "/never/umbrella.jpg?width=1";
-                using var unsignedModifiedResponse = await client.GetAsync(unsignedModifiedUrl);
+                using var unsignedModifiedResponse = await client.GetAsync(unsignedModifiedUrl, TestContext.Current.CancellationToken);
                 unsignedModifiedResponse.EnsureSuccessStatusCode();
                 
                 var signedEncodedUrl = Imazen.Common.Helpers.Signatures.SignRequest("/fire%20umbrella.jpg?width=1", key);
-                using var signedEncodedResponse = await client.GetAsync(signedEncodedUrl);
+                using var signedEncodedResponse = await client.GetAsync(signedEncodedUrl, TestContext.Current.CancellationToken);
                 signedEncodedResponse.EnsureSuccessStatusCode();
                 
                 var url5 = Imazen.Common.Helpers.Signatures.SignRequest("/fire umbrella.jpg?width=1&ke%20y=val%2fue&another key=another val/ue", key);
-                using var response5 = await client.GetAsync(url5);
+                using var response5 = await client.GetAsync(url5, TestContext.Current.CancellationToken);
                 response5.EnsureSuccessStatusCode();
                 
-                await host.StopAsync(CancellationToken.None);
+                await host.StopAsync(TestContext.Current.CancellationToken);
             }
         }
         
@@ -574,7 +574,7 @@ namespace Imageflow.Server.Tests
                                 ));
                         });
                     });
-                using var host = await hostBuilder.StartAsync();
+                using var host = await hostBuilder.StartAsync(TestContext.Current.CancellationToken);
                 using var client = host.GetTestClient();
 
                 // The origin file
@@ -587,17 +587,17 @@ namespace Imageflow.Server.Tests
                 
                 // Now we could stop here, but we also enabled request signing which is different from remote reader signing
                 var signedModifiedUrl = Imazen.Common.Helpers.Signatures.SignRequest(modifiedUrl, requestSigningKey);
-                using var signedResponse = await client.GetAsync(signedModifiedUrl);
+                using var signedResponse = await client.GetAsync(signedModifiedUrl, TestContext.Current.CancellationToken);
                 signedResponse.EnsureSuccessStatusCode();
                 
                 // Now, verify that the remote url can't be fetched without signing it the second time, 
                 // since we called .SetRequestSignatureOptions
-                using var halfSignedResponse = await client.GetAsync(modifiedUrl);
+                using var halfSignedResponse = await client.GetAsync(modifiedUrl, TestContext.Current.CancellationToken);
                 Assert.Equal(HttpStatusCode.Forbidden, halfSignedResponse.StatusCode);
 
                 
                 
-                await host.StopAsync(CancellationToken.None);
+                await host.StopAsync(TestContext.Current.CancellationToken);
             }
         }
     }
