@@ -1,10 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
+  <Import Project="..\TestDefaults.props" />
   <PropertyGroup>
     <Title>Imageflow.Server.LegacyBlob - Exercises old blob api, remote reader legacy version</Title>
     <Description>-</Description>
+ 
   </PropertyGroup>
-  <Import Project="..\TestDefaults.targets" />
+
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Imazen.Common\Imazen.Common.csproj" />

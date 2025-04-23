@@ -61,7 +61,7 @@ namespace Imazen.HybridCache.Tests
                 Assert.NotNull(result2.Data);
                 
                 //Assert.NotNull(((AsyncCache.AsyncCacheResultOld)result2).CreatedAt);
-                await cache.AwaitAllCurrentTasks(default);
+                await cache.AwaitAllCurrentTasks(TestContext.Current.CancellationToken);
                 
                 var result3 = await cache.GetOrCreateBytes(key, DataProvider, cancellationToken, true);
                 using var rd3 = result3 as IDisposable;

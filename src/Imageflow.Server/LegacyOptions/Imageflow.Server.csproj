@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <RootNamespace>Imageflow.Server</RootNamespace>
     <Title>Imageflow .NET Server - Middleware for fetching, processing, and caching images on-demand.</Title>
     <Description>Imageflow.Server - Middleware for fetching, processing, and caching images on-demand. Commercial licenses available.</Description>

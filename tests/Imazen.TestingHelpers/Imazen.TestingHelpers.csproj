@@ -5,6 +5,7 @@
         <TargetFramework>netstandard2.0</TargetFramework>
         <LangVersion>latest</LangVersion>
         <Nullable>enable</Nullable>
+        <OutputType>library</OutputType>
     </PropertyGroup>
 
     <ItemGroup>

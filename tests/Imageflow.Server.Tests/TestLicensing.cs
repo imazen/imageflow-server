@@ -92,16 +92,16 @@ namespace Imageflow.Server.Tests
                 // Create an HttpClient to send requests to the TestServer
                 using var client = host.GetTestClient();
                 
-                using var notLicensedResponse = await client.GetAsync("/fire.jpg?w=1");
+                using var notLicensedResponse = await client.GetAsync("/fire.jpg?w=1", TestContext.Current.CancellationToken);
                 Assert.Equal(HttpStatusCode.PaymentRequired,notLicensedResponse.StatusCode);
 
-                using var licensePageResponse = await client.GetAsync("/imageflow.license");
+                using var licensePageResponse = await client.GetAsync("/imageflow.license", TestContext.Current.CancellationToken);
                 licensePageResponse.EnsureSuccessStatusCode();
                 
-                using var notAuthorizedResponse = await client.GetAsync("/imageflow.debug");
+                using var notAuthorizedResponse = await client.GetAsync("/imageflow.debug", TestContext.Current.CancellationToken);
                 Assert.Equal(HttpStatusCode.Unauthorized,notAuthorizedResponse.StatusCode);
                 
-                using var debugPageResponse = await client.GetAsync("/imageflow.debug?password=pass");
+                using var debugPageResponse = await client.GetAsync("/imageflow.debug?password=pass", TestContext.Current.CancellationToken);
                 debugPageResponse.EnsureSuccessStatusCode();
                 
 
@@ -137,7 +137,7 @@ namespace Imageflow.Server.Tests
                 // Create an HttpClient to send requests to the TestServer
                 using var client = host.GetTestClient();
                 
-                using var licensedResponse = await client.GetAsync("/fire.jpg?w=1");
+                using var licensedResponse = await client.GetAsync("/fire.jpg?w=1", TestContext.Current.CancellationToken);
                 licensedResponse.EnsureSuccessStatusCode();
 
                 var page = licensing.Result.ProvidePublicLicensesPage();
@@ -181,7 +181,7 @@ namespace Imageflow.Server.Tests
                 using var client = host.GetTestClient();
                 
                 //Trigger license heartbeat.
-                using var isReady = await client.GetAsync("/imageflow.ready");
+                using var isReady = await client.GetAsync("/imageflow.ready", TestContext.Current.CancellationToken);
                 isReady.EnsureSuccessStatusCode();
                 
                 await mgr.AwaitTasks();
@@ -191,7 +191,7 @@ namespace Imageflow.Server.Tests
                 Thread.Sleep(50); //In case this helps with async
                 
                 url.Url = new Uri("https://unlicenseddomain.com");
-                using var notLicensedResponse = await client.GetAsync("/fire.jpg?w=1");
+                using var notLicensedResponse = await client.GetAsync("/fire.jpg?w=1", TestContext.Current.CancellationToken);
                 
                 // ON CI we sometimes get OK instead of 402 (Payment Required).
                 Assert.Equal(HttpStatusCode.PaymentRequired,notLicensedResponse.StatusCode);
@@ -199,15 +199,15 @@ namespace Imageflow.Server.Tests
                 
                 
                 url.Url = new Uri("https://acme.com");
-                using var licensedResponse1 = await client.GetAsync("/fire.jpg?w=1");
+                using var licensedResponse1 = await client.GetAsync("/fire.jpg?w=1", TestContext.Current.CancellationToken);
                 licensedResponse1.EnsureSuccessStatusCode(); // ON CI we sometimes get System.Net.Http.HttpRequestException : Response status code does not indicate success: 402 (Payment Required).
 
                 url.Url = new Uri("https://acmestaging.com");
-                using var licensedResponse2 = await client.GetAsync("/fire.jpg?w=1");
+                using var licensedResponse2 = await client.GetAsync("/fire.jpg?w=1", TestContext.Current.CancellationToken);
                 licensedResponse2.EnsureSuccessStatusCode();
                 
                 url.Url = new Uri("https://subdomain.acme.com");
-                using var licensedResponse3 = await client.GetAsync("/fire.jpg?w=1");
+                using var licensedResponse3 = await client.GetAsync("/fire.jpg?w=1", TestContext.Current.CancellationToken);
                 licensedResponse3.EnsureSuccessStatusCode();
                 
                 Assert.Empty(mgr.GetIssues());
@@ -250,7 +250,7 @@ namespace Imageflow.Server.Tests
                 using var client = host.GetTestClient();
                 
                 //Trigger license heartbeat.
-                using var isReady = await client.GetAsync("/imageflow.ready");
+                using var isReady = await client.GetAsync("/imageflow.ready", TestContext.Current.CancellationToken);
                 isReady.EnsureSuccessStatusCode();
                 
                 await mgr.AwaitTasks();
@@ -259,15 +259,15 @@ namespace Imageflow.Server.Tests
 
 
                 url.Url = new Uri("https://acme.com");
-                using var licensedResponse1 = await client.GetAsync("/fire.jpg?w=1");
+                using var licensedResponse1 = await client.GetAsync("/fire.jpg?w=1", TestContext.Current.CancellationToken);
                 licensedResponse1.EnsureSuccessStatusCode();
 
                 url.Url = new Uri("https://acmestaging.com");
-                using var licensedResponse2 = await client.GetAsync("/fire.jpg?w=1");
+                using var licensedResponse2 = await client.GetAsync("/fire.jpg?w=1", TestContext.Current.CancellationToken);
                 licensedResponse2.EnsureSuccessStatusCode();
                 
                 url.Url = new Uri("https://subdomain.acme.com");
-                using var licensedResponse3 = await client.GetAsync("/fire.jpg?w=1");
+                using var licensedResponse3 = await client.GetAsync("/fire.jpg?w=1", TestContext.Current.CancellationToken);
                 licensedResponse3.EnsureSuccessStatusCode();
                 
                 Assert.Empty(mgr.GetIssues());
@@ -325,7 +325,7 @@ namespace Imageflow.Server.Tests
                 using var client = host.GetTestClient();
                 
                 //Trigger license heartbeat.
-                using var isReady = await client.GetAsync("/imageflow.ready");
+                using var isReady = await client.GetAsync("/imageflow.ready", TestContext.Current.CancellationToken);
                 isReady.EnsureSuccessStatusCode();
                 
                 await mgr.AwaitTasks();
@@ -333,11 +333,11 @@ namespace Imageflow.Server.Tests
                 mock.Verify();
                 
                 url.Url = new Uri("https://domain.com");
-                using var notLicensedResponse = await client.GetAsync("/fire.jpg?w=1");
+                using var notLicensedResponse = await client.GetAsync("/fire.jpg?w=1", TestContext.Current.CancellationToken);
                 Assert.Equal(HttpStatusCode.PaymentRequired,notLicensedResponse.StatusCode); //TODO: Sometimes this comes back as OK
 
                 url.Url = null;
-                using var notLicensedResponse2 = await client.GetAsync("/fire.jpg?w=1");
+                using var notLicensedResponse2 = await client.GetAsync("/fire.jpg?w=1", TestContext.Current.CancellationToken);
                 Assert.Equal(HttpStatusCode.PaymentRequired,notLicensedResponse2.StatusCode);
 
                 

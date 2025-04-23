@@ -208,9 +208,10 @@ namespace Imageflow.Server.Storage.AzureBlob.Caching
 
   
 
-        public async Task<CodeResult<IAsyncEnumerable<IBlobStorageReference>>> CacheSearchByTag(SearchableBlobTag tag, CancellationToken cancellationToken = default)
+        public Task<CodeResult<IAsyncEnumerable<IBlobStorageReference>>> CacheSearchByTag(SearchableBlobTag tag, CancellationToken cancellationToken = default)
         {
-            return CodeResult<IAsyncEnumerable<IBlobStorageReference>>.Ok(CacheSearchByTagInner(tag, cancellationToken));
+            return Task.FromResult(
+                CodeResult<IAsyncEnumerable<IBlobStorageReference>>.Ok(CacheSearchByTagInner(tag, cancellationToken)));
         }
         
         public async IAsyncEnumerable<IBlobStorageReference> CacheSearchByTagInner(SearchableBlobTag tag,
@@ -239,15 +240,18 @@ namespace Imageflow.Server.Storage.AzureBlob.Caching
             }
         }
 
-        public async Task<CodeResult<IAsyncEnumerable<CodeResult<IBlobStorageReference>>>> CachePurgeByTag(SearchableBlobTag tag, CancellationToken cancellationToken = default)
+        public Task<CodeResult<IAsyncEnumerable<CodeResult<IBlobStorageReference>>>> CachePurgeByTag(SearchableBlobTag tag, CancellationToken cancellationToken = default)
         {
             try
             {
-                return CodeResult<IAsyncEnumerable<CodeResult<IBlobStorageReference>>>.Ok(CachePurgeByTagInner(tag, cancellationToken));
+                return Task.FromResult(
+                    CodeResult<IAsyncEnumerable<CodeResult<IBlobStorageReference>>>.Ok(
+                        CachePurgeByTagInner(tag, cancellationToken)));
             }
             catch (RequestFailedException ex)
             {
-                return CodeResult<IAsyncEnumerable<CodeResult<IBlobStorageReference>>>.Err(ex.ToHttpStatus());
+                return Task.FromResult(
+                    CodeResult<IAsyncEnumerable<CodeResult<IBlobStorageReference>>>.Err(ex.ToHttpStatus()));
             }
         }
         public async IAsyncEnumerable<CodeResult<IBlobStorageReference>> CachePurgeByTagInner(SearchableBlobTag tag,[EnumeratorCancellation] CancellationToken cancellationToken = default)
