@@ -1,18 +1,36 @@
-# Design of route matcher syntax
+# The problem
 
-This system never backtracks, ensuring that the matching process is always O(n) in the length of the path. Not all conditions are involved in capturing; many are validated after input is segmented.
+Regular expressions are wonderful, except when they're not. 
+
+1. They can be unclear and error-prone, leading to bugs and potential security issues.
+2. Mistakes can cause catastrophic backtracking and let a smart bulb overwhelm a 32-core behometh. Take this simple regex rewrite rule, designed to match a series of skus: 
+
+```regex
+/sku-list/(\w+\d+)+/
+-> /display-products.aspx?series=$1
+```
+When the incoming URL is `/sku-list/dress1251shirt726cap1362pants944top2154sweater72344/`, the regex engine only takes 2 milliseconds to match, a performance issue not noticeable in QA. But when an inbound like omits the trailing '/', suddenly each request is pegging a CPU core until it times out (1 second on ASP.NET 10), capping your server throughput at a handful of requests per second. 
+
+Now, the author and reader certainly would spot and prevent such an issue in the regex - if they permitted links in such a poor format to exist in the first place. But it might, perhaps, be a bit of an oversight to make regexes the *primary* syntax.
 
 
-When a querystring is specified in the expression, it is structurally parsed and matched regardless of 
-how the querystring is arranged, and extra unspecified keys are ignored.
+## A better syntax for routing and rewriting
 
-`/images/{sku:int}/{image_id:int}.{format:only(jpg|png|gif)}?w={width:int:?}`
-`/san/productimages/{{image_id}.{{format}}?format=webp&w={{width:default(40)}}`
+**Goals**
+1. Easy and clear for humans to read and write, meeting 95% of use cases.
+2. Impossible to express extremely complicated patterns - no repeating groups or backtracking, no need to escape ? and . 
+3. More capable for validating numeric input and transforming/mapping values.
+4. Clear templating syntax, capable of fallbacks, validations, mappings, defaults, and optionals. 
+5. Constant-time matching O(n), making even tiny performance issues impossible.
+4. Flexible, so it can be used for routing, rewriting, and other purposes.
+5. Intuitive, structural/smart matching and transformation of querystrings.
+6. Captures are named, and stop when the next bit can match. `/article_{slug}_` won't match `/article_day_1`, but `/article_{slug}` will. (Like lazy evaluation)
+7. No magical behavior. Unfortunately, this includes special treatment for optional segments. `/articles/{slug:?}/` will match `/articles//`, but you probably meant `/articles/{slug:suffix(/):?}`
 
-`/images/{sku:int}/{image_id:int}.{format:only(jpg|png|gif)}?w={w:int:?}&width={width:int:?}&http-accept={:contains(image/webp)}`
+** Examples **
+`/images/{slug:only([a-zA-Z0-9_-])}/{sku:int}/{image_id:int}.{format:only(jpg|png|gif)}?w={width:int:?}`
+`/san/productimages/{image_id}.{format}?format=webp&w={width:default(40)}`
 
-
-`/san/productimages/{{image_id}.{{format}}?format=webp&w={{width:or-var(w):default(40)}}`
 
 
 # MatchExpression Syntax Reference
@@ -21,14 +39,14 @@ how the querystring is arranged, and extra unspecified keys are ignored.
 
 ** These affect where captures start and stop, and how the input is divided up **
 
-- `equals(string)`: Matches a segment that equals the specified string.
-- `equals-i(string)`: Matches a segment that equals the specified string, ignoring case.
-- `starts-with(string)`: Matches a segment that starts with the specified string.
-- `starts-with-i(string)`: Matches a segment that starts with the specified string, ignoring case.
-- `ends-with(string)`: Matches a segment that ends with the specified string.
-- `ends-with-i(string)`: Matches a segment that ends with the specified string, ignoring case.
-- `len(int)`: Matches a segment with a fixed length specified by the integer.
-- `equals(char)`: Matches a segment that equals the specified character.
+- `equals(string)` (aliases: `eq`, ``): Matches a segment that equals the specified string.
+- `equals-i(string)` (aliases: `eq-i`): Matches a segment that equals the specified string, ignoring case.
+- `starts-with(string)` (alias: `starts`): Matches a segment that starts with the specified string.
+- `starts-with-i(string)` (alias: `starts-i`): Matches a segment that starts with the specified string, ignoring case.
+- `ends-with(string)` (alias: `ends`): Matches a segment that ends with the specified string.
+- `ends-with-i(string)` (alias: `ends-i`): Matches a segment that ends with the specified string, ignoring case.
+- `len(int)`: Matches a segment with a fixed length specified by the integer. (*Note: `length` is the canonical condition name, but `len` is used for the boundary.*)
+- `equals(char)` (aliases: `eq`): Matches a segment that equals the specified character.
 - `prefix(string)`: Matches a segment that starts with the specified string, not including it in the captured value.
 - `prefix-i(string)`: Matches a segment that starts with the specified string, ignoring case and not including it in the captured value.
 - `suffix(string)`: Matches a segment that ends with the specified string, not including it in the captured value.
@@ -43,30 +61,32 @@ where a capture starts and stops. **
 - `alpha-lower()`: Matches a segment that contains only lowercase alphabetic characters.
 - `alpha-upper()`: Matches a segment that contains only uppercase alphabetic characters.
 - `alphanumeric()`: Matches a segment that contains only alphanumeric characters.
-- `hex()`: Matches a segment that contains only hexadecimal characters.
-- `int32()`: Matches a segment that represents a valid 32-bit integer.
-- `int64()`: Matches a segment that represents a valid 64-bit integer.
+- `hex()` (alias: `hexadecimal`): Matches a segment that contains only hexadecimal characters.
+- `int32()` (aliases: `int`, `i32`, `integer`): Matches a segment that represents a valid 32-bit integer.
+- `int64()` (aliases: `long`, `i64`): Matches a segment that represents a valid 64-bit integer.
+- `uint32()` (aliases: `uint`, `u32`): Matches a segment that represents a valid unsigned 32-bit integer.
+- `uint64()` (aliases: `u64`): Matches a segment that represents a valid unsigned 64-bit integer.
 - `guid()`: Matches a segment that represents a valid GUID.
-- `equals(string1|string2|...)`: Matches a segment that equals one of the specified strings.
-- `equals-i(string1|string2|...)`: Matches a segment that equals one of the specified strings, ignoring case.
-- `starts-with(string1|string2|...)`: Matches a segment that starts with one of the specified strings.
-- `starts-with-i(string1|string2|...)`: Matches a segment that starts with one of the specified strings, ignoring case.
-- `ends-with(string1|string2|...)`: Matches a segment that ends with one of the specified strings.
-- `ends-with-i(string1|string2|...)`: Matches a segment that ends with one of the specified strings, ignoring case.
-- `contains(string)`: Matches a segment that contains the specified string.
-- `contains-i(string)`: Matches a segment that contains the specified string, ignoring case.
-- `contains(string1|string2|...)`: Matches a segment that contains one of the specified strings.
-- `contains-i(string1|string2|...)`: Matches a segment that contains one of the specified strings, ignoring case.
-- `range(min,max)`: Matches a segment that represents an integer within the specified range (inclusive).
-- `range(min,)`: Matches a segment that represents an integer greater than or equal to the specified minimum value.
-- `range(,max)`: Matches a segment that represents an integer less than or equal to the specified maximum value.
-- `length(min,max)`: Matches a segment with a length within the specified range (inclusive).
-- `length(min,)`: Matches a segment with a length greater than or equal to the specified minimum length.
-- `length(,max)`: Matches a segment with a length less than or equal to the specified maximum length.
-- `image-ext-supported()`: Matches a segment that represents a supported image file extension.
-- `allowed-chars(CharacterClass)`: Matches a segment that contains only characters from the specified character class.
-- `starts-with-chars(count,CharacterClass)`: Matches a segment that starts with a specified number of characters from the given character class.
-- `image-ext-supported()`: Matches a segment that represents a supported (for image processing) image file extension.
+- `equals(string1|string2|...)` (alias: `eq`): Matches a segment that equals one of the specified strings.
+- `equals-i(string1|string2|...)` (alias: `eq-i`): Matches a segment that equals one of the specified strings, ignoring case.
+- `starts-with(string1|string2|...)` (alias: `starts`): Matches a segment that starts with one of the specified strings.
+- `starts-with-i(string1|string2|...)` (alias: `starts-i`): Matches a segment that starts with one of the specified strings, ignoring case.
+- `ends-with(string1|string2|...)` (alias: `ends`): Matches a segment that ends with one of the specified strings.
+- `ends-with-i(string1|string2|...)` (alias: `ends-i`): Matches a segment that ends with one of the specified strings, ignoring case.
+- `contains(string)` (alias: `includes`): Matches a segment that contains the specified string.
+- `contains-i(string)` (alias: `includes-i`): Matches a segment that contains the specified string, ignoring case.
+- `contains(string1|string2|...)` (alias: `includes`): Matches a segment that contains one of the specified strings.
+- `contains-i(string1|string2|...)` (alias: `includes-i`): Matches a segment that contains one of the specified strings, ignoring case.
+- `range(min,max)` (alias: `integer-range`): Matches a segment that represents an integer within the specified range (inclusive).
+- `range(min,)` (alias: `integer-range`): Matches a segment that represents an integer greater than or equal to the specified minimum value.
+- `range(,max)` (alias: `integer-range`): Matches a segment that represents an integer less than or equal to the specified maximum value.
+- `length(min,max)` (alias: `len`): Matches a segment with a length within the specified range (inclusive).
+- `length(min,)` (alias: `len`): Matches a segment with a length greater than or equal to the specified minimum length.
+- `length(,max)` (alias: `len`): Matches a segment with a length less than or equal to the specified maximum length.
+- `image-ext-supported()` (aliases: `image-extension-supported`, `image-type-supported`): Matches a segment that represents a supported image file extension.
+- `allow(CharacterClass)` (alias: `only`): Matches a segment that contains only characters from the specified character class. (*Note: `allow` is the canonical name used internally.*)
+- `starts-with-chars(count,CharacterClass)` (aliases: `starts-with-only`, `starts-chars`): Matches a segment that starts with a specified number of characters from the given character class.
+- `image-ext-supported()` (aliases: `image-extension-supported`, `image-type-supported`): Matches a segment that represents a supported (for image processing) image file extension. (*Duplicate entry? Should be consolidated or removed*)
 
 ## Optional and Wildcard Segments
 
@@ -86,11 +106,14 @@ At the end of the match express, you can specify `[flags,commma-separated]`
 * `raw` Matches the raw path and querystring together, rather than structurally parsing and matching the querystring
 * `sort-raw-query-first` Alphabetically sorts the querystring key/value pairs before performing raw matching
 * `ignore-path` Applies the given query matcher to all paths.
+* `import-accept-header` Searches the accept header for image/webp, image/avif, and image/jxl and translates them to &accept.webp=1, &accept.avif=1, &accept.jxl=1
 * `require-accept-webp` Only matches if the Accept header is present and includes `image/webp` specifically.
+* `require-accept-avif` Only matches if the Accept header is present and includes `image/avif` specifically.
+* `require-accept-jxl` Only matches if the Accept header is present and includes `image/jxl` specifically.
 
 ## Escaping Special Characters
 
-Special characters like `{`, `}`, `:`, `?`, `*`, `[`, `]`, `(`, `)`, `|`, and `\` can be escaped using a backslash (`\`) to match them literally in segment conditions or literals.
+Special characters like `{`, `}`, `:`, `?`, `*`, `[`, `]`, `(`, `)`, `|`, and `\` can be escaped using a backslash (`\`) to match them literally in segment conditions or literals. `\` should be escaped as `\\`. Unrecognized escape sequences are errors.
 
 ## URL rewriting and querystring merging
 
@@ -101,13 +124,26 @@ Variables can be inserted in target strings using ${name} or ${name:transform:tr
 ### Transformations
 * `lower` e.g. {var:lower}
 * `upper`
-* more to come
+* `map(oldvalue,newvalue)`
+* `or_var(fallback_var_name)` (Previously `or`)
+* `default(fallback_value)`
+* `equals(value1|value2|value3)` (Previously `allow`)
+* `other(fallback_value)` (Previously `map_default`)
+
+TODO: clamp(0,2) (numeric)
+TODO: prepend(prefix)
+TODO: append(suffix)
+TODO: replace(old,new)
+
+
 
 ## Flags
 
 * `[stop-here]` - prevents application of further rewrite rules
-* 
-
+* `[ignore-case]` - Makes path matching case-insensitive, except for character classes.
+* `[case-sensitive]` - Makes path matching case-sensitive
+* `[keep-query]` - prevents application of further rewrite rules
+* `[copy-path]` - prevents application of further rewrite rules
 
 TODO: sha256/auth stuff
 
@@ -122,7 +158,7 @@ case_sensitive=true/false (IIS/ASP.NET default to insensitive, but it's a bad de
 /images/{seo_string_ignored}/{sku:guid}/{image_id:int:range(0,1111111)}{width:int:after(_):optional}.{format:only(jpg|png|gif)}
 /azure/centralstorage/skus/{sku:lower}/images/{image_id}.{format}?format=avif&w={width}
 
-/images/{path:has_supported_image_type}
+/images{path:has_supported_image_type}
 /azure/container/{path}
 
 
@@ -162,9 +198,9 @@ match_query
 
 ## conditions 
 
-alpha, alphanumeric, alphalower, alphaupper, guid, hex, int, only([a-zA-Z0-9_\:\,]), only(^/) len(3), length(3), length(0,3),starts_with_only(3,a-z), until(/), after(/): optional/?, equals(string), everything/**
+alpha, alphanumeric, alphalower, alphaupper, guid, hex, int, allow([a-zA-Z0-9_\\:\\,]), allow([^/]) len(3), length(3), length(0,3),starts_with_chars(3,a-z), equals(string), contains()
  ends_with((.jpg|.png|.gif)), includes(), supported_image_type
-ends_with(.jpg|.png|.gif), until(), after(), includes(), 
+ends_with(.jpg|.png|.gif), contains(), 
 
 until and after specify trailing and leading characters that are part of the matching group, but are only useful if combined with `optional`.
 
@@ -188,7 +224,7 @@ Test with url decoded foreign strings too
 
 Setting a max size by folder or authentication status..
 
-We were thinking we could save as a GUID and have some mapping, where we asked for image “St-Croix-Legend-Extreme-Rod….” and we somehow did a lookup to see what the actual GUID image name was but seems we would introduce more issues, like needing to make ImageResizer and handler and not a module to do the lookup and creating an extra database call per image. Doesn’t seem like a great solution, any ideas? Just use the descriptive name?
+We were thinking we could save as a GUID and have some mapping, where we asked for image "St-Croix-Legend-Extreme-Rod…." and we somehow did a lookup to see what the actual GUID image name was but seems we would introduce more issues, like needing to make ImageResizer and handler and not a module to do the lookup and creating an extra database call per image. Doesn't seem like a great solution, any ideas? Just use the descriptive name?
 
 2. You're free to use any URL rewriting solution, the provided Config.Current.Pipeline.Rewrite event, or the included Presets plugin: http://imageresizing.net/plugins/presets
 

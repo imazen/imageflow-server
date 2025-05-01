@@ -22,6 +22,21 @@ public record ParsingOptions
     public bool RequireAcceptWebP { get; init; }
     
     /// <summary>
+    /// If true, matching will only succeed if the Accept HTTP header is present and contains 'image/avif'
+    /// </summary>
+    public bool RequireAcceptAvif { get; init; }
+    
+    /// <summary>
+    /// If true, matching will only succeed if the Accept HTTP header is present and contains 'image/jxl'
+    /// </summary>
+    public bool RequireAcceptJxl { get; init; }
+    
+    /// <summary>
+    /// * `import-accept-header` Searches the accept header for image/webp, image/avif, and image/jxl and translates them to &accept.webp=1, &accept.avif=1, &accept.jxl=1
+    /// </summary>
+    public bool ImportAcceptHeader {get; init; } = false;
+
+    /// <summary>
     /// If no query matcher is specified, query-prohibit-excess will be respected but nothing else.
     /// 
     /// </summary>
@@ -70,6 +85,21 @@ public record ParsingOptions
         if (flags.Remove("require-accept-webp"))
         {
             context = context with { RequireAcceptWebP = true };
+        }
+
+        if (flags.Remove("require-accept-avif"))
+        {
+            context = context with { RequireAcceptAvif = true };
+        }
+
+        if (flags.Remove("require-accept-jxl"))
+        {
+            context = context with { RequireAcceptJxl = true };
+        }
+
+        if (flags.Remove("import-accept-header"))
+        {
+            context = context with { ImportAcceptHeader = true };
         }
 
         context = context with

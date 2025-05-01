@@ -238,7 +238,15 @@ namespace Imageflow.Server.Tests
             await host.DisposeAsync();
 
             var cacheFiles = Directory.GetFiles(diskCacheDir, "*.jpg", SearchOption.AllDirectories);
-            Assert.Single(cacheFiles);
+            if (cacheFiles.Length != 1)
+            {
+                // list the files
+                foreach (var file in cacheFiles)
+                {
+                    logger.LogError("Cache file: {file}", file);
+                }
+                Assert.Single(cacheFiles);
+            }
         }
 
         [Fact]
@@ -585,7 +593,7 @@ namespace Imageflow.Server.Tests
                 var modifiedUrl = $"/remote/{encodedRemoteUrl}?width=1";
                 
                 
-                // Now we could stop here, but we also enabled request signing which is different from remote reader signing
+                // Now we could stop here, but we also enabled request signing, which is different from remote reader signing
                 var signedModifiedUrl = Imazen.Common.Helpers.Signatures.SignRequest(modifiedUrl, requestSigningKey);
                 using var signedResponse = await client.GetAsync(signedModifiedUrl, TestContext.Current.CancellationToken);
                 signedResponse.EnsureSuccessStatusCode();

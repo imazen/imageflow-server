@@ -2,6 +2,8 @@ namespace Imazen.Routing.Matching;
 
 public record ExpressionParsingOptions
 {
+    
+    public static ExpressionParsingOptions Default { get; } = new ExpressionParsingOptions();
     /// <summary>
     /// Does not affect character classes.
     /// </summary>

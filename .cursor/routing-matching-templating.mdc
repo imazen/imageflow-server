@@ -1,0 +1,216 @@
+---
+description: 
+globs: *.cs
+alwaysApply: false
+---
+
+Okay, here is a consolidated document outlining the design principles, rules, implementation steps, and testing strategy for the URL templating system, ensuring alignment with the existing matching system.
+
+## I. Matching System Design Principles (Reference)
+
+To ensure consistency, the templating system should adhere to the core design principles of the existing matching system:
+
+1.  **Performance Focus:** The primary goal is extremely fast execution *after* parsing. Matching is O(n) in the length of the path and non-backtracking. Parsed templates should allow for similarly efficient evaluation.
+2.  **Explicit Syntax:** The syntax uses clear delimiters (`{`, `}`), separators (`:`, `?`), and keywords (`int`, `guid`, `starts`, `ends`, `map`, `default`, etc.) for conditions and variables. Templating should follow this explicit style.
+3.  **Segment-Based Processing:** Matching breaks the input path into segments based on boundary conditions (`equals`, `prefix`, `suffix`, `len`, `/`, `.`). While templating builds strings rather than segmenting input, the concept of distinct literal and variable parts remains relevant.
+4.  **Separation of Concerns:**
+    *   **Boundary Matching vs. Validation:** Matching distinguishes between conditions that define segment boundaries (affecting capture) and those that validate content *after* segmentation. Templating doesn't segment input, but transformations operate on captured values.
+    *   **Path vs. Query:** Matching can handle paths and query strings distinctly (unless `[raw]` is used). Templating should also distinctly handle path, query key, and query value construction.
+5.  **Flags for Behavior Modification:** Matching uses flags (`[ignore-case]`, `[raw]`) to modify overall behavior. Templating might adopt flags if global behaviors (like default encoding) are needed, but transformations handle most variations currently.
+6.  **Clear Error Handling:** While not explicitly detailed in `matching.md`, robust systems require good error messages during parsing and matching failures. Templating must prioritize this.
+7.  **Extensibility:** The use of conditions and interfaces suggests an extensible design. The templating system should also be designed with potential future transformations in mind.
+
+## II. Templating System Rules
+
+These rules define the syntax, behavior, and validation for the URL templating system.
+
+### A. Syntax Rules
+
+1.  **Delimiters:** Variable substitutions and transformations are enclosed in curly braces: `{variableName:transform1:...}`.
+2.  **Variable Names:** Must match the variable names captured by the corresponding match expression. Follow C# identifier rules potentially (letters, numbers, underscore, starting with letter or underscore).
+3.  **Transformations:** Separated by colons (`:`). Applied sequentially from left to right.
+4.  **Escaping:** Backslash (`\`) is used to escape special characters within template literals and transformation arguments:
+    *   `\{` -> Literal `{`
+    *   `\}` -> Literal `}`
+    *   `\\` -> Literal `\`
+    *   `\:` -> Literal `:` (mainly if needed within variable names, unlikely)
+    *   `\,` -> Literal `,` (within `map`/`default`/`or` arguments)
+    *   `\(` -> Literal `(` (within `map`/`default`/`or` arguments)
+    *   `\)` -> Literal `)` (within `map`/`default`/`or` arguments)
+5.  **Transformation Arguments:** Arguments for transformations like `map`, `default`, `or` are enclosed in parentheses `()`. Commas `,` separate arguments within the parentheses. Arguments themselves use backslash escaping.
+
+### B. Transformation Definitions
+
+Applied sequentially to the variable's current value.
+
+1.  `lower`: Converts the string to lowercase (invariant culture).
+2.  `upper`: Converts the string to uppercase (invariant culture).
+3.  `encode`: Applies URL component encoding (RFC 3986, UTF-8). Encodes characters unsafe for path segments or query values (e.g., space -> `%20`, `/` -> `%2F`).
+4.  `map(from1,to1)`:
+    *   Maps input string `from1` to output string `to1`.
+    *   Compares the *current* value being transformed against `from1` (case-sensitive, ordinal comparison).
+    *   If a match occurs, the value is replaced with `to1`, and *no subsequent `map` transforms* in the chain are evaluated for this variable.
+    *   `from` and `to` values within the parentheses use backslash escaping.
+5.  `or(fallbackVariable)`:
+    *   If the current value is null or empty, attempts to retrieve the value associated with `fallbackVariable` from the input variable dictionary.
+    *   If `fallbackVariable` exists and has a non-empty value, that value becomes the new current value.
+    *   If `fallbackVariable` does not exist or is null/empty, the current value remains null/empty.
+    *   `fallbackVariable` name must adhere to variable name rules.
+6.  `default(defaultValue)`:
+    *   If the current value is null or empty, it is replaced by `defaultValue`.
+    *   `defaultValue` within the parentheses uses backslash escaping.
+7.  `optional` (or `?`):
+    *   A marker transformation; it does not change the value.
+    *   Signals that if the *final* resulting value for this specific `{...}` segment (after all other transformations) is null or empty, it may trigger special handling (like query pair omission).
+
+### C. Query String Generation Rules
+
+1.  **Pair Omission:** When constructing a query string (e.g., `keyTemplate=valueTemplate`), the *entire* pair (`&key=value` or `?key=value`) is **omitted** if the final evaluated result of *any* `{variable:optional}` or `{variable:?}` segment within *either* the `keyTemplate` or the `valueTemplate` is null or empty.
+2.  **Empty Values (Not Optional):** If a variable evaluation results in a null/empty string but was *not* marked `:optional` or `:?` (and not replaced by `:default`), the key-value pair is included with the empty value (e.g., `?key=`, `&key=`, `?emptykey=value`).
+3.  **Structure:** The template defines the literal structure (e.g., `?`, `&`, `=`). The evaluation inserts values and omits pairs according to the rules.
+
+### D. Parser Validation Rules (Optional Mode)
+
+When the parser is provided with metadata about the associated matcher's variables (names, optionality):
+
+1.  **Undefined Variable:** Reject if a template uses `{var}` and `var` is not present in the matcher's variable list.
+    *   *Error Example:* `"Template error at position X: Uses variable '{var}' which is not defined by the match expression."*
+2.  **Unhandled Optional Variable:** Reject if a template uses `{optVar}` where `optVar` is optional in the matcher, *unless* the transformation chain includes `:or(...)`, `:default(...)`, or `:optional` (or `:?`).
+    *   *Error Example:* `"Template error at position X: Optional variable '{optVar}' is used without providing a fallback (:or, :default) or marking as ignorable (:optional, :?)."`
+3.  **Undefined `or` Fallback:** Reject if `or(fallbackVar)` is used and `fallbackVar` is not present in the matcher's variable list.
+    *   *Error Example:* `"Template error at position X: ':or' transform uses fallback variable '{fallbackVar}' which is not defined by the match expression."*
+
+## III. Implementation Steps
+
+### A. Data Structures (in `Imazen.Routing.Matching.Templating` namespace)
+
+1.  **`MultiTemplate` Record:**
+    *   `StringTemplate? PathTemplate { get; }`
+    *   `IReadOnlyList<(StringTemplate KeyTemplate, StringTemplate ValueTemplate)>? QueryTemplates { get; }` (Using a list preserves order from template)
+    *   `MultiTemplateOptions? Options { get; }` (For future use, e.g., global flags)
+    *   `// Potentially store MatcherVariableInfo used for validation`
+    *   Static `TryParse` and `Parse` methods.
+    *   `Evaluate(IDictionary<string, string> variables)` method.
+2.  **`StringTemplate` Record:**
+    *   `IReadOnlyList<ITemplateSegment> Segments { get; }`
+    *   Static `TryParse` and `Parse` methods.
+    *   Internal `Evaluate(IDictionary<string, string> variables, out bool containsOptionalEmptyResult)` method.
+3.  **`ITemplateSegment` Interface:**
+    *   `record LiteralSegment(string Value) : ITemplateSegment;`
+    *   `record VariableSegment(string VariableName, IReadOnlyList<ITransformation> Transformations) : ITemplateSegment;`
+4.  **`ITransformation` Interface:**
+    *   `string? Apply(string? currentValue, IDictionary<string, string> variables);`
+    *   Implementations:
+        *   `ToLowerTransform : ITransformation`
+        *   `ToUpperTransform : ITransformation`
+        *   `UrlEncodeTransform : ITransformation`
+        *   `MapTransform(IReadOnlyList<(string From, string To)> Mappings) : ITransformation`
+        *   `OrTransform(string FallbackVariableName) : ITransformation`
+        *   `DefaultTransform(string DefaultValue) : ITransformation`
+        *   `OptionalMarkerTransform : ITransformation` (Apply returns `currentValue` unchanged, used for flagging)
+
+### B. Parsing Logic
+
+1.  **`MultiTemplate.TryParse`:**
+    *   Separate path and query string parts (split on `?`).
+    *   Parse the path using `StringTemplate.TryParse`.
+    *   Parse the query string:
+        *   Split into pairs by `&`.
+        *   For each pair, split by `=` (handle cases with no `=`).
+        *   Parse the key part using `StringTemplate.TryParse`.
+        *   Parse the value part using `StringTemplate.TryParse`.
+        *   Store as `(KeyTemplate, ValueTemplate)` tuples.
+    *   Handle flags `[...]` at the end if needed later.
+    *   If `matcherVariableInfo` is provided, perform validation checks during/after parsing segments.
+2.  **`StringTemplate.TryParse`:**
+    *   Iterate through the input string.
+    *   Identify literal segments vs. variable segments (`{...}`).
+    *   Handle backslash escapes (`\\`, `\{`, `\}` etc.) in literals.
+    *   For `{...}` segments:
+        *   Parse `variableName`.
+        *   Parse transformation chain (`:transform1:transform2...`).
+        *   For each transform:
+            *   Identify transform name (e.g., `map`, `lower`, `?`).
+            *   If arguments `(...)` are present, parse them, handling escaping (`\,`, `\(`, `\)` etc.) and commas.
+            *   Create corresponding `ITransformation` objects.
+        *   Validate variable name and transforms against known syntax.
+        *   Create `VariableSegment`.
+    *   Perform validation rules if in validation mode.
+    *   Return parsed `Segments` list or error message.
+3.  **Error Handling:** Generate specific error messages with context (e.g., position, problematic text).
+
+### C. Evaluation Logic
+
+1.  **`MultiTemplate.Evaluate`:**
+    *   Input: `IDictionary<string, string> variables`.
+    *   Evaluate `PathTemplate` using `StringTemplate.Evaluate`, get `pathResult`.
+    *   Initialize a `StringBuilder` for the query string.
+    *   Iterate through `QueryTemplates` list:
+        *   Evaluate `KeyTemplate` -> `keyResult`, `keyOptionalEmpty`.
+        *   Evaluate `ValueTemplate` -> `valueResult`, `valueOptionalEmpty`.
+        *   If `keyOptionalEmpty` or `valueOptionalEmpty` is `true`, **skip** this pair entirely.
+        *   Otherwise, append the correct separator (`?` or `&`) and the `keyResult=valueResult` to the query `StringBuilder`. Handle cases where `valueResult` might be empty.
+    *   Combine `pathResult` and the query `StringBuilder` result.
+    *   Return the final URL string.
+2.  **`StringTemplate.Evaluate`:**
+    *   Input: `IDictionary<string, string> variables`. Output: `string? result`, `out bool containsOptionalEmptyResult`.
+    *   Initialize `StringBuilder` for the result.
+    *   Initialize `containsOptionalEmptyResult = false`.
+    *   Iterate through `Segments`:
+        *   If `LiteralSegment`, append `Value`.
+        *   If `VariableSegment`:
+            *   Get `variableName`. Check if it exists in `variables`. If not, and it's required (based on validation info or runtime check), throw error.
+            *   Initialize `currentValue` from `variables`.
+            *   Initialize `isOptional = false`.
+            *   For each `ITransformation` in `Transformations`:
+                *   If `OptionalMarkerTransform`, set `isOptional = true`.
+                *   Call `transformation.Apply(currentValue, variables)` to get the new `currentValue`.
+            *   If `isOptional` is `true` and `currentValue` is null or empty, set `containsOptionalEmptyResult = true`.
+            *   Append `currentValue` to the result `StringBuilder`.
+    *   Return `StringBuilder.ToString()` and `containsOptionalEmptyResult`.
+3.  **`ITransformation.Apply` Implementations:** Implement the logic defined in section II.B for each transformation type, handling null/empty inputs appropriately.
+
+## IV. Testing Strategy (`TemplatingExpressionTests.cs`)
+
+Create comprehensive unit tests covering:
+
+1.  **Parsing (`StringTemplate.TryParse`, `MultiTemplate.TryParse`):**
+    *   Valid syntax: path only, query only, path + query, various transformations.
+    *   Correct parsing of literals and variables.
+    *   Correct parsing of transformation chains and arguments.
+    *   Correct handling of all defined backslash escape sequences.
+    *   Invalid syntax detection and specific error messages (malformed braces, unknown transforms, bad arguments).
+2.  **Validation Mode Parsing:**
+    *   Test with `matcherVariableInfo` provided.
+    *   Correct detection of undefined variables.
+    *   Correct detection of unhandled optional variables.
+    *   Correct detection of undefined `:or` fallback variables.
+    *   Cases where validation should pass.
+3.  **Transformation Logic (`ITransformation.Apply`):**
+    *   Unit test each transformation individually with various inputs (null, empty, different cases, values to map/not map).
+    *   Test `map` with escaped characters in `from`/`to` values.
+    *   Test `or` and `default` behavior with null/empty inputs and missing fallback variables.
+4.  **Transformation Chaining (`StringTemplate.Evaluate`):**
+    *   Test combinations: `lower:map`, `map:default`, `or:upper`, `map:map:default`, `encode:lower`.
+    *   Ensure left-to-right application order is respected.
+    *   Verify `map` short-circuiting (only first match applies).
+5.  **Optionality and Query Pair Omission (`MultiTemplate.Evaluate`):**
+    *   Variable marked `:optional` results in null/empty -> pair omitted.
+    *   Variable *not* marked `:optional` results in null/empty -> pair included (`key=`).
+    *   Optional marker in key template -> pair omitted.
+    *   Optional marker in value template -> pair omitted.
+    *   Optional marker in both -> pair omitted.
+    *   No optional markers -> pair included even if values are empty.
+    *   Interaction with `:default` (if default provides value, pair is included even if original was optional and missing).
+6.  **Full Evaluation (`MultiTemplate.Evaluate`):**
+    *   End-to-end tests with various templates and input variable dictionaries.
+    *   Paths, simple queries, complex queries.
+    *   Mix of required and optional variables.
+7.  **Edge Cases:**
+    *   Empty template string.
+    *   Empty input variable dictionary.
+    *   Variables containing special characters (test interaction with `encode` and `map`).
+    *   Templates containing only literals or only variables.
+8.  **Runtime Errors:**
+    *   Test evaluation fails if a required variable is missing from the input dictionary (when not handled by `:or` or `:default`).
+

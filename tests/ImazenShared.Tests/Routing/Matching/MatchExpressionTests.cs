@@ -255,6 +255,9 @@ public class MatchExpressionTests
     [Theory]
     [InlineData("{path}?key={value}", true)]
     [InlineData("{path}?key={value}&key2={value2}[require-accept-webp]", true)]
+    [InlineData("{path}?key={value}&key2={value2}[import-accept-header]", true)]
+    [InlineData("{path}?key={value}&key2={value2}[require-accept-avif]", true)]
+    [InlineData("{path}?key={value}&key2={value2}[require-accept-jxl]", true)]
     [InlineData("{path}?key={value}&key2={value2}[raw]", true)]
     public void TestMultiValueMatcherParsing(string exp, bool ok)
     {

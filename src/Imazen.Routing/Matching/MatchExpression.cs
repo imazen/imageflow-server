@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.RegularExpressions;
 using Imazen.Routing.Helpers;
+using Imazen.Routing.Matching.Templating;
 
 namespace Imazen.Routing.Matching;
 
@@ -557,4 +558,20 @@ public partial record MatchExpression
         }
     }
 
+    public IReadOnlyDictionary<string, MatcherVariableInfo> GetMatcherVariableInfo()
+    {
+        var dict = new Dictionary<string, MatcherVariableInfo>(StringComparer.Ordinal); // Use Ordinal for variable names
+        foreach (var segment in Segments)
+        {
+            if (!string.IsNullOrEmpty(segment.Name))
+            {
+                // Matcher parsing should have already caught duplicates
+                if (!dict.ContainsKey(segment.Name))
+                {
+                    dict.Add(segment.Name, new MatcherVariableInfo(segment.Name, segment.IsOptional));
+                }
+            }
+        }
+        return new System.Collections.ObjectModel.ReadOnlyDictionary<string, MatcherVariableInfo>(dict);
+    }
 }
