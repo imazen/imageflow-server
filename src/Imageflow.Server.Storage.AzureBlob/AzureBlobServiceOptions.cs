@@ -18,7 +18,7 @@ namespace Imageflow.Server.Storage.AzureBlob
 
         internal readonly List<PrefixMapping> Mappings = new List<PrefixMapping>();
         
-        [Obsolete("Use AzureBlobServiceOptions(BlobServiceClient client) or .ICalledAddBlobServiceClient instead")]
+        [Obsolete("Use AzureBlobServiceOptions(new BlobServiceClient(connectionString, blobClientOptions)) instead or .ICalledAddBlobServiceClien(blobClientName) instead")]
         public AzureBlobServiceOptions(string connectionString, BlobClientOptions? blobClientOptions = null)
         {
             BlobClientOptions = blobClientOptions ?? new BlobClientOptions();
@@ -26,7 +26,7 @@ namespace Imageflow.Server.Storage.AzureBlob
         }
 
         /// <summary>
-        /// If you use the Azure SDK to call AddBlobServiceClient, you can use ICalledAddBlobServiceClient to create an AzureBlobServiceOptions instance without directly specifying it.
+        /// If you use the Azure SDK to call AddBlobServiceClient, you can use ICalledAddBlobServiceClient(blobClientName) to create an AzureBlobServiceOptions instance without directly specifying it.
         /// </summary>
         /// <param name="blobServiceClient"></param>
         public AzureBlobServiceOptions(BlobServiceClient blobServiceClient)

@@ -12,6 +12,10 @@
 
     </ItemGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\Imazen.Analyzers\Imazen.Analyzers.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    </ItemGroup>
+
     
     <ItemGroup>
       <!-- <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="3.3.4">

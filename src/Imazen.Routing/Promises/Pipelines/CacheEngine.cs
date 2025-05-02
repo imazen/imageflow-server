@@ -362,6 +362,8 @@ public class CacheEngine: IBlobPromisePipeline
         }
         else
         {
+            // We need to dispose of our forked reference to prevent memory leaks.
+            mainBlob.Dispose();
             //TODO: log a bug, we should be able to find cacheHit among the set 
             throw new InvalidOperationException();
         }

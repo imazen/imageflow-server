@@ -51,7 +51,9 @@ namespace Imageflow.Server.Example
                 }
                 .AddPrefix("/remote/"));
 
-
+            services.AddImageflowDomainProxyService(new DomainProxyServiceOptions()
+                .AddPrefix("/iio/", "https://www.imazen.io/")
+            );
             var s3east1 = new AmazonS3Client(new AnonymousAWSCredentials(), RegionEndpoint.USEast1);
             var s3west2 = new AmazonS3Client(new AnonymousAWSCredentials(), RegionEndpoint.USWest2);
 
@@ -66,11 +68,12 @@ namespace Imageflow.Server.Example
             
             // Make Azure container available at /azure
             // You can call AddImageflowAzureBlobService multiple times for each connection string
+            var blobServiceClient = new BlobServiceClient("UseDevelopmentStorage=true;",
+                        new BlobClientOptions());
             services.AddImageflowAzureBlobService(
-                new AzureBlobServiceOptions(
-                        "UseDevelopmentStorage=true;",
-                        new BlobClientOptions())
-                    .MapPrefix("/azure", "imageflow-demo" ));
+                    new AzureBlobServiceOptions(
+                            blobServiceClient
+                    ).MapPrefix("/azure", "imageflow-demo" ));
 
             // Custom blob services can do whatever you need. See CustomBlobService.cs in src/Imageflow.Service.Example
             services.AddImageflowCustomBlobService(new CustomBlobServiceOptions()
