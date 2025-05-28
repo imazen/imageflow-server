@@ -86,7 +86,7 @@ internal class LegacyStreamCacheAdapter : IStreamCache
 
     public Task StopAsync(CancellationToken cancellationToken)
     {
-        return Task.CompletedTask;
+        return AwaitAllCurrentTasks(cancellationToken);
     }
 
     private async Task<IStreamCacheResult?> CacheFetch(IBlobCacheRequest cacheRequest,CancellationToken cancellationToken)

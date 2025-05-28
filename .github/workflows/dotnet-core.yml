@@ -5,7 +5,15 @@ on:
   pull_request:
   release:
     types: [ published ]
-    
+# just to reduce warnings :(
+env:
+  DOTNET_VERSION_LIST: ''
+  ARTIFACT_VERSION: ''
+  HOST_ZIP_FILE: ''
+  TAGGED_VERSION: ''
+  CODECOV_TOKEN: ''
+  NUGET_API_KEY: ''
+  GITHUB_TOKEN: ''
 jobs:
   test:
     strategy:
@@ -96,7 +104,7 @@ jobs:
         dotnet test -c Release --framework net8.0
       # dotnet test -c Release --framework net9.0
 
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       if: failure()
       with:
         name: TestResults-${{matrix.os}}-${{ env.ARTIFACT_VERSION }}
@@ -106,7 +114,6 @@ jobs:
       if: matrix.os == 'windows-latest'
       run: |
         dotnet test -c Release /p:CollectCoverage=true /p:CoverletOutputFormat=opencover /p:CoverletOutput=./TestResults/coverage.net48.opencover.xml --framework net48
-      #  dotnet test -c Release /p:CollectCoverage=true /p:CoverletOutputFormat=opencover /p:CoverletOutput=./TestResults/coverage.net9.opencover.xml --framework net9.0
         dotnet test -c Release /p:CollectCoverage=true /p:CoverletOutputFormat=opencover /p:CoverletOutput=./TestResults/coverage.net8.opencover.xml --framework net8.0
 
     - name: Upload coverage to Codecov

@@ -306,3 +306,5 @@ __pycache__/
 tempfile.txt
 
 imageflow_cache/
+src/Imazen.Routing/Parsing/parsing-combined.txt.cs
+src/Imazen.Routing/Matching/matching-combined.txt.cs

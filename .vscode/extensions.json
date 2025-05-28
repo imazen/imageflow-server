@@ -3,7 +3,5 @@
     "ms-azuretools.vscode-azurefunctions",
     "ms-dotnettools.csharp",
     "ms-dotnettools.dotnet-interactive-vscode",
-    "formulahendry.dotnet-test-explorer",
-    "ryanluker.vscode-coverage-gutters"
   ]
 }

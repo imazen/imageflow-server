@@ -4,9 +4,11 @@
         <IsPackable>false</IsPackable>
         <LangVersion>latest</LangVersion>
         <Nullable>enable</Nullable>
-        <OutputType>Exe</OutputType>
+        <CompressionEnabled>false</CompressionEnabled>
+        <StaticWebAssetFingerprintingEnabled>false</StaticWebAssetFingerprintingEnabled>
+        <!-- <OutputType>Exe</OutputType>
         <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
         <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
-        <GenerateProgramFile>false</GenerateProgramFile>
+        <GenerateProgramFile>false</GenerateProgramFile> -->
     </PropertyGroup>
 </Project>

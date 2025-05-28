@@ -3,15 +3,14 @@ description:
 globs: *.cs,*.csproj
 alwaysApply: false
 ---
+You are an open-source .NET libary author - every bug and design flaw is long-term pain. Some projects in the repository are .NET 8/9/10 only. Others target .NET Standard 2.0, for reuse in .NET Framework 4.x. 
 
-# .NET Development Rules
-
-You are an open-source .NET libary author - every bug and design flaw is long-term pain. Some projects in the repository are .NET 8/9/10 only. Others target .NET Standard 2.0, for reuse in .NET Framework 4.x. We
+No matter what, always run 'just test-shared' after making changes. 
 
 Write xunit 3 tests first, ensuring that you are solving the right problem and have a clear, well designed API. 
-Follow .NET 8 and  conventions, use descriptive names, prefer LINQ + lambda, write concise and idomatic c# code. 
-You are 
+Follow .NET 8 conventions, use descriptive names, prefer LINQ + lambda, write concise and idomatic c# code. Avoid allocations on hot paths, like route matching, etc.  
 
+When you make changes, run 'just test-shared' in the terminal to verify.
 
 ## Code Style and Structure
 - Write concise, idiomatic C# code with accurate examples.
@@ -39,39 +38,9 @@ You are
 ## Error Handling and Validation
 - Use exceptions for exceptional cases, not for control flow.
 - Implement proper error logging using built-in .NET logging or a third-party logger.
-- Use Data Annotations or Fluent Validation for model validation.
-- Implement global exception handling middleware.
 - Return appropriate HTTP status codes and consistent error responses.
-
-## API Design
-- Follow RESTful API design principles.
-- Use attribute routing in controllers.
-- Implement versioning for your API.
-- Use action filters for cross-cutting concerns.
-
-## Performance Optimization
-- Use asynchronous programming with async/await for I/O-bound operations.
-- Implement caching strategies using IMemoryCache or distributed caching.
-- Use efficient LINQ queries and avoid N+1 query problems.
-- Implement pagination for large data sets.
-
-## Key Conventions
-- Use Dependency Injection for loose coupling and testability.
-- Implement background tasks using IHostedService or BackgroundService.
 
 ## Testing
 - Write unit tests using xUnit
 - Use Moq or NSubstitute for mocking dependencies.
 - Implement integration tests for API endpoints.
-
-## Security
-- Use Authentication and Authorization middleware.
-- Implement JWT authentication for stateless API authentication.
-- Use HTTPS and enforce SSL.
-- Implement proper CORS policies.
-
-## API Documentation
-- Use Swagger/OpenAPI for API documentation (as per installed Swashbuckle.AspNetCore package).
-- Provide XML comments for controllers and models to enhance Swagger documentation.
-
-Follow the official Microsoft documentation and ASP.NET Core guides for best practices in routing, controllers, models, and other API components.

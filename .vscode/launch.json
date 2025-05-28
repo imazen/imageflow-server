@@ -2,13 +2,33 @@
     "version": "0.2.0",
     "configurations": [
 
-
         {
-            "name": ".NET Core Launch (console)",
+            "name": "netcoredbg ImazenShared.Tests",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/tests/Imageflow.Server.Tests/bin/Debug/net7.0/Imageflow.Server.Tests.dll",
+            "program": "${workspaceFolder}/tests/ImazenShared.Tests/bin/Debug/net8.0/ImazenShared.Tests.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/tests/ImazenShared.Tests",
+            "console": "internalConsole",
+            "pipeTransport": {
+                "pipeCwd": "${workspaceFolder}",
+                "pipeProgram": "powershell",
+                "pipeArgs": ["-Command"],
+                "debuggerPath": "V:\\tooling\\netcoredbg\\netcoredbg.exe",
+                "debuggerArgs": ["--interpreter=vscode"],
+                "quoteArgs": true
+            },
+            "env": {
+                "DOTNET_ENVIRONMENT": "Development"
+         }
+        },
+        {
+            "name": "Old Imageflow.Server.Tests",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/tests/Imageflow.Server.Tests/bin/Debug/net8.0/Imageflow.Server.Tests.dll",
             "args": [],
             "cwd": "${workspaceFolder}/tests/Imageflow.Server.Tests",
             "console": "internalConsole",
@@ -24,6 +44,19 @@
             "type": "coreclr",
             "request": "attach",
             "processId": "${command:azureFunctions.pickProcess}"
-        }
+        },
+        {
+            "name": "Build Imazen.SharedTests",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/tests/ImazenShared.Tests/bin/Debug/net8.0/ImazenShared.Tests.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/tests/ImazenShared.Tests",
+            "console": "internalConsole",
+            "stopAtEntry": false
+        },
+        
     ]
 }
+

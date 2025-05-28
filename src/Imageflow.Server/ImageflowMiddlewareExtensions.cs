@@ -1,6 +1,8 @@
 ﻿using Imazen.Abstractions.Logging;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Builder.Extensions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace Imageflow.Server
@@ -26,6 +28,16 @@ namespace Imageflow.Server
                 services?.AddImageflowLoggingSupport();
             }
             return builder.UseMiddleware<ImageflowMiddleware>(options);
+        }
+
+        public static WebApplication UseImageflow(this WebApplication app, ImageflowMiddlewareOptions options)
+        { 
+            if (app.Services.GetService<IReLoggerFactory>() == null)
+            {
+                throw new System.Exception("You must call Services.AddImageflowLoggingSupport() before calling UseImageflow");
+            }
+            app.UseMiddleware<ImageflowMiddleware>(options);
+            return app;
         }
 
     }

@@ -213,12 +213,11 @@ public class TemplatingExpressionTests
     // Update Helper to return Dictionary for context creation
     private static Dictionary<string, MatcherVariableInfo>? ParseMatcherVarsToDict(string? varInfoString)
     {
-        if (string.IsNullOrEmpty(varInfoString))
-            return null;
+        if (string.IsNullOrWhiteSpace(varInfoString)) return new Dictionary<string, MatcherVariableInfo>(StringComparer.OrdinalIgnoreCase); // Return empty dict for null/empty/whitespace
 
-        var dict = new Dictionary<string, MatcherVariableInfo>();
         try
         {
+            var dict = new Dictionary<string, MatcherVariableInfo>(StringComparer.OrdinalIgnoreCase);
             foreach (var part in varInfoString.Split(','))
             {
                 var pair = part.Trim().Split(':');
@@ -276,8 +275,8 @@ public class TemplatingExpressionTests
     [InlineData("/path/{reqVar:or(undef)}", "reqVar:req", false, "uses fallback variable 'undef' which is not defined")]
 
     // --- Null Info = No Validation ---
-    [InlineData("/path/{anything}", null, true, null)] // Should pass like normal TryParse
-    [InlineData("/path/{opt:lower}", null, true, null)] // Should pass like normal TryParse
+    [InlineData("/path/{anything}", null, false, "uses variable 'anything' which is not defined")] // Should fail when vars is null
+    [InlineData("/path/{opt:lower}", null, false, "uses variable 'opt' which is not defined")] // Should fail when vars is null
 
     public void TestValidatedParsing(string template, string? varInfoString, bool shouldSucceed, string? expectedErrorSubstring)
     {

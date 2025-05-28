@@ -1,5 +1,13 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
+<!-- exclude .txt.cs files from compilation -->
+    <ItemGroup>
+        <Compile Remove="**\*.txt.cs" />
+    </ItemGroup>
+
+
+
+
 
     <Import Project="..\NugetPackageDefaults.targets" />
 
@@ -18,15 +26,16 @@
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
+        <PackageReference Include="sly" Version="3.7.3" />
         <PackageReference Include="Supernova.Enum.Generators" Version="1.0.17">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
 
         <PackageReference Include="Imageflow.Net" Version="0.13.2" />
-        <PackageReference Include="System.Collections.Immutable" Version="6.*" />
+        <PackageReference Condition="'$(TargetFramework)' == 'netstandard2.0'" Include="System.Collections.Immutable" Version="6.*" />
         <PackageReference Include="CommunityToolkit.HighPerformance" Version="8.*" />
-        <PackageReference Include="System.IO.Pipelines" Version="6.*" />
+        <PackageReference Condition="'$(TargetFramework)' == 'netstandard2.0'" Include="System.IO.Pipelines" Version="9.0.4" />
 
         <PackageReference Include="System.Threading.Tasks.Extensions" Version="4.*" Condition="'$(TargetFramework)' == 'netstandard2.0'" />
     </ItemGroup>

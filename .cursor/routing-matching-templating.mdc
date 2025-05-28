@@ -29,7 +29,7 @@ These rules define the syntax, behavior, and validation for the URL templating s
 1.  **Delimiters:** Variable substitutions and transformations are enclosed in curly braces: `{variableName:transform1:...}`.
 2.  **Variable Names:** Must match the variable names captured by the corresponding match expression. Follow C# identifier rules potentially (letters, numbers, underscore, starting with letter or underscore).
 3.  **Transformations:** Separated by colons (`:`). Applied sequentially from left to right.
-4.  **Escaping:** Backslash (`\`) is used to escape special characters within template literals and transformation arguments:
+4.  **Escaping:** Backslash (`\`) is used to escape special characters within template literals and transformation arguments. Even when special characters don't carry special meaning in a context, any \ other than \\ should unescape as a user with a programming background would expect.
     *   `\{` -> Literal `{`
     *   `\}` -> Literal `}`
     *   `\\` -> Literal `\`

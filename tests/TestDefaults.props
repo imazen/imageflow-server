@@ -5,10 +5,13 @@
         <TargetFramework>net8.0</TargetFramework>
         <LangVersion>latest</LangVersion>
         <Nullable>enable</Nullable>
+        <UseAppHost>true</UseAppHost>
         <OutputType>Exe</OutputType>
+        <GenerateProgramFile>false</GenerateProgramFile>
+        <!-- 
         <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
         <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
-        <GenerateProgramFile>false</GenerateProgramFile>
+        <GenerateProgramFile>false</GenerateProgramFile> -->
     </PropertyGroup>
     
   <ItemGroup>
