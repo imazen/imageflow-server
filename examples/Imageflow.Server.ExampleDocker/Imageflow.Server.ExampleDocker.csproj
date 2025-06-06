@@ -2,14 +2,14 @@
 
     <PropertyGroup>
         <TargetFramework>net8.0</TargetFramework>
+        
     </PropertyGroup>
 
     <ItemGroup>
       <PackageReference Include="Imageflow.Server" Version="0.8.3" />
     </ItemGroup>
 
-    <ItemGroup>
-      <EmbeddedResource Include="wwwroot\fire-umbrella-small.jpg" />
-    </ItemGroup>
+
+
 
 </Project>

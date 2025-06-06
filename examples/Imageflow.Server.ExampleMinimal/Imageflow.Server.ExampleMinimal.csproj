@@ -7,9 +7,4 @@
     <ItemGroup>
       <ProjectReference Include="..\..\src\Imageflow.Server\Imageflow.Server.csproj" />
     </ItemGroup>
-
-    <ItemGroup>
-      <EmbeddedResource Include="wwwroot\fire-umbrella-small.jpg" />
-    </ItemGroup>
-
 </Project>
