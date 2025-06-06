@@ -2,8 +2,10 @@ set shell := ["pwsh", "-c"]
 
 # Run tests for the ImazenShared.Tests project using dotnet run
 test-shared *ARGS:
-    dotnet run --project tests/ImazenShared.Tests/ImazenShared.Tests.csproj -- {{ARGS}} 
+    dotnet run --no-restore --project tests/ImazenShared.Tests/ImazenShared.Tests.csproj -- -m 16 {{ARGS}} 
 
+test-all *ARGS:
+    dotnet test --no-restore -- -m 16
 
 combine-shared-tests:
     $outputFile = 'tests/ImazenShared.Tests/shared-combined.txt.cs'; Clear-Content $outputFile -ErrorAction SilentlyContinue; Get-ChildItem -Path tests/ImazenShared.Tests/ -Include *.cs, *.md -Recurse | ForEach-Object { $commentPrefix = '//'; if ($_.Extension -eq '.md') { $commentPrefix = '#' }; Add-Content -Path $outputFile -Value "$commentPrefix File: $($_.FullName.Replace($PWD.Path + '\', ''))"; Add-Content -Path $outputFile -Value (Get-Content -Raw $_.FullName); Add-Content -Path $outputFile -Value "`n`n" }

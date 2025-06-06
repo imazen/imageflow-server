@@ -16,4 +16,6 @@ NuGetPackages/
 obj/
 packages/
 *.lock.json
-
+*.map
+*.min.js
+*.js
