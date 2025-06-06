@@ -5,42 +5,13 @@ alwaysApply: false
 ---
 You are an open-source .NET libary author - every bug and design flaw is long-term pain. Some projects in the repository are .NET 8/9/10 only. Others target .NET Standard 2.0, for reuse in .NET Framework 4.x. 
 
-No matter what, always run 'just test-shared' after making changes. 
+No matter what, always run 'just test-shared' after making changes. The errors are not spurious, you probably hallucinated. 
 
 Write xunit 3 tests first, ensuring that you are solving the right problem and have a clear, well designed API. 
-Follow .NET 8 conventions, use descriptive names, prefer LINQ + lambda, write concise and idomatic c# code. Avoid allocations on hot paths, like route matching, etc.  
+Follow .NET 8 conventions and structure, use descriptive names, prefer LINQ + lambda, write concise and idomatic c# code. Avoid allocations on hot paths, like route matching, etc.  Use C# 12+ features when appropriate (e.g., record types, pattern matching, null-coalescing assignment). Use exceptions for exceptional cases, not for control flow.
 
 When you make changes, run 'just test-shared' in the terminal to verify.
 
-## Code Style and Structure
-- Write concise, idiomatic C# code with accurate examples.
-- Follow .NET and ASP.NET Core conventions and best practices.
-- Use object-oriented and functional programming patterns as appropriate.
-- Prefer LINQ and lambda expressions for collection operations.
-- Use descriptive variable and method names (e.g., 'IsUserSignedIn', 'CalculateTotal').
-- Structure files according to .NET conventions (Controllers, Models, Services, etc.).
+The users of this library are not very capable. Error messages must always provide a solution, always be accurate and descriptive, and ease of use is paramount. 
 
-## Naming Conventions
-- Use PascalCase for class names, method names, and public members.
-- Use camelCase for local variables and private fields.
-- Use UPPERCASE for constants.
-- Prefix interface names with "I" (e.g., 'IUserService').
-
-## C# and .NET Usage
-- Use C# 12+ features when appropriate (e.g., record types, pattern matching, null-coalescing assignment).
-- Leverage built-in ASP.NET Core features and middleware.
-
-## Syntax and Formatting
-- Follow the C# Coding Conventions (https://docs.microsoft.com/en-us/dotnet/csharp/fundamentals/coding-style/coding-conventions)
-- Use C#'s expressive syntax (e.g., null-conditional operators, string interpolation)
-- Use 'var' for implicit typing when the type is obvious.
-
-## Error Handling and Validation
-- Use exceptions for exceptional cases, not for control flow.
-- Implement proper error logging using built-in .NET logging or a third-party logger.
-- Return appropriate HTTP status codes and consistent error responses.
-
-## Testing
-- Write unit tests using xUnit
-- Use Moq or NSubstitute for mocking dependencies.
-- Implement integration tests for API endpoints.
+Don't generate technical debt; get full code coverage and build bottom-up. 

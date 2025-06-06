@@ -14,16 +14,16 @@ public enum ImazenRoutingToken
     [Lexeme("}")]
     RBRACE = 2,
 
-    [Lexeme("(")]
+    [Lexeme(@"\(")]
     LPAREN = 3,
 
-    [Lexeme(")")]
+    [Lexeme(@"\)")]
     RPAREN = 4,
 
-    [Lexeme("[")]
+    [Lexeme(@"\[")]
     LSQUARE = 5,
 
-    [Lexeme("]")]
+    [Lexeme(@"\]")]
     RSQUARE = 6,
 
     [Lexeme(":")]
@@ -32,10 +32,10 @@ public enum ImazenRoutingToken
     [Lexeme(",")]
     COMMA = 8,
 
-    [Lexeme("|")]
+    [Lexeme("\\|")]
     PIPE = 9,
 
-    [Lexeme("?")]
+    [Lexeme("\\?")]
     QUESTION = 10,
 
     [Lexeme("=")]
@@ -44,14 +44,20 @@ public enum ImazenRoutingToken
     [Lexeme("&")]
     AMPERSAND = 12,
 
-    [Lexeme("*")]
+    [Lexeme("\\*")]
     STAR = 13,
 
-    [Lexeme("^")]
+    [Lexeme("\\^")]
     CARET = 14,
 
     [Lexeme("-")]
     DASH = 15,
+
+    [Lexeme("\\+")]
+    PLUS = 16,
+
+    [Lexeme("/")]
+    DIVIDE = 17,
 
     // --- Literals and Identifiers ---
     [Lexeme(@"[a-zA-Z_][a-zA-Z0-9_]*")]
@@ -61,14 +67,14 @@ public enum ImazenRoutingToken
     DASHED_IDENTIFIER = 21,
 
     // Integer Numbers
-    [Lexeme(GenericToken.Int)]
+    [Lexeme(@"-?\d+")] // Replaced GenericToken.Int with regex
     INT = 25,
 
     // Literal Chars - Any character not part of other tokens/delimiters
-    // Needs careful exclusion list. Excludes: \{}()[]:?,=*&|^-	\r\n 
+    // Needs careful exclusion list. Excludes: \{}()[]:?,=*&|^- \r\n 
     // and characters starting IDENTIFIER ([a-zA-Z_]) or INT (\d)
     // This regex might be overly complex or incorrect; requires testing.
-    [Lexeme(@"[^\\\{\}\(\)\[\]:,?=*&|^\-\s\da-zA-Z_]")]
+    [Lexeme(@"[^\\\{\}\(\)\[\]:,?=*&|\^\-\s\da-zA-Z_]")]
     LITERAL_CHAR = 28,
 
     // --- Escapes ---

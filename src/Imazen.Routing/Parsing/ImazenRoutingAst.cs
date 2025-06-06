@@ -37,10 +37,28 @@ public record SimpleModifier(string Name) : IModifier;
 public record ArgumentList(IReadOnlyList<ImazenRoutingParser.TokenViewModel> Tokens) : IAstNode;
 
 // Represents a query string key-value pair (key is literal, value is sequence of segments)
-public record QueryPair(string Key, IReadOnlyList<ISegment> ValueSegments) : IAstNode;
+public record QueryPair(IdentifierNode Key, SegmentListAstNode? ValueSegmentsNode) : IAstNode;
+
+// New AST Node for a list of QueryPairs
+public record QueryPairListAstNode(IReadOnlyList<QueryPair> Pairs) : IAstNode;
 
 // Represents the list of flags like [flag1, flag2]
-public record FlagList(IReadOnlyList<string> Flags) : IAstNode;
+public record FlagList(IReadOnlyList<IdentifierNode> Flags) : IAstNode;
+
+// AST Node for simple identifiers
+public record IdentifierNode(string Name) : IAstNode;
+
+// AST Node for wrapping a list of modifiers
+public record ModifierListAstNode(IReadOnlyList<IModifier> Modifiers) : IAstNode;
+
+// AST Node for a generic token, useful for literal parts or other token-level nodes
+public record TokenNode(Token<ImazenRoutingToken> Token) : IAstNode;
+
+// New AST Node for a list of ISegments
+public record SegmentListAstNode(IReadOnlyList<ISegment> Segments) : IAstNode;
+
+// New AST Node for content within a character class
+public record CharClassContentNode(IReadOnlyList<TokenNode> Tokens) : IAstNode;
 
 // TODO: Potentially add more specific nodes if needed during parser implementation,
 // e.g., separate ConditionNode and TransformationNode inheriting from Modifier if their

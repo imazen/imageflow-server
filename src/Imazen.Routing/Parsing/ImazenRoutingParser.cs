@@ -1,11 +1,11 @@
 using sly.lexer;
 using sly.parser;
 using sly.parser.generator;
-using sly.parser.syntax;
+using sly.parser.parser;
 using System.Collections.Generic;
 using System.Linq;
-using System; // For ValueTuple
-using System.Text; // For StringBuilder
+using System;
+using System.Text;
 
 namespace Imazen.Routing.Parsing;
 
@@ -15,299 +15,220 @@ public class ImazenRoutingParser
 {
     // --- Entry Point --- -> Could be expression root
 
-    [Production("root : expression EOS")]
-    public IAstNode Root(Expression expr, Token<ImazenRoutingToken> eos) => expr;
+    [Production("root : expression")]
+    public IAstNode Root(Expression expr) => expr;
 
-    // --- Main Expression Structure --- (Path ? Query ? Flags)
+    // --- Simplified Expression Structure --- 
+    [Production("expression : pathPart flagPart?")] // Optional flagPart
+    public IAstNode ExpressionWithPathAndFlags(PathExpression path, ValueOption<FlagList> flags)
+        => new Expression(path, null, flags.Match(f => f, () => null));
 
-    [Production("expression : pathPart queryPart? flagPart?")]
-    public IAstNode ExpressionWithPathQueryFlags(IAstNode path, IReadOnlyList<QueryPair>? query, FlagList? flags)
-        => new Expression(path, query, flags);
-
-    [Production("expression : queryPart flagPart?")]
-    public IAstNode ExpressionWithQueryFlags(IReadOnlyList<QueryPair> query, FlagList? flags)
-        => new Expression(null, query, flags);
-
-    [Production("expression : pathPart flagPart?")]
-    public IAstNode ExpressionWithPathFlags(IAstNode path, FlagList? flags)
-        => new Expression(path, null, flags);
-
-    [Production("expression : flagPart")]
-    public IAstNode ExpressionWithFlags(FlagList flags)
+    [Production("expression : flagPart")] 
+    public IAstNode ExpressionWithFlagsOnly(FlagList flags)
         => new Expression(null, null, flags);
 
-    // --- Path Part --- (Sequence of Segments)
-    // One-or-more (+) maps to List<T>
-    [Production("pathPart : segment+ ")]
-    public IAstNode PathPart(List<ISegment> segments) => new PathExpression(segments);
+    [Production("expression : pathPart")] 
+    public IAstNode ExpressionWithPathOnly(PathExpression path)
+        => new Expression(path, null, null);
 
-    // --- Query Part --- (? key=value & key=value)
-
-    [Production("queryPart : QUESTION queryParamList")]
-    public IReadOnlyList<QueryPair> QueryPart(Token<ImazenRoutingToken> qMark, List<QueryPair> pairs) => pairs;
-
-    // Zero-or-more (*) maps to List<T>. Using ValueTuple for the group.
-    [Production("queryParamList : queryPair (AMPERSAND queryPair)*")]
-    public List<QueryPair> QueryParamList(QueryPair first, List<ValueTuple<Token<ImazenRoutingToken>, QueryPair>> rest)
-        => new List<QueryPair> { first }.Concat(rest.Select(g => g.Item2)).ToList();
-
-    // Query Pair (key must be identifier or dashed identifier treated as literal)
-    // Optional value part (?) maps to nullable List<ISegment>?
-    [Production("queryPair : queryKey EQUALS queryValueSegments?")]
-    public QueryPair QueryParam(string key, Token<ImazenRoutingToken> eq, List<ISegment>? valueSegments)
-        => new QueryPair(key, valueSegments ?? new List<ISegment>()); // Provide empty list if null
-
-    [Production("queryKey : IDENTIFIER")]
-    public string QueryKeyIdentifier(Token<ImazenRoutingToken> id) => id.Value;
-
-    [Production("queryKey : DASHED_IDENTIFIER")]
-    public string QueryKeyDashed(Token<ImazenRoutingToken> id) => id.Value;
-
-    // One-or-more (+) maps to List<T>
-    [Production("queryValueSegments : segment+")]
-    public List<ISegment> QueryValueSegments(List<ISegment> segments) => segments;
-
-    // --- Flag Part --- ([ flag1 , flag2 ])
-
-    [Production("flagPart : LSQUARE flagList RSQUARE")]
-    public FlagList FlagPart(Token<ImazenRoutingToken> lsq, FlagList list, Token<ImazenRoutingToken> rsq) => list;
-
-    // Zero-or-more (*) maps to List<T>. Using ValueTuple for the group.
-    [Production("flagList : flagName (COMMA flagName)*")]
-    public FlagList FlagList(string first, List<ValueTuple<Token<ImazenRoutingToken>, string>> rest)
-        => new FlagList(new List<string> { first }.Concat(rest.Select(g => g.Item2)).ToList());
-
-    // Flag names can have dashes
-    [Production("flagName : IDENTIFIER")]
-    public string FlagNameIdentifier(Token<ImazenRoutingToken> id) => id.Value;
-    [Production("flagName : DASHED_IDENTIFIER")]
-    public string FlagNameDashed(Token<ImazenRoutingToken> id) => id.Value;
+    // --- Path Part --- 
+    [Production("pathPart : segment")] 
+    public PathExpression PathPart(ISegment segment) => new PathExpression(new List<ISegment> { segment }); 
 
     // --- Segments --- (Literal or Variable)
-
-    // How to handle literals? They can be IDENTIFIERs, DASHED_IDENTIFIERs, INTs, or sequences of them.
-    // csly might treat unrecognized sequences as errors unless defined.
-    // Option 1: Define a broad "LITERAL_CHUNK" token (difficult regex).
-    // Option 2: Define segment as sequence of allowed tokens, then post-process AST to merge literals.
-
-    // Let's try defining segment content loosely and relying on post-processing or specific literal rules.
     [Production("segment : literalSegment")]
     public ISegment SegmentLiteral(LiteralSegment lit) => lit;
 
     [Production("segment : variableSegment")]
     public ISegment SegmentVariable(VariableSegment varSeg) => varSeg;
 
-    // Literal Segment - consumes one or more literal-contributing tokens
-    [Production("literalSegment : literalPart+")]
-    public LiteralSegment Literal(List<Token<ImazenRoutingToken>> parts)
+    // --- Literal Segment ---
+    [Production("literalSegment : literalPart")] 
+    public LiteralSegment Literal(TokenNode partNode) 
     {
         var sb = new StringBuilder();
-        foreach (var part in parts)
-        {
-            if (part.TokenID == ImazenRoutingToken.ESCAPE_SEQUENCE)
-            {
-                // Unescape known sequences or just append the escaped char
-                if (part.Value.Length > 1)
-                {
-                    char escapedChar = part.Value[1];
-                    // Add more specific unescape logic if needed (e.g., \t, \n)
-                    // For now, just append the character after backslash
-                    sb.Append(escapedChar);
-                }
-                // else: dangling backslash? Ignore or handle as error?
-            }
-            else
-            {
-                sb.Append(part.Value);
-            }
-        }
+        var token = partNode.Token; 
+        if (token.TokenID == ImazenRoutingToken.ESCAPE_SEQUENCE && token.Value.Length > 1) sb.Append(token.Value[1]);
+        else sb.Append(token.Value);
         return new LiteralSegment(sb.ToString());
     }
 
-    // Defines what can be part of a literal sequence - return the Token itself
+    // --- Literal Part Tokens ---
     [Production("literalPart : IDENTIFIER")]
-    public Token<ImazenRoutingToken> LiteralPartIdentifier(Token<ImazenRoutingToken> token) => token;
+    public IAstNode LiteralPartIdentifier(Token<ImazenRoutingToken> token) => new TokenNode(token);
 
     [Production("literalPart : DASHED_IDENTIFIER")]
-    public Token<ImazenRoutingToken> LiteralPartDashed(Token<ImazenRoutingToken> token) => token;
+    public IAstNode LiteralPartDashed(Token<ImazenRoutingToken> token) => new TokenNode(token);
 
     [Production("literalPart : INT")]
-    public Token<ImazenRoutingToken> LiteralPartInt(Token<ImazenRoutingToken> token) => token; // Pass token, not stringified int
+    public IAstNode LiteralPartInt(Token<ImazenRoutingToken> token) => new TokenNode(token);
 
     [Production("literalPart : LITERAL_CHAR")]
-    public Token<ImazenRoutingToken> LiteralPartChar(Token<ImazenRoutingToken> token) => token;
+    public IAstNode LiteralPartChar(Token<ImazenRoutingToken> token) => new TokenNode(token);
 
-    // Include other single-char tokens that can be part of literals
-    [Production("literalPart : PLUS")]
-    public Token<ImazenRoutingToken> LiteralPartPlus(Token<ImazenRoutingToken> token) => token;
-    [Production("literalPart : MINUS")]
-    public Token<ImazenRoutingToken> LiteralPartMinus(Token<ImazenRoutingToken> token) => token;
-    [Production("literalPart : TIMES")]
-    public Token<ImazenRoutingToken> LiteralPartTimes(Token<ImazenRoutingToken> token) => token;
-    [Production("literalPart : DIVIDE")]
-    public Token<ImazenRoutingToken> LiteralPartDivide(Token<ImazenRoutingToken> token) => token;
-    [Production("literalPart : ASSIGN")]
-    public Token<ImazenRoutingToken> LiteralPartAssign(Token<ImazenRoutingToken> token) => token;
-    [Production("literalPart : CARET")]
-    public Token<ImazenRoutingToken> LiteralPartCaret(Token<ImazenRoutingToken> token) => token;
-    [Production("literalPart : DASH")]
-    public Token<ImazenRoutingToken> LiteralPartDash(Token<ImazenRoutingToken> token) => token;
-    // Add COMMA, PIPE etc. if they should be treated as literals outside specific contexts
-    [Production("literalPart : COMMA")]
-    public Token<ImazenRoutingToken> LiteralPartComma(Token<ImazenRoutingToken> token) => token;
-    [Production("literalPart : PIPE")]
-    public Token<ImazenRoutingToken> LiteralPartPipe(Token<ImazenRoutingToken> token) => token;
-    [Production("literalPart : AMPERSAND")]
-    public Token<ImazenRoutingToken> LiteralPartAmpersand(Token<ImazenRoutingToken> token) => token;
-
-    // Explicitly handle escape sequences as part of a literal
     [Production("literalPart : ESCAPE_SEQUENCE")]
-    public Token<ImazenRoutingToken> LiteralPartEscape(Token<ImazenRoutingToken> token) => token;
+    public IAstNode LiteralPartEscape(Token<ImazenRoutingToken> token) => new TokenNode(token);
+    
+    [Production("literalPart : DASH")] 
+    public IAstNode LiteralPartMinus(Token<ImazenRoutingToken> token) => new TokenNode(token);
 
-    // --- Variable Segment --- ({ name? : modifier* })
+    [Production("literalPart : STAR")] 
+    public IAstNode LiteralPartTimes(Token<ImazenRoutingToken> token) => new TokenNode(token);
 
-    [Production("variableSegment : LBRACE variableContent RBRACE")]
-    public VariableSegment VariableSeg(Token<ImazenRoutingToken> lb, VariableSegment content, Token<ImazenRoutingToken> rb) => content;
+    [Production("literalPart : DIVIDE")]
+    public IAstNode LiteralPartDivide(Token<ImazenRoutingToken> token) => new TokenNode(token);
 
-    // Content can be just modifiers, name + modifiers, or just name
-    [Production("variableContent : IDENTIFIER COLON modifierList")]
-    public VariableSegment VarContentNameAndMods(Token<ImazenRoutingToken> name, Token<ImazenRoutingToken> colon, List<IModifier> modifiers)
-        => new VariableSegment(name.Value, modifiers);
+    [Production("literalPart : EQUALS")] 
+    public IAstNode LiteralPartAssign(Token<ImazenRoutingToken> token) => new TokenNode(token);
 
-    [Production("variableContent : IDENTIFIER")]
-    public VariableSegment VarContentNameOnly(Token<ImazenRoutingToken> name)
-        => new VariableSegment(name.Value, new List<IModifier>());
+    [Production("literalPart : CARET")]
+    public IAstNode LiteralPartCaret(Token<ImazenRoutingToken> token) => new TokenNode(token);
 
-    [Production("variableContent : modifierList")] // e.g. {*:?} or {?:int}
-    public VariableSegment VarContentModsOnly(List<IModifier> modifiers)
-        => new VariableSegment(null, modifiers);
+    [Production("literalPart : COLON")] 
+    public IAstNode LiteralPartColon(Token<ImazenRoutingToken> token) => new TokenNode(token);
 
-    // Zero-or-more (*) maps to List<T>. Using ValueTuple for the group.
+    [Production("literalPart : COMMA")]
+    public IAstNode LiteralPartComma(Token<ImazenRoutingToken> token) => new TokenNode(token);
+
+    [Production("literalPart : PIPE")]
+    public IAstNode LiteralPartPipe(Token<ImazenRoutingToken> token) => new TokenNode(token);
+
+    [Production("literalPart : AMPERSAND")]
+    public IAstNode LiteralPartAmpersand(Token<ImazenRoutingToken> token) => new TokenNode(token);
+        
+    [Production("literalPart : QUESTION")] 
+    public IAstNode LiteralPartQuestion(Token<ImazenRoutingToken> token) => new TokenNode(token);
+    
+    [Production("literalPart : LPAREN")]
+    public IAstNode LiteralPartLParen(Token<ImazenRoutingToken> token) => new TokenNode(token);
+
+    [Production("literalPart : RPAREN")]
+    public IAstNode LiteralPartRParen(Token<ImazenRoutingToken> token) => new TokenNode(token);
+    
+    [Production("literalPart : LSQUARE")]
+    public IAstNode LiteralPartLSquare(Token<ImazenRoutingToken> token) => new TokenNode(token);
+
+    [Production("literalPart : RSQUARE")]
+    public IAstNode LiteralPartRSquare(Token<ImazenRoutingToken> token) => new TokenNode(token);
+    
+    [Production("literalPart : LBRACE")] // Allow literal LBRACE if escaped
+    public IAstNode LiteralPartLBrace(Token<ImazenRoutingToken> token) => new TokenNode(token);
+
+    [Production("literalPart : RBRACE")] // Allow literal RBRACE if escaped
+    public IAstNode LiteralPartRBrace(Token<ImazenRoutingToken> token) => new TokenNode(token);
+
+
+    // --- Variable Segment (Simplified) ---
+    [Production("variableSegment : LBRACE IDENTIFIER (COLON modifierList)? RBRACE")] // Simplified: name, optional colon + modifiers
+    public VariableSegment VariableSeg(Token<ImazenRoutingToken> lb, Token<ImazenRoutingToken> nameToken, ValueOption<Group<Token<ImazenRoutingToken>, IAstNode>> colonAndModifiers, Token<ImazenRoutingToken> rb)
+    {
+        var modifiers = new List<IModifier>();
+        if (colonAndModifiers.IsSome) {
+             // colonAndModifiers.Value is Group<COLON, modifierList_node>
+             // modifierList_node is IAstNode (ModifierListAstNode)
+            var modifierListNode = colonAndModifiers.Value.Value as ModifierListAstNode; 
+            if (modifierListNode != null) modifiers.AddRange(modifierListNode.Modifiers);
+        }
+        return new VariableSegment(nameToken.Value, modifiers);
+    }
+
+    // --- Flag Part (Simplified, no commas) ---
+    [Production("flagPart : LSQUARE flagList? RSQUARE")]
+    public FlagList FlagPartProduction(Token<ImazenRoutingToken> lsq, ValueOption<FlagList> list, Token<ImazenRoutingToken> rsq)
+        => list.Match(f => f, () => new FlagList(new List<IdentifierNode>()));
+
+    [Production("flagList : flagName (COMMA flagName)*")] 
+    public FlagList FlagList(IdentifierNode first, List<ValueTuple<Token<ImazenRoutingToken>, IdentifierNode>> rest) 
+    {
+        var allIdentifierNodes = new List<IdentifierNode> { first };
+        if (rest != null)
+        {
+            allIdentifierNodes.AddRange(rest.Select(g => g.Item2)); 
+        }
+        return new FlagList(allIdentifierNodes);
+    }
+
+    [Production("flagName : IDENTIFIER")] 
+    public IdentifierNode FlagNameIdentifier(Token<ImazenRoutingToken> id) => new IdentifierNode(id.Value);
+    [Production("flagName : DASHED_IDENTIFIER")]
+    public IdentifierNode FlagNameDashed(Token<ImazenRoutingToken> id) => new IdentifierNode(id.Value);
+
+    // --- Modifier List (Simplified, but using ValueTuple pattern) ---
     [Production("modifierList : modifier (COLON modifier)*")]
-    public List<IModifier> ModifierList(IModifier first, List<ValueTuple<Token<ImazenRoutingToken>, IModifier>> rest)
-        => new List<IModifier> { first }.Concat(rest.Select(g => g.Item2)).ToList();
-
-    // --- Modifiers --- (Simple or With Arguments)
-
-    // Optional argumentList? maps to ArgumentList? (nullable)
-    [Production("modifier : modifierName LPAREN argumentList? RPAREN")] // With args: name(arg1,arg2)
-    public IModifier ModifierWithArgs(string name, Token<ImazenRoutingToken> lp, ArgumentList? args, Token<ImazenRoutingToken> rp)
+    public IAstNode ModifierList(IModifier first, List<ValueTuple<Token<ImazenRoutingToken>, IModifier>> rest) 
     {
-        // TODO: Add logic here or in evaluator to validate args based on modifier name (e.g., check delimiter used)
-        return new Modifier(name, args);
+        var allModifiers = new List<IModifier> { first };
+        if (rest != null)
+        {
+            allModifiers.AddRange(rest.Select(g => g.Item2));
+        }
+        var allModifiers = modifierAstNodes.Cast<IModifier>().ToList();
+        return new ModifierListAstNode(allModifiers);
     }
-
-    [Production("modifier : modifierName")] // Simple modifier: name or ? or *
-    public IModifier ModifierSimple(string name)
-    {
-        // Distinguish simple name from simple modifier symbols
-        if (name == "?" || name == "*" || name == "**") // Check if ** needs separate token
-            return new SimpleModifier(name);
-        else
-            return new Modifier(name, null); // Treat as modifier without args
-    }
-
-    // Handling STAR and QUESTION tokens as simple modifiers
+    
+    // --- Modifier (Simplified) ---
+    [Production("modifier : IDENTIFIER")] 
+    public IModifier ModifierSimpleByName(Token<ImazenRoutingToken> nameToken) => new SimpleModifier(nameToken.Value);
+    
     [Production("modifier : STAR")]
-    public IModifier ModifierStar(Token<ImazenRoutingToken> star) => new SimpleModifier("*");
+    public IModifier ModifierStar(Token<ImazenRoutingToken> starToken) => new SimpleModifier(starToken.Value);
 
     [Production("modifier : QUESTION")]
-    public IModifier ModifierQuestion(Token<ImazenRoutingToken> q) => new SimpleModifier("?");
+    public IModifier ModifierQuestion(Token<ImazenRoutingToken> qToken) => new SimpleModifier(qToken.Value);
 
-    // Modifier Name (Identifier or Dashed Identifier)
-    [Production("modifierName : IDENTIFIER")]
-    public string ModifierNameId(Token<ImazenRoutingToken> id) => id.Value;
-
-    [Production("modifierName : DASHED_IDENTIFIER")]
-    public string ModifierNameDashed(Token<ImazenRoutingToken> id) => id.Value;
-
-    // --- Argument List --- 
-    // Collects view models (wrapping tokens or char classes)
-    [Production("argumentList : argumentToken (argumentSeparator argumentToken)*")]
-    public ArgumentList ArgumentList(TokenViewModel first, List<ValueTuple<Token<ImazenRoutingToken>, TokenViewModel>> rest)
+    // --- Argument List (Simplified, using ValueTuple pattern) ---
+    [Production("argumentList : argumentToken+")]
+    public ArgumentList ArgumentListProduction(List<IAstNode> argumentAstNodes) 
     {
-        var allViewModels = new List<ImazenRoutingParser.TokenViewModel> { first }; // Start with the first view model
-        foreach (var group in rest)
-        {
-            // group.Item1 is the separator token (ignored here)
-            // group.Item2 is the TokenViewModel for the argument part
-            allViewModels.Add(group.Item2);
-        }
-        // Pass the List<TokenViewModel> to the ArgumentList constructor
+        var allViewModels = argumentAstNodes.Cast<TokenViewModel>().ToList(); 
         return new ArgumentList(allViewModels);
     }
 
-    // Define argument separator (handling both COMMA and PIPE might need parser logic or separate rules)
-    [Production("argumentSeparator : COMMA")]
-    public Token<ImazenRoutingToken> ArgSepComma(Token<ImazenRoutingToken> comma) => comma;
-
-    [Production("argumentSeparator : PIPE")]
-    public Token<ImazenRoutingToken> ArgSepPipe(Token<ImazenRoutingToken> pipe) => pipe;
-
-    // ArgumentToken: returns the Token itself or reconstructs CharacterClass string
-    [Production("argumentToken : IDENTIFIER")]
+    [Production("argumentToken : IDENTIFIER")] 
     public TokenViewModel ArgumentTokenIdentifier(Token<ImazenRoutingToken> id) => new TokenViewModel(id);
-
-    [Production("argumentToken : DASHED_IDENTIFIER")]
-    public TokenViewModel ArgumentTokenDashed(Token<ImazenRoutingToken> id) => new TokenViewModel(id);
-
-    [Production("argumentToken : INT")]
-    public TokenViewModel ArgumentTokenInt(Token<ImazenRoutingToken> num) => new TokenViewModel(num);
-
-    [Production("argumentToken : ESCAPE_SEQUENCE")]
-    public TokenViewModel ArgumentTokenEscape(Token<ImazenRoutingToken> esc) => new TokenViewModel(esc);
     
-    // Rule for Character Class Argument -> returns a special view model indicating it's a char class
-    [Production("argumentToken : characterClass")]
-    public TokenViewModel ArgumentTokenCharClass(CharacterClassViewModel charClass) => new TokenViewModel(charClass);
+    // --- Character Class (Simplified, not really used by above) ---
+    [Production("characterClass : LSQUARE IDENTIFIER RSQUARE")] // e.g. [abc]
+    public CharacterClassViewModel CharacterClassProduction(Token<ImazenRoutingToken> lsq, Token<ImazenRoutingToken> content, Token<ImazenRoutingToken> rsq) 
+        => new CharacterClassViewModel(lsq.Value + content.Value + rsq.Value);
 
-    // Character Class Structure
-    [Production("characterClass : LSQUARE charClassContent RSQUARE")]
-    public CharacterClassViewModel CharacterClassProduction(Token<ImazenRoutingToken> lsq, List<Token<ImazenRoutingToken>> content, Token<ImazenRoutingToken> rsq)
+    // charClassToken productions - one for each allowed token type
+    [Production("charClassToken : IDENTIFIER")]
+    [Production("charClassToken : DASHED_IDENTIFIER")]
+    [Production("charClassToken : INT")]
+    [Production("charClassToken : LITERAL_CHAR")]
+    [Production("charClassToken : ESCAPE_SEQUENCE")]
+    [Production("charClassToken : DASH")]
+    [Production("charClassToken : CARET")]
+    [Production("charClassToken : COMMA")]
+    [Production("charClassToken : PIPE")]
+    [Production("charClassToken : LPAREN")]
+    [Production("charClassToken : RPAREN")]
+    [Production("charClassToken : LBRACE")]
+    [Production("charClassToken : RBRACE")]
+    [Production("charClassToken : PLUS")]
+    [Production("charClassToken : STAR")]
+    [Production("charClassToken : DIVIDE")]
+    [Production("charClassToken : EQUALS")]
+    [Production("charClassToken : QUESTION")]
+    [Production("charClassToken : AMPERSAND")]
+    [Production("charClassToken : COLON")]
+    public IAstNode CharClassToken(Token<ImazenRoutingToken> token) => new TokenNode(token);
+
+    // TokenViewModel and CharacterClassViewModel are public as they are used in public AST records
+    public record TokenViewModel (Token<ImazenRoutingToken>? RawToken = null, CharacterClassViewModel? CharClass = null) : IAstNode
     {
-        // Reconstruct the raw string representation, including brackets
-        var sb = new StringBuilder();
-        sb.Append(lsq.Value); // Append '['
-        foreach(var token in content)
-        {
-            sb.Append(token.Value); // Append raw content tokens
-        }
-        sb.Append(rsq.Value); // Append ']'
-        return new CharacterClassViewModel(sb.ToString());
-    }
-
-    // Define charClassContent - sequence of non-RSQUARE tokens (simplified)
-    [Production("charClassContent : charClassToken*")] // Use * for zero or more content tokens
-    public List<Token<ImazenRoutingToken>> CharClassContent(List<Token<ImazenRoutingToken>> tokens) => tokens;
-    
-    // Tokens allowed inside a character class (excluding RSQUARE, handled by parser)
-    // Added COLON based on original parser needing escape
-    [Production("charClassToken : IDENTIFIER | DASHED_IDENTIFIER | INT | LITERAL_CHAR | ESCAPE_SEQUENCE | DASH | CARET | COMMA | PIPE | LPAREN | RPAREN | LBRACE | RBRACE | PLUS | TIMES | DIVIDE | ASSIGN | QUESTION | STAR | EQUALS | AMPERSAND | COLON")]
-    public Token<ImazenRoutingToken> CharClassToken(Token<ImazenRoutingToken> token) => token;
-
-    // --- Helper ViewModels for ArgumentList ---
-    // Need a way to pass either a raw Token or a reconstructed CharacterClass string
-    // Use a simple wrapper/discriminator for now.
-    public record TokenViewModel 
-    {
-        public Token<ImazenRoutingToken>? RawToken { get; } = null;
-        public CharacterClassViewModel? CharClass { get; } = null;
         public bool IsCharacterClass => CharClass != null;
-        
-        public TokenViewModel(Token<ImazenRoutingToken> token) { RawToken = token; }
-        public TokenViewModel(CharacterClassViewModel charClass) { CharClass = charClass; }
+        public TokenViewModel(Token<ImazenRoutingToken> token) : this(RawToken: token, CharClass: null) {}
+        public TokenViewModel(CharacterClassViewModel charClass) : this(RawToken: null, CharClass: charClass) {}
 
-        // Helper to get value, abstracting reconstruction for char class
         public string GetValue()
         {
             if (IsCharacterClass) return CharClass!.RawValue;
             if (RawToken?.TokenID == ImazenRoutingToken.INT) return RawToken.IntValue.ToString();
-            if (RawToken?.TokenID == ImazenRoutingToken.ESCAPE_SEQUENCE && RawToken.Value.Length > 1) return RawToken.Value.Substring(1, 1); // Basic unescape
+            if (RawToken?.TokenID == ImazenRoutingToken.ESCAPE_SEQUENCE && RawToken.Value.Length > 1) return RawToken.Value.Substring(1, 1); 
             return RawToken?.Value ?? "";
         }
     }
-    public record CharacterClassViewModel(string RawValue); 
-
-    // Update ArgumentList in AST to use TokenViewModel
-    // public record ArgumentList(IReadOnlyList<Token<ImazenRoutingToken>> Tokens) : IAstNode; --> Needs change in AST file
+    public record CharacterClassViewModel(string RawValue) : IAstNode;
 } 

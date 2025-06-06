@@ -61,7 +61,7 @@ public class TemplateAstEvaluator
             EvaluateSegments(GetKeySegments(queryPair), keyBuilder, ref keyOptionalEmpty); 
 
             // Evaluate Value Segments
-            EvaluateSegments(queryPair.ValueSegments, valueBuilder, ref valueOptionalEmpty);
+            EvaluateSegments(queryPair.ValueSegmentsNode?.Segments ?? new List<ISegment>(), valueBuilder, ref valueOptionalEmpty);
 
             // Skip pair if EITHER key or value was optional and evaluated to empty
             if (keyOptionalEmpty || valueOptionalEmpty)
@@ -89,7 +89,7 @@ public class TemplateAstEvaluator
     {
         // For now, treat the QueryPair.Key string as a single LiteralSegment.
         // If the parser is changed to allow variable keys, this needs updating.
-        return new List<ISegment> { new LiteralSegment(pair.Key) }; 
+        return new List<ISegment> { new LiteralSegment(pair.Key.Name) }; 
     }
 
     private void EvaluateSegments(IReadOnlyList<ISegment> segments, StringBuilder sb, ref bool containsOptionalEmpty)

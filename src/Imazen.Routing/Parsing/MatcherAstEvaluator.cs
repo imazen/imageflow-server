@@ -375,60 +375,161 @@ public class MatcherAstEvaluator
     // Applies AST modifier semantics to boundary info
     private void ApplyModifierToBoundaries(IModifier modifier, ref BoundaryInfo start, ref BoundaryInfo end)
     {
-        if (modifier is SimpleModifier sm) { if (sm.Name == "?") { start.IsOptional = true; } }
+        if (modifier is SimpleModifier sm) { 
+            if (sm.Name == "?") { 
+                start.IsOptional = true; 
+                // Also make the default end boundary optional if the start is optional
+                // This mirrors original MatchSegment.IsOptional behavior based on StartsOn.IsOptional
+                end.IsOptional = true; 
+            } 
+        }
         else if (modifier is Modifier mwa)
         {
-            var argTokens = mwa.Arguments?.Tokens ?? [];
-            bool useIgnoreCase = _parsingOptions.PathParsingOptions.OrdinalIgnoreCase; 
-            var modName = mwa.Name.ToLowerInvariant();
-            var args = ExtractArguments(argTokens, ImazenRoutingToken.COMMA); // Default extraction
-            // TODO: Need better arg extraction based on modName
+            var modNameOriginal = mwa.Name;
+            var normalizedModName = NormalizeModifierName(modNameOriginal);
+            bool ignoreCase = GetEffectiveIgnoreCase(modNameOriginal, normalizedModName);
+            string? arg = ExtractSingleArgumentString(mwa.Arguments);
 
-            if (args != null && args.Count == 1) 
+            if (arg != null)
             {
-                 string arg = args[0]; 
-                 switch(modName)
+                 switch(normalizedModName)
                  {
-                     case "equals": case "eq": 
-                        start.Kind = BoundaryKind.Literal; start.LiteralValue = arg; start.IgnoreCase = useIgnoreCase; start.IncludeInVariable = true;
-                        start.MatchesEntireSegment = true; // Mark start as equals
-                        end.Kind = BoundaryKind.Literal; end.MatchesEntireSegment = true; end.UseNextSegmentAsEnd = false;
+                     case "equals": // eq, ""
+                        start.Kind = BoundaryKind.Literal; 
+                        start.LiteralValue = arg; 
+                        start.IgnoreCase = ignoreCase; 
+                        start.IncludeInVariable = true;
+                        start.MatchesEntireSegment = true; 
+                        
+                        end.Kind = BoundaryKind.Literal; // End is defined by start for equals
+                        end.LiteralValue = arg; // Not strictly needed for end if MatchesEntireSegment is true
+                        end.IgnoreCase = ignoreCase;
+                        end.IncludeInVariable = true; 
+                        end.MatchesEntireSegment = true; 
+                        end.UseNextSegmentAsEnd = false;
                         break;
-                     case "starts-with": case "starts": 
-                        start.Kind = BoundaryKind.Literal; start.LiteralValue = arg; start.IgnoreCase = useIgnoreCase; start.IncludeInVariable = true;
-                        start.MatchesEntireSegment = false; // Reset if previously equals
-                        end.Kind = BoundaryKind.Default; end.UseNextSegmentAsEnd = true; end.MatchesEntireSegment = false;
+                     case "starts-with": // starts
+                        start.Kind = BoundaryKind.Literal; 
+                        start.LiteralValue = arg; 
+                        start.IgnoreCase = ignoreCase; 
+                        start.IncludeInVariable = true;
+                        start.MatchesEntireSegment = false; 
+                        
+                        // Default end: relies on next segment
+                        end.Kind = BoundaryKind.Default;
+                        end.UseNextSegmentAsEnd = true; 
+                        end.MatchesEntireSegment = false;
+                        end.LiteralValue = null;
+                        end.FixedLength = -1;
                         break;
-                     case "ends-with": case "ends": 
-                        end.Kind = BoundaryKind.Literal; end.LiteralValue = arg; end.IgnoreCase = useIgnoreCase; end.IncludeInVariable = true;
-                        end.UseNextSegmentAsEnd = false; end.MatchesEntireSegment = false;
-                        start.Kind = BoundaryKind.Default; start.MatchesEntireSegment = false; // Reset start
+                     case "ends-with": // ends
+                        end.Kind = BoundaryKind.Literal; 
+                        end.LiteralValue = arg; 
+                        end.IgnoreCase = ignoreCase; 
+                        end.IncludeInVariable = true;
+                        end.UseNextSegmentAsEnd = false;
+                        end.MatchesEntireSegment = false;
+
+                        // Default start: matches immediately
+                        start.Kind = BoundaryKind.Default; 
+                        start.MatchesEntireSegment = false;
+                        start.LiteralValue = null;
                         break;
                      case "prefix": 
-                        start.Kind = BoundaryKind.Prefix; start.LiteralValue = arg; start.IgnoreCase = useIgnoreCase; start.IncludeInVariable = false;
+                        start.Kind = BoundaryKind.Prefix; 
+                        start.LiteralValue = arg; 
+                        start.IgnoreCase = ignoreCase; 
+                        start.IncludeInVariable = false;
                         start.MatchesEntireSegment = false;
-                        end.Kind = BoundaryKind.Default; end.UseNextSegmentAsEnd = true; end.MatchesEntireSegment = false; 
-                         break;
+
+                        end.Kind = BoundaryKind.Default;
+                        end.UseNextSegmentAsEnd = true;
+                        end.MatchesEntireSegment = false;
+                        end.LiteralValue = null;
+                        end.FixedLength = -1;
+                        break;
                      case "suffix": 
-                         end.Kind = BoundaryKind.Suffix; end.LiteralValue = arg; end.IgnoreCase = useIgnoreCase; end.IncludeInVariable = false;
-                         end.UseNextSegmentAsEnd = false; end.MatchesEntireSegment = false;
-                         start.Kind = BoundaryKind.Default; start.MatchesEntireSegment = false;
+                         end.Kind = BoundaryKind.Suffix; 
+                         end.LiteralValue = arg; 
+                         end.IgnoreCase = ignoreCase; 
+                         end.IncludeInVariable = false;
+                         end.UseNextSegmentAsEnd = false;
+                         end.MatchesEntireSegment = false;
+
+                         start.Kind = BoundaryKind.Default;
+                         start.MatchesEntireSegment = false;
+                         start.LiteralValue = null;
                          break;
-                     case "len": 
-                         if (int.TryParse(arg, NumberStyles.None, CultureInfo.InvariantCulture, out int len) && len > 0)
+                     case "len": // length (boundary context)
+                         if (int.TryParse(arg, NumberStyles.None, CultureInfo.InvariantCulture, out int lenVal) && lenVal > 0)
                          {
-                             end.Kind = BoundaryKind.FixedLength; end.FixedLength = len;
+                             end.Kind = BoundaryKind.FixedLength; 
+                             end.FixedLength = lenVal;
                              end.IncludeInVariable = true; 
                              end.UseNextSegmentAsEnd = false;
-                             end.MatchesEntireSegment = false;
-                             start.Kind = BoundaryKind.Default; start.MatchesEntireSegment = false;
+                             end.MatchesEntireSegment = false; // Length is about the end, not the whole segment "equaling" a length.
+
+                             start.Kind = BoundaryKind.Default; // Start is default for length-based end
+                             start.MatchesEntireSegment = false;
+                             start.LiteralValue = null;
                          }
+                         // Else: Invalid arg for len, boundary info remains unchanged (or could error)
                          break;
                  }
             }
         }
     }
 
+    private string NormalizeModifierName(string name)
+    {
+        name = name.ToLowerInvariant();
+        return name switch
+        {
+            "eq" => "equals",
+            "starts" => "starts-with",
+            "ends" => "ends-with",
+            "length" => "len", // Canonical for boundary, "length" is for condition
+            // Keep other names as is (prefix, suffix, len)
+            _ => name
+        };
+    }
+
+    private bool GetEffectiveIgnoreCase(string originalName, string normalizedName)
+    {
+        // Check if original name implies ignore case (e.g., ends with "-i")
+        // Or if global parsing options dictate ignore case for this type of modifier
+        // For now, just use global path parsing options as a base
+        bool globalIgnoreCase = _parsingOptions.PathParsingOptions.OrdinalIgnoreCase;
+        
+        // Specific ignore-case variants like "equals-i" are not yet handled by AST,
+        // but if they were, this is where that logic would combine with global settings.
+        // For now, if originalName was "equals-i" it becomes "equals" by NormalizeModifierName,
+        // and we rely on the global flag.
+        // A more robust solution would be to have the parser produce an IgnoreCase flag on the Modifier AST node.
+        if (originalName.EndsWith("-i")) return true; // Modifier explicitly requests ignore case
+
+        return globalIgnoreCase; // Fallback to global
+    }
+    
+    private string? ExtractSingleArgumentString(ArgumentList? argList)
+    {
+        if (argList?.Tokens != null && argList.Tokens.Count == 1)
+        {
+            // For simplicity, assuming the single token can be directly converted to its string value.
+            // This might need refinement if TokenViewModel.GetValue() isn't sufficient or if
+            // specific unescaping or type checks are needed here.
+            var tokenVm = argList.Tokens[0];
+            if (tokenVm.IsCharacterClass)
+            {
+                // Boundary conditions typically don't use character classes directly as their literal value.
+                // This might indicate an error or a need for a different kind of handling.
+                // For now, return null if it's a char class used where a simple string is expected for boundary.
+                return null; 
+            }
+            return tokenVm.GetValue();
+        }
+        return null; // No arguments or more than one argument
+    }
 
     // Closes the currently open segment, validates its content, and adds captures.
     private bool CloseOpenSegment(int closingBoundaryStart)
@@ -540,161 +641,223 @@ public class MatcherAstEvaluator
     private bool EvaluateStringCondition(string name, ArgumentList? argsAst, ReadOnlySpan<char> value)
     {
         var tokens = argsAst?.Tokens ?? (IReadOnlyList<ImazenRoutingParser.TokenViewModel>)Enumerable.Empty<ImazenRoutingParser.TokenViewModel>(); 
-        bool ignoreCase = _parsingOptions.PathParsingOptions.OrdinalIgnoreCase; 
-        var conditionName = name.ToLowerInvariant();
+        bool ignoreCase = GetEffectiveIgnoreCase(name, NormalizeModifierName(name)); // Use effective ignore case for conditions too
+        var conditionName = NormalizeModifierName(name); // Normalize condition name as well
 
-        var expectedSeparator = (conditionName == "equals" || conditionName == "contains" || conditionName == "includes") 
-                               ? ImazenRoutingToken.PIPE 
-                               : ImazenRoutingToken.COMMA;
-
-        // Extract string arguments based on the expected separator
-        var arguments = ExtractArguments(tokens.ToList(), expectedSeparator); // Convert to List for ExtractArguments
-        if (arguments == null) return false; 
+        ImazenRoutingToken expectedSeparator;
+        switch (conditionName)
+        {
+            case "equals":
+            case "contains": // Alias includes
+            case "starts-with":
+            case "ends-with":
+                expectedSeparator = ImazenRoutingToken.PIPE; // These can take string arrays delimited by pipe
+                break;
+            default:
+                expectedSeparator = ImazenRoutingToken.COMMA;
+                break;
+        }
+        
+        var arguments = ExtractArguments(tokens.ToList(), expectedSeparator, conditionName == "allow" || conditionName == "starts-with-chars"); 
+        if (arguments == null && (conditionName != "alpha" && conditionName != "alphanumeric" && 
+                                 conditionName != "alpha-lower" && conditionName != "alpha-upper" && 
+                                 conditionName != "hex" && conditionName != "int32" && 
+                                 conditionName != "int64" && conditionName != "uint32" && 
+                                 conditionName != "uint64" && conditionName != "guid" && 
+                                 conditionName != "image-ext-supported"))
+        {
+            // If arguments are required but couldn't be parsed, it's a failure.
+            // Boolean checks without args are handled in the switch.
+            return false; 
+        }
+        
         
         switch (conditionName)
         {
-            // --- Boolean checks (no args needed) ---
+            // --- Boolean checks (no args needed by ExtractArguments) ---
             case "alpha": return value.IsEnglishAlphabet();
             case "alphanumeric": return value.IsNumbersAndEnglishAlphabet();
             case "alpha-lower": return value.IsLowercaseEnglishAlphabet();
             case "alpha-upper": return value.IsUppercaseEnglishAlphabet();
-            case "hex": case "hexadecimal": return value.IsHexadecimal();
-            case "int32": case "int": case "i32": case "integer": return value.IsInt32();
-            case "int64": case "long": case "i64": return value.IsInt64();
-            case "uint32": case "uint": case "u32": return value.IsU32();
-            case "uint64": case "u64": return value.IsU64();
+            case "hex": /*case "hexadecimal":*/ return value.IsHexadecimal(); // hexadecimal is normalized to hex
+            case "int32": /*case "int": case "i32": case "integer":*/ return value.IsInt32();
+            case "int64": /*case "long": case "i64":*/ return value.IsInt64();
+            case "uint32": /*case "uint": case "u32":*/ return value.IsU32();
+            case "uint64": /*case "u64":*/ return value.IsU64();
             case "guid": return value.IsGuid();
             case "image-ext-supported": return _context.EndsWithSupportedImageExtension(value);
 
             // --- Conditions using extracted string arguments ---
             case "equals": 
-                if (arguments.Count == 0) return false; 
+                if (arguments == null || arguments.Count == 0) return false; 
                 if (arguments.Count == 1) return ignoreCase ? value.EqualsOrdinalIgnoreCase(arguments[0]) : value.EqualsOrdinal(arguments[0]);
                 return ignoreCase ? value.EqualsAnyOrdinalIgnoreCase(arguments.ToArray()) : value.EqualsAnyOrdinal(arguments.ToArray());
-            case "contains": case "includes":
-                if (arguments.Count == 0) return false; 
+            
+            case "starts-with":
+                if (arguments == null || arguments.Count == 0) return false;
+                if (arguments.Count == 1) return ignoreCase ? value.StartsWithOrdinalIgnoreCase(arguments[0]) : value.StartsWithOrdinal(arguments[0]);
+                return ignoreCase ? value.StartsWithAnyOrdinalIgnoreCase(arguments.ToArray()) : value.StartsWithAnyOrdinal(arguments.ToArray());
+
+            case "ends-with":
+                if (arguments == null || arguments.Count == 0) return false;
+                if (arguments.Count == 1) return ignoreCase ? value.EndsWithOrdinalIgnoreCase(arguments[0]) : value.EndsWithOrdinal(arguments[0]);
+                return ignoreCase ? value.EndsWithAnyOrdinalIgnoreCase(arguments.ToArray()) : value.EndsWithAnyOrdinal(arguments.ToArray());
+
+            case "contains": // includes
+                if (arguments == null || arguments.Count == 0) return false; 
                 if (arguments.Count == 1) return ignoreCase ? value.IncludesOrdinalIgnoreCase(arguments[0]) : value.IncludesOrdinal(arguments[0]);
                 return ignoreCase ? value.IncludesAnyOrdinalIgnoreCase(arguments.ToArray()) : value.IncludesAnyOrdinal(arguments.ToArray());
-             case "range": case "integer-range":
+            
+             case "range": // integer-range
+                if (arguments == null) return false;
                 ParseIntRange(arguments, out var minInt, out var maxInt);
                 return value.IsInIntegerRangeInclusive(minInt, maxInt);
-             case "length":
+            
+            case "len": // length (condition context)
                  { 
-                    var lengthArgs = ExtractArguments(tokens, expectedSeparator); // Use determined separator (COMMA)
-                    if (lengthArgs == null) return false;
-                    ParseIntRange(lengthArgs, out var minLen, out var maxLen);
+                    if (arguments == null) return false;
+                    ParseIntRange(arguments, out var minLen, out var maxLen);
                     return value.LengthWithinInclusive(minLen, maxLen);
                  }
-            case "allow": case "only":
+            case "allow": // only
                  { 
-                    // ArgumentList should contain a single TokenViewModel which is a CharacterClassViewModel
-                    if (tokens.Count != 1 || !tokens[0].IsCharacterClass) return false; 
-                    
-                    string charClassRawString = tokens[0].CharClass!.RawValue;
-
+                    if (arguments == null || arguments.Count != 1) return false; // Expect a single raw char class string
+                    string charClassRawString = arguments[0];
                     if (CharacterClass.TryParseInterned(charClassRawString.AsMemory(), true, out var cc, out _))
                     {
                         return value.IsCharClass(cc);
                     }
-                    // Log error?
                     return false;
                  }
             case "starts-with-chars":
                  { 
-                     // Expects two arguments: INT, CharacterClass
-                     if (tokens.Count != 2) return false;
-
-                     // First arg should be an INT token
-                     var countTokenVm = tokens[0];
-                     string? countArg = null;
-                     if (!countTokenVm.IsCharacterClass && countTokenVm.RawToken?.TokenID == ImazenRoutingToken.INT) {
-                         countArg = countTokenVm.RawToken.Value; // Or IntValue.ToString()?
-                     } else { return false; } // First arg is not an INT
+                     if (arguments == null || arguments.Count != 2) return false; // Expects: count, charClassString
                      
-                     // Second arg should be a CharacterClassViewModel
-                     var charClassVm = tokens[1];
-                     if (!charClassVm.IsCharacterClass) return false; // Second arg is not a char class
-                     string charClassArgRaw = charClassVm.CharClass!.RawValue;
+                     string countArg = arguments[0];
+                     string charClassArgRaw = arguments[1];
                      
                      if (int.TryParse(countArg, out int count) && 
                          CharacterClass.TryParseInterned(charClassArgRaw.AsMemory(), true, out var cc2, out _))
                      {
                          return value.StartsWithNCharClass(cc2, count);
                      }
-                     // Log error?
                      return false;
                  }
             default:
-                return true; 
+                // If the condition isn't recognized as one that uses arguments or is a known boolean one,
+                // it might be a custom or future condition. Defaulting to true might be too permissive.
+                // Consider throwing an error or returning false if strictness is desired.
+                // For now, if it reached here and wasn't a known arg-less boolean, and args were null (as per check above),
+                // it implies an unknown condition. The original code defaulted to true for unknown modifiers.
+                // However, if arguments were expected (i.e., arguments != null here but condition not matched),
+                // that would be an error handled by the null check of `arguments` at the start for most cases.
+                // This path mainly covers unknown conditions that *don't* take arguments according to their definition.
+                // This could be a simple flag-like condition not yet implemented.
+                // The safest is to return false for unknown conditions that are not boundary conditions.
+                Debug.WriteLine($"Warning: Unhandled condition '{conditionName}' in MatcherAstEvaluator.EvaluateStringCondition");
+                return false; 
         }
     }
 
     // Updated Helper to extract argument strings from TokenViewModel list
-    // Accepts List<TokenViewModel> 
-    private List<string>? ExtractArguments(IReadOnlyList<ImazenRoutingParser.TokenViewModel> allTokens, ImazenRoutingToken expectedSeparator)
+    private List<string>? ExtractArguments(
+        IReadOnlyList<ImazenRoutingParser.TokenViewModel> allTokens, 
+        ImazenRoutingToken expectedSeparator,
+        bool rawCharClassAsSingleArg = false)
     {
         var arguments = new List<string>();
-        StringBuilder currentArg = new StringBuilder();
-        bool separatorFound = false;
-        ImazenRoutingToken? firstSeparator = null;
-        bool isInsideCharClass = false;
+        StringBuilder currentArgContent = new StringBuilder();
+        bool separatorEncounteredInCurrentGroup = false;
+        ImazenRoutingToken? firstSeparatorUsed = null;
 
-        foreach (var tokenVm in allTokens)
+        for (int i = 0; i < allTokens.Count; i++)
         {
-            // If we hit a character class, treat its reconstructed value as a single argument
-            if (tokenVm.IsCharacterClass) {
-                if (currentArg.Length > 0) { // Cannot have char class follow other parts in same arg slot
-                    arguments.Add(currentArg.ToString());
-                    currentArg.Clear();
-                    // We need a separator before the char class if not first arg
-                    if (!separatorFound) return null; 
+            var tokenVm = allTokens[i];
+
+            if (tokenVm.IsCharacterClass)
+            {
+                if (rawCharClassAsSingleArg) {
+                    if (currentArgContent.Length > 0) // Char class must be its own argument if raw
+                    {
+                        // This implies something like "text[abc]", which is not typical for `allow` or `starts-with-chars`
+                        // Expected: `allow([abc])` or `starts-with-chars(1,[abc])` where `[abc]` is a full arg.
+                        return null; // Invalid structure prior to char class as raw arg
+                    }
+                    arguments.Add(tokenVm.CharClass!.RawValue); // Add the raw `[abc]` string
+                    currentArgContent.Clear();
+                    separatorEncounteredInCurrentGroup = false; // Reset for next argument
+                    if (i < allTokens.Count -1 && !(allTokens[i+1].RawToken?.TokenID == expectedSeparator) && 
+                        (allTokens[i+1].RawToken?.TokenID != ImazenRoutingToken.RPAREN)) // Check for RPAREN for last arg
+                    {
+                        // If char class is not the last argument, it must be followed by a separator.
+                        // Or if it is the last, it should be followed by RPAREN (implicitly handled by parser structure)
+                        return null; // Missing separator after char class as raw arg
+                    }
+                    continue; // Move to next token
                 }
-                arguments.Add(tokenVm.CharClass!.RawValue);
-                // Char class is a full argument, force looking for a separator next if more tokens exist
-                separatorFound = true; 
-                continue; 
+                // If not rawCharClassAsSingleArg, treat [ and ] as part of a normal string arg if not separated.
+                currentArgContent.Append(tokenVm.CharClass!.RawValue); 
+                continue;
             }
 
             var token = tokenVm.RawToken;
-            if (token == null) continue; 
+            if (token == null) continue; // Should not happen if IsCharacterClass is false
 
-            bool isSeparator = token.TokenID == ImazenRoutingToken.COMMA || token.TokenID == ImazenRoutingToken.PIPE;
-            
-            if (isSeparator)
+            bool isCurrentTokenSeparator = token.TokenID == expectedSeparator;
+            bool isOtherSeparator = (token.TokenID == ImazenRoutingToken.COMMA || token.TokenID == ImazenRoutingToken.PIPE) && !isCurrentTokenSeparator;
+
+            if (isCurrentTokenSeparator)
             {
-                if (!separatorFound) firstSeparator = token.TokenID;
-                if (separatorFound && token.TokenID != firstSeparator) return null; 
-                if (token.TokenID != expectedSeparator) return null;
+                if (firstSeparatorUsed == null) firstSeparatorUsed = token.TokenID;
+                else if (firstSeparatorUsed != token.TokenID) return null; // Mixed separators
 
-                separatorFound = true;
-                arguments.Add(currentArg.ToString());
-                currentArg.Clear();
+                arguments.Add(currentArgContent.ToString());
+                currentArgContent.Clear();
+                separatorEncounteredInCurrentGroup = true;
             }
-            else
+            else if (isOtherSeparator)
             {
-                 // Append value, handling basic escapes - needed for non-char-class args
-                 if (token.TokenID == ImazenRoutingToken.ESCAPE_SEQUENCE)
-                 {
-                     if (token.Value.Length > 1) currentArg.Append(token.Value[1]); // Unescape
-                 }
-                  else if (token.TokenID == ImazenRoutingToken.INT) 
-                 {
-                     currentArg.Append(token.IntValue);
-                 }
-                 else
-                 {
-                     currentArg.Append(token.Value);
-                 }
+                return null; // Wrong separator used
+            }
+            else // Regular token part of an argument
+            {
+                if (separatorEncounteredInCurrentGroup && currentArgContent.Length == 0)
+                {
+                    // We found a separator, this token starts a new argument.
+                    separatorEncounteredInCurrentGroup = false; 
+                }
+                 
+                if (token.TokenID == ImazenRoutingToken.ESCAPE_SEQUENCE)
+                {
+                    if (token.Value.Length > 1) currentArgContent.Append(token.Value[1]); // Basic unescape
+                }
+                else if (token.TokenID == ImazenRoutingToken.INT)
+                {
+                    currentArgContent.Append(token.IntValue);
+                }
+                else
+                {
+                    currentArgContent.Append(token.Value);
+                }
             }
         }
-        // Add the last argument accumulated in StringBuilder
-        if (currentArg.Length > 0 || (arguments.Count == 0 && allTokens.Count > 0) || separatorFound) 
-        { 
-            arguments.Add(currentArg.ToString());
+
+        // Add the last accumulated argument
+        if (currentArgContent.Length > 0 || allTokens.Count == 0 || separatorEncounteredInCurrentGroup || (allTokens.Any() && !arguments.Any() && !allTokens.Last().IsCharacterClass) )
+        {
+             // Add if content, or if it was an empty list of tokens (yields one empty arg), 
+             // or if last thing was a separator (yields empty arg), 
+             // or if there were tokens but no args yet and last token wasn't a char class that got its own arg slot.
+            arguments.Add(currentArgContent.ToString());
+        }
+        
+        // If only one argument was expected and it was a char class handled by rawCharClassAsSingleArg,
+        // arguments list might be empty if the char class was the *only* token. Correct this.
+        if (rawCharClassAsSingleArg && allTokens.Count == 1 && allTokens[0].IsCharacterClass && arguments.Count == 0)
+        {
+            arguments.Add(allTokens[0].CharClass!.RawValue);
         }
 
-        // Final separator check
-        if (separatorFound && firstSeparator != expectedSeparator) return null;
 
         return arguments;
     }
