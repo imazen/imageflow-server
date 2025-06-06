@@ -13,6 +13,27 @@ test-all *ARGS:
 test-all-with-48 *ARGS:
     $env:TEST_DOTNET_48 = 'true'; just test-all {{ARGS}}; $env:TEST_DOTNET_48 = 'false';
 
+run-example-minimal *ARGS:
+    dotnet run --project examples/Imageflow.Server.ExampleMinimal/Imageflow.Server.ExampleMinimal.csproj -- {{ARGS}}
+
+run-example-docker *ARGS:
+    dotnet run --project examples/Imageflow.Server.ExampleDocker/Imageflow.Server.ExampleDocker.csproj -- {{ARGS}}
+
+run-example-docker-with-cache *ARGS:
+    dotnet run --project examples/Imageflow.Server.ExampleDockerDiskCache/Imageflow.Server.ExampleDockerDiskCache.csproj -- {{ARGS}}
+
+run-example-modern-api *ARGS:
+    dotnet run --project examples/Imageflow.Server.ExampleModernAPI/Imageflow.Server.ExampleModernAPI.csproj -- {{ARGS}}
+
+run-example-full *ARGS:
+    dotnet run --project examples/Imageflow.Server.Example.csproj -- {{ARGS}}
+
+run-zrio *ARGS:
+    dotnet run --project examples/ZRIO/zrio.csproj -- {{ARGS}}
+
+run-server-host *ARGS:
+    dotnet run --project src/Imageflow.Server.Host/Imageflow.Server.Host.csproj -- {{ARGS}}
+
 combine-shared-tests:
     $outputFile = 'tests/ImazenShared.Tests/shared-combined.txt.cs'; Clear-Content $outputFile -ErrorAction SilentlyContinue; Get-ChildItem -Path tests/ImazenShared.Tests/ -Include *.cs, *.md -Recurse | ForEach-Object { $commentPrefix = '//'; if ($_.Extension -eq '.md') { $commentPrefix = '#' }; Add-Content -Path $outputFile -Value "$commentPrefix File: $($_.FullName.Replace($PWD.Path + '\', ''))"; Add-Content -Path $outputFile -Value (Get-Content -Raw $_.FullName); Add-Content -Path $outputFile -Value "`n`n" }
 
