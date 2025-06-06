@@ -57,6 +57,10 @@ jobs:
       if: matrix.os == 'windows-latest' && contains(env.DOTNET_VERSION_LIST, '4.8.1') == 'false'
       with:
         dotnet-version: '4.8.1'
+    - name: set TEST_DOTNET_48 to true if on windows
+      run: |
+        echo "TEST_DOTNET_48=true" >> $GITHUB_ENV
+      if: matrix.os == 'windows-latest'
         
     - uses: nowsprinting/check-version-format-action@v3
       id: version

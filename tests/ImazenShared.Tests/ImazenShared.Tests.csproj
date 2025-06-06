@@ -3,10 +3,11 @@
     <Import Project="..\TestDefaults.props" />
     <PropertyGroup>
       <RootNamespace>Imazen.Tests</RootNamespace>
-        <TargetFrameworks Condition="'$(OS)' == 'Windows_NT'">
-            net8.0;net48;</TargetFrameworks>
-        <TargetFrameworks Condition="'$(OS)' != 'Windows_NT'">
-            net8.0;</TargetFrameworks>
+
+        <!-- if env var TEST_DOTNET_48 is set, use net48+net8.0 -->
+        <TargetFrameworks Condition="'$(TEST_DOTNET_48)' == 'true'">net48;net8.0</TargetFrameworks>
+        <TargetFramework Condition="'$(TEST_DOTNET_48)' != 'true'">net8.0</TargetFramework>
+        <!-- in pwsh, you would run: $env:TEST_DOTNET_48 = 'true'; just test-shared-->
         <ImplicitUsings>enable</ImplicitUsings>
 
     </PropertyGroup>
