@@ -1,14 +1,23 @@
 set shell := ["pwsh", "-c"]
 
 # Run tests for the ImazenShared.Tests project using dotnet run
+#  just test-shared -stopOnFail
 test-shared *ARGS:
-    dotnet run --no-restore --project tests/ImazenShared.Tests/ImazenShared.Tests.csproj -- -m 16 {{ARGS}} 
+    dotnet run -p:MaxCpuCount=16 --no-restore --project tests/ImazenShared.Tests/ImazenShared.Tests.csproj  --  {{ARGS}} 
+
+test-shared-fast *ARGS:
+    just test-shared -stopOnFail
 
 test-shared-with-48 *ARGS:
-    $env:TEST_DOTNET_48 = 'true'; just test-shared {{ARGS}}; $env:TEST_DOTNET_48 = 'false';
+    $env:TEST_DOTNET_48 = 'true'
+    just test-shared {{ARGS}}
+    $env:TEST_DOTNET_48 = 'false'
 
 test-all *ARGS:
-    dotnet test --no-restore -- -m 16
+    dotnet test -p:MaxCpuCount=16 --no-restore --no-build -- {{ARGS}}
+
+test-all-fast *ARGS:
+    just test-all -stopOnFail
 
 test-all-with-48 *ARGS:
     $env:TEST_DOTNET_48 = 'true'; just test-all {{ARGS}}; $env:TEST_DOTNET_48 = 'false';

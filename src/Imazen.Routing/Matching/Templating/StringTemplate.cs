@@ -49,9 +49,20 @@ public record StringTemplate(IReadOnlyList<ITemplateSegment> Segments)
                         }
                         lastOpenBrace = literalEnd; // Remember position of '{'
                         consumed = literalEnd + 1; // Move past '{'
+                        // Debug: Indicate finding '{'
+                        // System.Diagnostics.Debug.WriteLine($"StringTemplate.TryParse: Found '{{' at absolute position {lastOpenBrace}. Consumed is now {consumed}.");
                     }
                     else // No more '{', the rest is a literal
                     {
+                        // Before adding as a literal, check for unexpected '}'
+                        int unexpectedCloseBrace = ExpressionParsingHelpers.FindCharNotEscaped(template.Slice(consumed), '}', '\\');
+                        if (unexpectedCloseBrace != -1)
+                        {
+                             error = $"Syntax error: Unexpected '}}' at position {consumed + unexpectedCloseBrace}.";
+                             result = null;
+                             return false;
+                        }
+
                         if (consumed < template.Length)
                         {
                             segments.Add(CreateLiteralSegment(template.Slice(consumed)));
@@ -65,8 +76,12 @@ public record StringTemplate(IReadOnlyList<ITemplateSegment> Segments)
 
                     if (nextCloseBrace != -1) // Found closing '}'
                     {
-                        int variableContentEnd = consumed + nextCloseBrace;
-                        var variableContent = template.Slice(consumed, variableContentEnd - consumed);
+                        int closeBraceAbsoluteIndex = consumed + nextCloseBrace;
+                        // Variable content is between lastOpenBrace and closeBraceAbsoluteIndex
+                        var variableContent = template.Slice(lastOpenBrace + 1, closeBraceAbsoluteIndex - (lastOpenBrace + 1));
+
+                        // Debug: Indicate finding '}' and variable content
+                        // System.Diagnostics.Debug.WriteLine($"StringTemplate.TryParse: Found '}}' at absolute position {closeBraceAbsoluteIndex}. Variable content: '{{variableContent.ToString()}}'");
 
                         if (!TryParseVariableContent(variableContent, validationContext, out var varSegment, out error))
                         {
@@ -76,11 +91,13 @@ public record StringTemplate(IReadOnlyList<ITemplateSegment> Segments)
                             return false;
                         }
                         segments.Add(varSegment);
-                        consumed = variableContentEnd + 1; // Move past '}'
+                        consumed = closeBraceAbsoluteIndex + 1; // Move past '}'
                         lastOpenBrace = -1; // Reset state, look for literals again
                     }
                     else // No closing '}', syntax error
                     {
+                        // Debug: Indicate unmatched '{'
+                        // System.Diagnostics.Debug.WriteLine($"StringTemplate.TryParse: Unmatched '{{' at position {lastOpenBrace}.");
                         error = $"Syntax error: Unmatched '{{' starting at position {lastOpenBrace}.";
                         result = null;
                         return false;
@@ -325,12 +342,12 @@ public record StringTemplate(IReadOnlyList<ITemplateSegment> Segments)
         if (args == null)
         {   // --- No Args ---
             switch (transformName)
-            { 
-                 case "lower": transformation = new ToLowerTransform(); error = null; return true;
-                 case "upper": transformation = new ToUpperTransform(); error = null; return true;
-                 case "encode": transformation = new UrlEncodeTransform(); error = null; return true;
+            {
+                case "lower": transformation = new ToLowerTransform(); error = null; return true;
+                case "upper": transformation = new ToUpperTransform(); error = null; return true;
+                case "encode": transformation = new UrlEncodeTransform(); error = null; return true;
                  case "?": case "optional": transformation = new OptionalMarkerTransform(); error = null; return true;
-                 default:
+                default:
                     if (transformName == "map" || transformName == "or_var" || transformName == "default" || transformName == "equals" || transformName == "map_default") { error = $"Transformation '{transformName}' requires arguments in parentheses."; } else { error = $"Unknown transformation: '{transformName}'"; } transformation = null; return false;
             }
         }
@@ -340,6 +357,7 @@ public record StringTemplate(IReadOnlyList<ITemplateSegment> Segments)
             {
                  case "map": if (args.Count % 2 != 0) { error = $"'map' requires an even number of arguments. Found {args.Count}."; transformation = null; return false; } var mappings = new List<(string From, string To)>(args.Count / 2); for (int i = 0; i < args.Count; i += 2) { mappings.Add((args[i], args[i + 1])); } transformation = new MapTransform(mappings); error = null; return true;
                  case "or_var":
+                 case "or": // Alias for or_var
                      if (args.Count != 1) { error = $"'or_var' requires exactly one argument. Found {args.Count}."; transformation = null; return false; }
                      string fallbackVarName = args[0];
                      if (!IsValidTemplateVariableName(fallbackVarName)) { error = $"Invalid fallback variable name '{fallbackVarName}' in 'or_var'."; transformation = null; return false; }
@@ -351,21 +369,20 @@ public record StringTemplate(IReadOnlyList<ITemplateSegment> Segments)
                     if (args.Count == 0) { error = "'equals' requires at least one argument."; transformation = null; return false; }
                     // Arguments were already parsed using '|' delimiter
                     transformation = new EqualsTransform(args); error = null; return true;
-                 case "other":
-                     if (args.Count != 1) { error = $"'other' requires exactly one argument. Found {args.Count}."; transformation = null; return false; }
-                     transformation = new MapDefaultTransform(args[0]);
-                     error = null; return true;
-                 case "lower": case "upper": case "encode": case "?": case "optional": error = $"Transformation '{transformName}' does not accept arguments."; transformation = null; return false;
-                 default:
-                    if (transformName == "map" || transformName == "or_var" || transformName == "default" || transformName == "equals" || transformName == "other")
-                    {
-                         error = $"Transformation '{transformName}' requires arguments in parentheses.";
-                    }
-                    else
-                    {
-                         error = $"Unknown transformation: '{transformName}'";
-                    }
-                    transformation = null; return false;
+                 case "allow": // New: Maps to AllowTransform (placeholder)
+                     if (args.Count == 0) { error = "'allow' requires at least one argument."; transformation = null; return false; }
+                     transformation = new AllowTransform(args); error = null; return true;
+                 case "only": // New: Maps to OnlyTransform (placeholder)
+                     if (args.Count == 0) { error = "'only' requires at least one argument."; transformation = null; return false; }
+                     transformation = new OnlyTransform(args); error = null; return true;
+                 case "map_default": // New: Maps to MapDefaultTransform (placeholder)
+                     if (args.Count != 1) { error = "'map_default' requires exactly one argument."; transformation = null; return false; }
+                     transformation = new MapDefaultTransform(args[0]); error = null; return true;
+
+                default:
+                    error = $"Unknown transformation: '{transformName}'";
+                    transformation = null;
+                    return false;
             }
         }
     }
@@ -497,5 +514,39 @@ public record StringTemplate(IReadOnlyList<ITemplateSegment> Segments)
     private class TemplateParseException : Exception
     {
         public TemplateParseException(string message) : base(message) { }
+    }
+}
+
+// Placeholder for 'allow' transformation
+public class AllowTransform : ITransformation
+{
+    private readonly List<string> _allowedValues;
+    public AllowTransform(List<string> allowedValues) => _allowedValues = allowedValues;
+    public string? Apply(string? value, IDictionary<string, string> variables, EvaluationContext context)
+    {
+        // Placeholder: Actual logic needed
+        if (value == null || !_allowedValues.Contains(value, StringComparer.OrdinalIgnoreCase))
+        {
+             // If value is not in allowed list, treat as missing/null
+            return null;
+        }
+        return value;
+    }
+}
+
+// Placeholder for 'only' transformation
+public class OnlyTransform : ITransformation
+{
+    private readonly List<string> _allowedValues;
+     public OnlyTransform(List<string> allowedValues) => _allowedValues = allowedValues;
+    public string? Apply(string? value, IDictionary<string, string> variables, EvaluationContext context)
+    {
+        // Placeholder: Actual logic needed - similar to Allow but might behave differently
+         if (value == null || !_allowedValues.Contains(value, StringComparer.OrdinalIgnoreCase))
+        {
+             // If value is not in allowed list, treat as missing/null
+            return null;
+        }
+        return value;
     }
 }

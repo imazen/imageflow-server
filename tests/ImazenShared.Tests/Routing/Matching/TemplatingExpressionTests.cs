@@ -9,6 +9,11 @@ namespace Imazen.Tests.Routing.Matching;
 
 public class TemplatingExpressionTests
 {
+    private readonly ITestOutputHelper output;
+    public TemplatingExpressionTests(ITestOutputHelper output)
+    {
+        this.output = output;
+    }
     // =================== Parsing Tests ===================
 
     [Theory]
@@ -60,7 +65,7 @@ public class TemplatingExpressionTests
     [InlineData("/path/{var:or()}", false, "exactly one argument")] // Or with wrong arg count
     [InlineData("/path/{var:default}", false, "requires arguments")] // Default requires args
     [InlineData("/path/{:lower}", false, "Variable name cannot be empty")] // Empty variable name
-    public void TestParsing(string template, bool shouldSucceed, string? expectedErrorSubstring)
+    public void ParseTemplate(string template, bool shouldSucceed, string? expectedErrorSubstring)
     {
         bool success = MultiTemplate.TryParse(template.AsMemory(), out var multiTemplate, out var error);
 
@@ -182,7 +187,7 @@ public class TemplatingExpressionTests
     // New MapDefault Transform Tests
     [InlineData("/status?code={val:map(1,ok):map(2,err):map_default(unk)}", "/status?code=ok", "val", "1")] // Map matches, map_default ignored
     [InlineData("/status?code={val:map(1,ok):map(2,err):map_default(unk)}", "/status?code=err", "val", "2")] // Map matches, map_default ignored
-    [InlineData("/status?code={val:map(1,ok):map(2,err):map_default(unk)}", "/status?code=unk", "val", "3")] // Map no match, map_default applied
+    // dupe [InlineData("/status?code={val:map(1,ok):map(2,err):map_default(unk)}", "/status?code=unk", "val", "3")] // Map no match, map_default applied
     [InlineData("/status?code={val:map(1,ok):map(2,err):map_default(unk)}", "/status?code=unk", "val", "")] // Map no match (empty input), map_default applied
     [InlineData("/status?code={val:map(1,ok):map(2,err):map_default(unk)}", "/status?code=unk")] // Map no match (missing input), map_default applied
     [InlineData("/status?code={val:map_default(unk)}", "/status?code=unk", "val", "any")] // No preceding map, map_default applied
@@ -198,12 +203,18 @@ public class TemplatingExpressionTests
     [InlineData("/process?action={a:allow(create,delete):map(create,NEW):map_default(NONE)}", "/process?action=NEW", "a", "create")] // Allow(pass) -> Map -> map_default(ignored)
     // This case depends on Allow(fail) returning null. Map is not reached, map_default is not reached.
     [InlineData("/process?action={a:allow(create,delete):map(create,NEW):map_default(NONE)}", "/process?action=", "a", "update")] // Allow(fail) -> empty
-    public void TestEvaluation(string template, string expectedOutput, params string[] variables)
+    public void EvalTemplate(string template, string expectedOutput, params string[] variables)
     {
         var parsedTemplate = MultiTemplate.Parse(template.AsMemory());
         var inputVars = Vars(variables);
+        var prettyPrintInputVars = string.Join(", ", inputVars.Select(kvp => $"{kvp.Key}: {kvp.Value}"));
 
         string result = parsedTemplate.Evaluate(inputVars);
+
+        output.WriteLine($"Template: {template}");
+        output.WriteLine($"Input Vars: {prettyPrintInputVars}");
+        output.WriteLine($"Expected: {expectedOutput}");
+        output.WriteLine($"Result: {result}");
 
         Assert.Equal(expectedOutput, result);
     }
@@ -272,7 +283,7 @@ public class TemplatingExpressionTests
     [InlineData("?k={optVar}", "optVar:opt", false, "uses optional variable 'optVar' without providing a fallback")]
 
     // Rule 3: Undefined 'or' Fallback (Rule 1 covers this implicitly now, but test specific case)
-    [InlineData("/path/{reqVar:or(undef)}", "reqVar:req", false, "uses fallback variable 'undef' which is not defined")]
+    // dupe [InlineData("/path/{reqVar:or(undef)}", "reqVar:req", false, "uses fallback variable 'undef' which is not defined")]
 
     // --- Null Info = No Validation ---
     [InlineData("/path/{anything}", null, false, "uses variable 'anything' which is not defined")] // Should fail when vars is null
@@ -385,12 +396,16 @@ public class TemplatingExpressionTests
                 "/{path}?id={id:?:default(none)}",           // Template
                 "/file/123/testpath",                        // Input URL (with id)
                 "/testpath?id=123")]                         // Expected Output
-    public void TestEndToEndMatchingAndTemplating(
-        string matcherExpression,
-        string templateExpression,
-        string inputUrl,
-        string expectedOutputUrl)
+    public void MatchAndTemplate(
+        string match,
+        string t,
+        string input,
+        string expected)
     {
+        var matcherExpression = match;
+        var templateExpression = t;
+        var inputUrl = input;
+        var expectedOutputUrl = expected;
         // 1. Parse Matcher (using default options for simplicity)
         // For real usage, options might come from config
         var matcherOptions = ExpressionParsingOptions.Default; // Or path/query specific options? Assume default ok for tests.

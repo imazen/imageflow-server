@@ -3,104 +3,185 @@ using System.Linq;
 using Imazen.Abstractions.Resulting;
 using Imazen.Routing.Matching;
 using Xunit;
+using Imazen.Routing.Parsing;
+using System.Collections.Generic;
+using FluentAssertions;
+using sly.parser.generator;
+using sly.lexer;
+using sly.parser;
 
 namespace Imazen.Tests.Routing.Matching;
 
 public class MatchExpressionTests
 {
+    public static TheoryData<string, bool, string, string[]> TestAllData
+    {
+        get
+        {
+            var data = new TheoryData<string, bool, string, string[]>();
+            var theories = new List<(bool, string, string[])>
+            {
+                (true, "/{name}/{country}{:(/):?}", new[] { "/hi/usa", "/hi/usa/" }),
+                (true, "/{name}/{country:ends(/)}", new[] { "/hi/usa/" }),
+                (true, "{:int}", new[] { "-1300" }),
+                (false, "{:uint}", new[] { "-1300" }),
+                (true, "{:int:range(-1000,1000)}", new[] { "-1000", "1000" }),
+                (false, "{:int:range(-1000,1000)}", new[] { "-1001", "1001" }),
+                (true, "/{name}/{country:suffix(/)}", new[] { "/hi/usa/" }),
+                (true, "/{name}/{country}{:eq(/):optional}", new[] { "/hi/usa", "/hi/usa/" }),
+                (true, "/{name}/{country:len(3)}", new[] { "/hi/usa" }),
+                (true, "/{name}/{country:len(3)}/{state:len(2)}", new[] { "/hi/usa/CO" }),
+                (false, "/{name}/{country:length(3)}", new[] { "/hi/usa2" }),
+                (false, "/{name}/{country:length(3)}", new[] { "/hi/usa/" }),
+                (true, "/images/{seo_string_ignored}/{sku:guid}/{image_id:integer-range(0,1111111)}{width:integer:prefix(_):optional}.{format:equals(jpg|png|gif)}", new[] { "/images/seo-string/12345678-1234-1234-1234-123456789012/12678_300.jpg", "/images/seo-string/12345678-1234-1234-1234-123456789012/12678.png" })
+            };
+            foreach (var (success, exp, inputs) in theories)
+            {
+                data.Add("Old", success, exp, inputs);
+                data.Add("AST", success, exp, inputs);
+            }
+            return data;
+        }
+    }
     
     [Theory]
-    [InlineData(true, "/{name}/{country}{:(/):?}", "/hi/usa", "/hi/usa/")]
-    [InlineData(true, "/{name}/{country:ends(/)}", "/hi/usa/")]
-    [InlineData(true, "{:int}", "-1300")]
-    [InlineData(false, "{:uint}", "-1300")]
-    [InlineData(true, "{:int:range(-1000,1000)}", "-1000", "1000")]
-    [InlineData(false, "{:int:range(-1000,1000)}", "-1001", "1001")]
-    
-    [InlineData(true, "/{name}/{country:suffix(/)}", "/hi/usa/")]
-    [InlineData(true, "/{name}/{country}{:eq(/):optional}", "/hi/usa", "/hi/usa/")]
-    [InlineData(true, "/{name}/{country:len(3)}", "/hi/usa")]
-    [InlineData(true, "/{name}/{country:len(3)}/{state:len(2)}", "/hi/usa/CO")]
-    [InlineData(false, "/{name}/{country:length(3)}", "/hi/usa2")]
-    [InlineData(false, "/{name}/{country:length(3)}", "/hi/usa/")]
-    [InlineData(true, "/images/{seo_string_ignored}/{sku:guid}/{image_id:integer-range(0,1111111)}{width:integer:prefix(_):optional}.{format:equals(jpg|png|gif)}"
-        , "/images/seo-string/12345678-1234-1234-1234-123456789012/12678_300.jpg", "/images/seo-string/12345678-1234-1234-1234-123456789012/12678.png")]
-    
-    public void TestAll(bool m, string exp, params string[] inputs)
+    [MemberData(nameof(TestAllData))]
+    public void TestAll(string t, bool ok, string exp, params string[] inputs)
     {
-        var c = MatchingContext.Default;
-        var me = MultiValueMatcher.Parse(exp.AsMemory());
+        var parserType = t;
+        var expectedSuccess = ok;
+        var c = DefaultMatchingContext;
         foreach (var v in inputs)
         {
-            var matched = me.Match(c, v);
-            if (matched.Success && !m)
+            if (parserType == "Old")
             {
-                Assert.Fail($"False positive! Expression {exp} should not have matched {v}! False positive.");
+                var matcher = MultiValueMatcher.Parse(exp.AsMemory());
+                var result = matcher.Match(c, v);
+                if (result.Success == expectedSuccess) continue;
+                
+                var message = result.Success
+                    ? $"[{parserType}] False positive! Expression '{exp}' should not have matched '{v}'. Error: {result.Error}."
+                    : $"[{parserType}] Incorrect failure! Expression '{exp}' failed to match '{v}'. Error: {result.Error}";
+                Assert.Fail(message);
             }
-            if (!matched.Success && m)
+            else // AST
             {
-                Assert.Fail($"Expression {exp} incorrectly failed to match {v} with error {matched.Error}");
+                var result = EvaluateWithAst(exp, v, c);
+                if (result.Success == expectedSuccess) continue;
+                
+                var message = result.Success
+                    ? $"[{parserType}] False positive! Expression '{exp}' should not have matched '{v}'. Error: {result.Error}."
+                    : $"[{parserType}] Incorrect failure! Expression '{exp}' failed to match '{v}'. Error: {result.Error}";
+                Assert.Fail(message);
             }
         }
     }
-    [Theory]
-    [InlineData(true,"/{name:ends(y)}", "/cody", "name=cody")]
-    // ints
-    [InlineData(true, "{a:int}", "123", "a=123")]
-    [InlineData(true, "{a:int}", "-123", "a=-123")]
-    [InlineData(true, "{a:int}", "0", "a=0")]
-    [InlineData(true, "{a:u64}?k={v}", "123?k=h&a=b", "a=123&v=h", "a")]
-    [InlineData(true, "{a:u64}", "0", "a=0")]
-    [InlineData(false, "{:u64}", "-123", null)]
-    [InlineData(true, "/{name}/{country}{:eq(/):?}", "/hi/usa", "name=hi&country=usa")]
-    [InlineData(true, "/{name}/{country}{:(/):?}",  "/hi/usa/", "name=hi&country=usa")]
-    [InlineData(true, "/{name}/{country}{:eq(/):optional}", "/hi/usa", "name=hi&country=usa")]
-    [InlineData(true, "/{name}/{country:len(3)}", "/hi/usa", "name=hi&country=usa")]
-    [InlineData(true, "/{name}/{country:len(3)}/{state:len(2)}", "/hi/usa/CO", "name=hi&country=usa&state=CO")]
-    [InlineData(true, "{country:len(3)}{state:len(2)}", "USACO", "country=USA&state=CO")]
-    [InlineData(true, "/images/{seo_string_ignored}/{sku:guid}/{image_id:integer-range(0,1111111)}{width:integer:prefix(_):optional}.{format:equals(jpg|png|gif)}"
-        , "/images/seo-string/12345678-1234-1234-1234-123456789012/12678_300.jpg", "seo_string_ignored=seo-string&sku=12345678-1234-1234-1234-123456789012&image_id=12678&width=300&format=jpg")]
-    [InlineData(true, "/images/{seo_string_ignored}/{sku:guid}/{image_id:integer-range(0,1111111)}{width:integer:prefix(_):optional}.{format:equals(jpg|png|gif)}"
-        , "/images/seo-string/12345678-1234-1234-1234-123456789012/12678.jpg", "seo_string_ignored=seo-string&sku=12345678-1234-1234-1234-123456789012&image_id=12678&format=jpg")]
-    [InlineData(true, "/{dir}/{file}.{ext}", "/path/file.txt", "dir=path&file=file&ext=txt")]
-    [InlineData(true, "/{dir}/{file:**}.{ext}", "/path/to/nested/dir/file.txt", "dir=path&file=to/nested/dir/file&ext=txt")]
-    public void TestCaptures(bool m, string expr, string input, string? expectedCaptures, string? excessKeys = null)
+    
+    
+    public static TheoryData<string, bool, string, string, string?, string?> TestCapturesData
     {
-        var me = MultiValueMatcher.Parse(expr.AsMemory());
-        var result = me.Match(MatchingContext.Default, input);
-        
-        if (!result.Success && m)
+        get
         {
-            Assert.Fail($"{expr} failed to match '{input}' with error: {result.Error}");
-        }
-        if (result.Success && !m)
-        {
-            var captureString = result!.Captures == null ? "null" : string.Join("&", result!.Captures.Select(x => $"{x.Key}={x.Value}"));
-            Assert.Fail($"False positive! {expr} should NOT have matched {input} with captures {captureString} and excess query keys {string.Join(",",result.ExcessQueryKeys ?? [])}");
-        }
-        if (expectedCaptures == null)
-        {
-            return;
-        }
-
-        if (result.Success)
-        {
-            var expectedPairs = Imazen.Routing.Helpers.PathHelpers.ParseQuery(expectedCaptures)!
-                .ToDictionary(x => x.Key, x => x.Value.ToString());
-
-            var actualPairs = result!.Captures!
-                .ToDictionary(x => x.Key, x => x.Value.ToString());
-
-            Assert.Equal(expectedPairs, actualPairs);
+            var data = new TheoryData<string, bool, string, string, string?, string?>();
+            var theories = new List<(bool, string, string, string?, string?)>
+            {
+                (true,"/{name:ends(y)}", "/cody", "name=cody", null),
+                // ints
+                (true, "{a:int}", "123", "a=123", null),
+                (true, "{a:int}", "-123", "a=-123", null),
+                (true, "{a:int}", "0", "a=0", null),
+                (true, "{a:u64}?k={v}", "123?k=h&a=b", "a=123&v=h", "a"),
+                (true, "{a:u64}", "0", "a=0", null),
+                (false, "{:u64}", "-123", null, null),
+                (true, "/{name}/{country}{:eq(/):?}", "/hi/usa", "name=hi&country=usa", null),
+                (true, "/{name}/{country}{:eq(/):?}",  "/hi/usa/", "name=hi&country=usa", null),
+                (true, "/{name}/{country:len(3)}", "/hi/usa", "name=hi&country=usa", null),
+                (true, "/{name}/{country:len(3)}/{state:len(2)}", "/hi/usa/CO", "name=hi&country=usa&state=CO", null),
+                (true, "{country:len(3)}{state:len(2)}", "USACO", "country=USA&state=CO", null),
+                (true, "/images/{seo_string_ignored}/{sku:guid}/{image_id:integer-range(0,1111111)}{width:integer:prefix(_):optional}.{format:equals(jpg|png|gif)}", "/images/seo-string/12345678-1234-1234-1234-123456789012/12678_300.jpg", "seo_string_ignored=seo-string&sku=12345678-1234-1234-1234-123456789012&image_id=12678&width=300&format=jpg", null),
+                (true, "/images/{seo_string_ignored}/{sku:guid}/{image_id:integer-range(0,1111111)}{width:integer:prefix(_):optional}.{format:equals(jpg|png|gif)}", "/images/seo-string/12345678-1234-1234-1234-123456789012/12678.jpg", "seo_string_ignored=seo-string&sku=12345678-1234-1234-1234-123456789012&image_id=12678&format=jpg", null),
+                (true, "/{dir}/{file}.{ext}", "/path/file.txt", "dir=path&file=file&ext=txt", null),
+                (true, "/{dir}/{file:**}.{ext}", "/path/to/nested/dir/file.txt", "dir=path&file=to/nested/dir/file&ext=txt", null)
+            };
             
-            // Check excess keys
+            foreach (var (success, expr, input, captures, keys) in theories)
+            {
+                data.Add("Old", success, expr, input, captures, keys);
+                data.Add("AST", success, expr, input, captures, keys);
+            }
+            return data;
+        }
+    }
+    [Theory]
+    [MemberData(nameof(TestCapturesData))]
+    public void TestCaptures(string t, bool ok, string expr, string input, string? expectedCapturesString, string? excessKeys = null)
+    {
+        var parserType = t;
+        var expectedSuccess = ok;
+        if (parserType == "Old")
+        {
+            var matcher = MultiValueMatcher.Parse(expr.AsMemory());
+            var result = matcher.Match(DefaultMatchingContext, input);
+
+            if (result.Success != expectedSuccess)
+            {
+                var message = result.Success
+                    ? $"[{parserType}] False positive! Expression '{expr}' should NOT have matched '{input}'."
+                    : $"[{parserType}] Incorrect failure! Expression '{expr}' failed to match '{input}'. Error: {result.Error}";
+                Assert.Fail(message);
+            }
+            if (!result.Success) return;
+
+            Dictionary<string, string>? expectedPairs =
+                expectedCapturesString is null
+                    ? null
+                    : Imazen.Routing.Helpers.PathHelpers.ParseQuery(expectedCapturesString)!
+                        .ToDictionary(x => x.Key, x => x.Value.ToString());
+
+            if (expectedPairs != null)
+            {
+                var actualPairs = result!.Captures!
+                    .ToDictionary(x => x.Key, x => x.Value.ToString());
+                actualPairs.Should().BeEquivalentTo(expectedPairs);
+            }
+
             if (excessKeys != null)
             {
                 var expectedExcessKeys = excessKeys.Split(',');
                 Assert.Equal(expectedExcessKeys, result.ExcessQueryKeys);
             }
         }
+        else // AST
+        {
+            var result = EvaluateWithAst(expr, input, DefaultMatchingContext);
 
+            if (result.Success != expectedSuccess)
+            {
+                var message = result.Success
+                    ? $"[{parserType}] False positive! Expression '{expr}' should NOT have matched '{input}'."
+                    : $"[{parserType}] Incorrect failure! Expression '{expr}' failed to match '{input}'. Error: {result.Error}";
+                Assert.Fail(message);
+            }
+
+            if (!result.Success) return;
+
+            Dictionary<string, string>? expectedPairs =
+                expectedCapturesString is null
+                    ? null
+                    : Imazen.Routing.Helpers.PathHelpers.ParseQuery(expectedCapturesString)!
+                        .ToDictionary(x => x.Key, x => x.Value.ToString());
+
+            if (expectedPairs != null)
+            {
+                (result.Captures ?? new Dictionary<string, string>()).Should().BeEquivalentTo(expectedPairs,
+                    because: $"[{parserType}] captures for '{expr}' on '{input}' should match.");
+            }
+            else
+            {
+                Assert.True(result.Captures == null || result.Captures.Count == 0,
+                    $"[{parserType}] captures should be empty when no captures expected.");
+            }
+        }
     }
     [Theory]
     [InlineData("{name:starts(foo):ends(bar)?}", false)]
@@ -273,6 +354,68 @@ public class MatchExpressionTests
         }
     }
     
-     
+    
+    private static readonly MatchingContext DefaultMatchingContext = MatchingContext.Default;
+
+    private static readonly Lazy<Imazen.Routing.Parsing.ImazenRoutingParser> ParserHost = new(() => new ImazenRoutingParser());
+    private static readonly Lazy<Parser<ImazenRoutingToken, IAstNode>> AstParser = new(() =>
+    {
+        var builder = new ParserBuilder<ImazenRoutingToken, IAstNode>();
+        var buildResult = builder.BuildParser(ParserHost.Value, ParserType.EBNF_LL_RECURSIVE_DESCENT, "root");
+        if (buildResult.IsError)
+        {
+            var allBuildErrors = string.Join("; ", buildResult.Errors.Select(e => e.Message));
+            throw new InvalidOperationException($"AST Parser build failed: {allBuildErrors}");
+        }
+        return buildResult.Result;
+    });
+    
+    private (bool Success, Dictionary<string, string>? Captures, string? Error) EvaluateWithAst(
+        string expressionString,
+        string inputString,
+        MatchingContext matchingContext)
+    {
+        var flagParseSuccess = ExpressionFlags.TryParseFromEnd(expressionString.AsMemory(),
+            out var expressionWithoutFlags, out var astFlagStrings, out var flagError);
+        if (!flagParseSuccess)
+        {
+            return (false, null, $"Flag Parser error: {flagError}");
+        }
+        
+        var astParsingOptions = new Imazen.Routing.Matching.ParsingOptions();
+        
+        var astParser = AstParser.Value;
+        
+        // 3. Parse the expression string (without flags) to get the AST
+        // var astParseResult = UnifiedExpressionParser.TryParse(expressionWithoutFlags.ToString(), ParseMode.Matching);
+        var astParseResult = astParser.Parse(expressionWithoutFlags.ToString());
+
+        if (astParseResult.IsError || (astParseResult.Errors != null && astParseResult.Errors.Any()) || astParseResult.Result == null)
+        {
+            // Combine all parse errors for a more complete diagnostic message
+            string allParseErrors = string.Join("; ", astParseResult.Errors?.Select(e => e.ErrorMessage) ?? new List<string>());
+            if (string.IsNullOrEmpty(allParseErrors) && astParseResult.IsError) allParseErrors = "Unknown parsing error."; // Fallback if Errors list is empty but IsError is true
+            return (false, null, $"AST Parser error: {allParseErrors}");
+        }
+
+        var astRootNode = astParseResult.Result as Expression;
+        if (astRootNode == null)
+        {
+            return (false, null, "AST parsing succeeded but result is not an Expression node.");
+        }
+
+        var astEvaluator = new MatcherAstEvaluator(astRootNode, matchingContext, astParsingOptions);
+        
+        var astMatchResult = astEvaluator.Match(inputString.AsMemory());
+
+        Dictionary<string, string>? astCaptures = null;
+        if (astMatchResult.Captures != null)
+        {
+            astCaptures = astMatchResult.Captures.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToString());
+        }
+
+        return (astMatchResult.Success, astCaptures, astMatchResult.Error);
+    }
+    
 
 }

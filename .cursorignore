@@ -19,3 +19,5 @@ packages/
 *.map
 *.min.js
 *.js
+
+!external/

@@ -120,18 +120,21 @@ public class ImazenRoutingParser
 
     // --- Variable Segment (Simplified) ---
     [Production("variableSegment : LBRACE IDENTIFIER (COLON modifierList)? RBRACE")] // Simplified: name, optional colon + modifiers
-    public VariableSegment VariableSeg(Token<ImazenRoutingToken> lb, Token<ImazenRoutingToken> nameToken, ValueOption<Group<Token<ImazenRoutingToken>, IAstNode>> colonAndModifiers, Token<ImazenRoutingToken> rb)
+    public VariableSegment VariableSeg(Token<ImazenRoutingToken> lb, Token<ImazenRoutingToken> nameToken, ValueOption<Group<ImazenRoutingToken, IAstNode>> colonAndModifiers, Token<ImazenRoutingToken> rb)
     {
         var modifiers = new List<IModifier>();
-        if (colonAndModifiers.IsSome) {
-             // colonAndModifiers.Value is Group<COLON, modifierList_node>
-             // modifierList_node is IAstNode (ModifierListAstNode)
-            var modifierListNode = colonAndModifiers.Value.Value as ModifierListAstNode; 
-            if (modifierListNode != null) modifiers.AddRange(modifierListNode.Modifiers);
-        }
+        colonAndModifiers.Match(
+            some: group => {
+                // group.Value(1) should be the modifierList IAstNode
+                if (group.Value(1) is ModifierListAstNode modifierListNode) {
+                    modifiers.AddRange(modifierListNode.Modifiers);
+                }
+                return group;
+            },
+            none: () => null
+        );
         return new VariableSegment(nameToken.Value, modifiers);
     }
-
     // --- Flag Part (Simplified, no commas) ---
     [Production("flagPart : LSQUARE flagList? RSQUARE")]
     public FlagList FlagPartProduction(Token<ImazenRoutingToken> lsq, ValueOption<FlagList> list, Token<ImazenRoutingToken> rsq)
@@ -162,7 +165,7 @@ public class ImazenRoutingParser
         {
             allModifiers.AddRange(rest.Select(g => g.Item2));
         }
-        var allModifiers = modifierAstNodes.Cast<IModifier>().ToList();
+        //var allModifiers = modifierAstNodes.Cast<IModifier>().ToList();
         return new ModifierListAstNode(allModifiers);
     }
     

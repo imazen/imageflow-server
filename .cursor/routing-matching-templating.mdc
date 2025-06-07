@@ -4,7 +4,7 @@ globs: *.cs
 alwaysApply: false
 ---
 
-Okay, here is a consolidated document outlining the design principles, rules, implementation steps, and testing strategy for the URL templating system, ensuring alignment with the existing matching system.
+Okay, here is a consolidated document outlining the design principles, rules, implementation steps, and testing strategy for the URL templating system, ensuring alignment with the existing matching system. 
 
 ## I. Matching System Design Principles (Reference)
 
@@ -12,7 +12,7 @@ To ensure consistency, the templating system should adhere to the core design pr
 
 1.  **Performance Focus:** The primary goal is extremely fast execution *after* parsing. Matching is O(n) in the length of the path and non-backtracking. Parsed templates should allow for similarly efficient evaluation.
 2.  **Explicit Syntax:** The syntax uses clear delimiters (`{`, `}`), separators (`:`, `?`), and keywords (`int`, `guid`, `starts`, `ends`, `map`, `default`, etc.) for conditions and variables. Templating should follow this explicit style.
-3.  **Segment-Based Processing:** Matching breaks the input path into segments based on boundary conditions (`equals`, `prefix`, `suffix`, `len`, `/`, `.`). While templating builds strings rather than segmenting input, the concept of distinct literal and variable parts remains relevant.
+3.  **Segment-Based Processing:** Matching breaks the input path into segments based on boundary conditions (`equals`, `prefix`, starts, `suffix`, ends, `len`,  segments that end when the next 'literal' starts). While templating builds strings rather than segmenting input, the concept of distinct literal and variable parts remains relevant.
 4.  **Separation of Concerns:**
     *   **Boundary Matching vs. Validation:** Matching distinguishes between conditions that define segment boundaries (affecting capture) and those that validate content *after* segmentation. Templating doesn't segment input, but transformations operate on captured values.
     *   **Path vs. Query:** Matching can handle paths and query strings distinctly (unless `[raw]` is used). Templating should also distinctly handle path, query key, and query value construction.
@@ -213,4 +213,6 @@ Create comprehensive unit tests covering:
     *   Templates containing only literals or only variables.
 8.  **Runtime Errors:**
     *   Test evaluation fails if a required variable is missing from the input dictionary (when not handled by `:or` or `:default`).
+
+Note that a unified lexer+parser is under development for both matching and templating systems.
 

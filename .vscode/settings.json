@@ -17,5 +17,8 @@
     "debug.internalConsoleOptions": "neverOpen",
     "azureFunctions.preDeployTask": "publish (functions)",
     "azureFunctions.projectSubpath": "src\\Imageflow.Server.AzureFunctions",
-\
+    "csharp.lsp.enable": true,
+    
+    "dotnet.testExplorer.testProjectPath": "tests\\**\\**\\*Tests.csproj"
+      
 }
