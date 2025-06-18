@@ -23,9 +23,9 @@ jobs:
             os: ubuntu-latest
             cache_dependencies: true
             
-#          - name: ubuntu-24.04-arm
-#            os: ubuntu-24.04-arm64
-#            cache_dependencies: true
+          - name: ubuntu-24-arm-16gb
+            os: ubuntu-24-arm-16gb #our imazen large runner
+            cache_dependencies: true
           
           - name: macos-13-x86_64
             os: macos-13
@@ -94,6 +94,7 @@ jobs:
       
     - name: Setup .NET 6,8
       uses: actions/setup-dotnet@v4
+      
       with:
         dotnet-version: "6\n8\n"
         
