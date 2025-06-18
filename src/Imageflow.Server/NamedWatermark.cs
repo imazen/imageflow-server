@@ -1,6 +1,8 @@
+using System;
+using System.Collections.Generic;
 using System.IO;
 using Imageflow.Fluent;
-using Newtonsoft.Json;
+using System.Text.Json;
 
 namespace Imageflow.Server
 {
@@ -18,20 +20,14 @@ namespace Imageflow.Server
         public WatermarkOptions Watermark { get; }
         
         
-        private string serialized;
+        private readonly string[] serialized;
 
-        internal string Serialized()
+        internal IEnumerable<string> Serialized()
         {
             if (serialized != null) return serialized;
-            using var writer = new StringWriter();
-            writer.WriteLine(Name);
-            writer.WriteLine(VirtualPath);
-            JsonSerializer.Create().Serialize(writer, Watermark.ToImageflowDynamic(0));
-
-
-            writer.Flush(); //Required or no bytes appear
-            serialized = writer.ToString();
-            return serialized;
+            var bytes = JsonSerializer.SerializeToUtf8Bytes(Watermark.ToImageflowDynamic(0));
+            var json64 = Convert.ToBase64String(bytes);
+            return new[] { Name, VirtualPath, json64 };
         }
     }
 }

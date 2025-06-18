@@ -339,7 +339,7 @@ namespace Imageflow.Server
         {
             if (serializedWatermarkConfigs != null) return serializedWatermarkConfigs;
             if (appliedWatermarks == null) return Enumerable.Empty<string>();
-            serializedWatermarkConfigs = appliedWatermarks.Select(w => w.Serialized()).ToArray();
+            serializedWatermarkConfigs = appliedWatermarks.SelectMany(w => w.Serialized()).ToArray();
             return serializedWatermarkConfigs;
         }
 

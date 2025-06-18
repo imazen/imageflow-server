@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net6.0</TargetFramework>
+        <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
         <Title>Imageflow.Server.HybridCache - Plugin for caching processed images to disk while limiting the overall cache size.</Title>
         <Description>Imageflow.Server plugin for caching processed images to a limit amount of space on disk.</Description>
         <IsPackable>true</IsPackable>

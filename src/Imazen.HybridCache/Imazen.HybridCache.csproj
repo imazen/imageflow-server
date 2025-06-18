@@ -4,7 +4,7 @@
         <Title>Imageflow.HybridCache - Modern disk caching system with write-ahead-logs and strict cache size limiting.</Title>
         <Description>Imageflow.HybridCache - Modern disk caching system with write-ahead-logs and strict cache size limiting</Description>
         <IsPackable>true</IsPackable>
-        <TargetFrameworks>net472;netstandard2.0</TargetFrameworks>
+        <TargetFrameworks>net472;netstandard2.0;net8.0</TargetFrameworks>
     </PropertyGroup>
 
     <Import Project="..\NugetPackages.targets" />
