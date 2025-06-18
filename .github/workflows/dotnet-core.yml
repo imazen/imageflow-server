@@ -30,14 +30,14 @@ jobs:
     runs-on: ${{matrix.os}}
     steps:     
     - uses: actions/checkout@v4
-    - uses: actions/cache@v3
+    - uses: actions/cache@v4
       id: cache
       with:
         path: ~/.nuget/packages
         key: ${{ runner.os }}-nuget-breaker3-${{ hashFiles('**/packages.lock.json') }}
       if: matrix.cache_dependencies
         
-    - uses: nowsprinting/check-version-format-action@v3
+    - uses: nowsprinting/check-version-format-action@v4
       id: version
       with:
         prefix: 'v'
@@ -116,7 +116,7 @@ jobs:
 
     # Upload the publish folder for src/Imageflow.Server.Host to the release artifacts
     - name: Upload Imageflow.Server.Host to artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: success()
       with:
         name: ${{env.HOST_ZIP_FILE}}
