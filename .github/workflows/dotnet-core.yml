@@ -14,13 +14,29 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: ubuntu-20.04
-            os: ubuntu-20.04
+          - name: ubuntu-24.04
+            os: ubuntu-24.04
             uploader: true
             cache_dependencies: true
             
-          - name: osx_11.0-x86_64
-            os: macos-11.0
+          - name: ubuntu-latest
+            os: ubuntu-latest
+            uploader: true
+            cache_dependencies: true
+            
+          - name: ubuntu-22.04-arm
+            os: ubuntu-22.04-arm64
+            
+          - name: macos-13-x86_64
+            os: macos-13
+            cache_dependencies: true
+            
+          - name: macos-14-arm
+            os: macos-14
+            cache_dependencies: true                    
+
+          - name: windows-11-arm
+            os: windows-11-arm
             cache_dependencies: true
             
           - name: win-x86_64
@@ -75,11 +91,11 @@ jobs:
         dotnet --list-sdks >> $GITHUB_ENV
         echo "EOF" >> $GITHUB_ENV
       
-    - name: Setup .NET 6,8,9
-      uses: actions/setup-dotnet@v3
-      if:  contains(env.DOTNET_VERSION_LIST, '9.0.') == 'false' || contains(env.DOTNET_VERSION_LIST, '8.0.') == 'false' || contains(env.DOTNET_VERSION_LIST, '6.0.') == 'false'
+    - name: Setup .NET 6,8
+      uses: actions/setup-dotnet@v4
+      if:  contains(env.DOTNET_VERSION_LIST, '8.0.') == 'false' || contains(env.DOTNET_VERSION_LIST, '6.0.') == 'false'
       with:
-        dotnet-version: "6\n8\n9\n"
+        dotnet-version: "6\n8\n"
         
     - name: Clear & clean on release or cache miss
       run: |
