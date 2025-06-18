@@ -14,19 +14,19 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: ubuntu-24.04
-            os: ubuntu-24.04
+          - name: ubuntu-22.04
+            os: ubuntu-22.04
             uploader: true
             cache_dependencies: true
             
           - name: ubuntu-latest
             os: ubuntu-latest
-            uploader: true
             cache_dependencies: true
             
-          - name: ubuntu-22.04-arm
-            os: ubuntu-22.04-arm64
-            
+          - name: ubuntu-24.04-arm
+            os: ubuntu-24.04-arm64
+            cache_dependencies: true
+          
           - name: macos-13-x86_64
             os: macos-13
             cache_dependencies: true
@@ -90,6 +90,7 @@ jobs:
         echo "DOTNET_VERSION_LIST<<EOF" >> $GITHUB_ENV
         dotnet --list-sdks >> $GITHUB_ENV
         echo "EOF" >> $GITHUB_ENV
+        dotnet --list-sdks
       
     - name: Setup .NET 6,8
       uses: actions/setup-dotnet@v4
