@@ -23,9 +23,9 @@ jobs:
             os: ubuntu-latest
             cache_dependencies: true
             
-          - name: ubuntu-24.04-arm
-            os: ubuntu-24.04-arm64
-            cache_dependencies: true
+#          - name: ubuntu-24.04-arm
+#            os: ubuntu-24.04-arm64
+#            cache_dependencies: true
           
           - name: macos-13-x86_64
             os: macos-13
@@ -84,7 +84,7 @@ jobs:
         echo Set HOST_ZIP_FILE to ${{ env.HOST_ZIP_FILE }}
       shell: bash
 
-    - name: Check .NET versions available to see if we can skip install
+    - name: Check .NET versions available 
       shell: bash
       run: |
         echo "DOTNET_VERSION_LIST<<EOF" >> $GITHUB_ENV
@@ -94,7 +94,6 @@ jobs:
       
     - name: Setup .NET 6,8
       uses: actions/setup-dotnet@v4
-      if:  contains(env.DOTNET_VERSION_LIST, '8.0.') == 'false' || contains(env.DOTNET_VERSION_LIST, '6.0.') == 'false'
       with:
         dotnet-version: "6\n8\n"
         
