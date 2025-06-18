@@ -46,12 +46,22 @@ jobs:
     runs-on: ${{matrix.os}}
     steps:     
     - uses: actions/checkout@v4
-    - uses: actions/cache@v4
-      id: cache
+      
+    - name: Check .NET versions available
+      shell: bash
+      run: |
+        echo "DOTNET_VERSION_LIST<<EOF" >> $GITHUB_ENV
+        dotnet --list-sdks >> $GITHUB_ENV
+        echo "EOF" >> $GITHUB_ENV
+        dotnet --list-sdks
+
+    - name: Setup .NET 6,8
+      uses: actions/setup-dotnet@v4
       with:
-        path: ~/.nuget/packages
-        key: ${{ runner.os }}-nuget-breaker3-${{ hashFiles('**/packages.lock.json') }}
-      if: matrix.cache_dependencies
+        cache: ${{ matrix.cache_dependencies }}
+        dotnet-version: |
+          6.x
+          8.x
         
     - uses: nowsprinting/check-version-format-action@v4
       id: version
@@ -84,20 +94,7 @@ jobs:
         echo Set HOST_ZIP_FILE to ${{ env.HOST_ZIP_FILE }}
       shell: bash
 
-    - name: Check .NET versions available to see if we can skip install
-      shell: bash
-      run: |
-        echo "DOTNET_VERSION_LIST<<EOF" >> $GITHUB_ENV
-        dotnet --list-sdks >> $GITHUB_ENV
-        echo "EOF" >> $GITHUB_ENV
-        dotnet --list-sdks
-      
-    - name: Setup .NET 6,8
-      uses: actions/setup-dotnet@v4
-      if:  contains(env.DOTNET_VERSION_LIST, '8.0.') == 'false' || contains(env.DOTNET_VERSION_LIST, '6.0.') == 'false'
-      with:
-        dotnet-version: "6\n8\n"
-        
+
     - name: Clear & clean on release or cache miss
       run: |
         dotnet clean --configuration Release
