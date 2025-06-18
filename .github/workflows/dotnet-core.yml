@@ -112,7 +112,7 @@ jobs:
     - name: Test
       run: dotnet test -c Release --blame --no-build
 
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       if: failure()
       with:
         name: TestResults-${{matrix.os}}-${{ env.ARTIFACT_VERSION }}
@@ -123,7 +123,7 @@ jobs:
 
     # Zip the contents of folder host/publish/ into host/Imageflow.Server.Host-${{matrix.os}}-${{ env.ARTIFACT_VERSION }}.zip
     - name: Zip Server.Host
-      uses: thedoctor0/zip-release@0.7.1
+      uses: thedoctor0/zip-release@0.7.6
       with:
         type: 'zip'
         directory: 'host/publish/'
@@ -140,15 +140,16 @@ jobs:
 
     # If this is a release, upload it to the github release page using the git
     - name: Upload Imageflow.Server.Host to release
-      uses: Shopify/upload-to-release@v1.0.1
+      uses: xresloader/upload-to-github-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       if: steps.version.outputs.is_valid == 'true' && github.event_name == 'release'
       with:
-        name: ${{env.HOST_ZIP_FILE}}
-        path: host/${{env.HOST_ZIP_FILE}}
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-        content-type: application/zip
-      
-      
+        file: "host/${{env.HOST_ZIP_FILE}}"
+        tags: true
+        overwrite: true
+        verbose: true
+        
     - name: Pack
       run: dotnet pack -c Release --include-source
 
