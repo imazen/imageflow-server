@@ -24,12 +24,12 @@ jobs:
             cache_dependencies: true
             
           - name: win-x86_64
-            os: windows-latest
+            os: windows-2022 #2022 is the last version with net472
             cache_dependencies: false
 
     runs-on: ${{matrix.os}}
     steps:     
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: actions/cache@v3
       id: cache
       with:
@@ -75,14 +75,12 @@ jobs:
         dotnet --list-sdks >> $GITHUB_ENV
         echo "EOF" >> $GITHUB_ENV
       
-    - name: Setup .NET 6.0.x and 7.0.x
-      uses: actions/setup-dotnet@v2
-      if: contains(env.DOTNET_VERSION_LIST, '6.0') == 'false' || contains(env.DOTNET_VERSION_LIST, '7.0.') == 'false'
+    - name: Setup .NET 6,8,9
+      uses: actions/setup-dotnet@v3
+      if:  contains(env.DOTNET_VERSION_LIST, '9.0.') == 'false' || contains(env.DOTNET_VERSION_LIST, '8.0.') == 'false' || contains(env.DOTNET_VERSION_LIST, '6.0.') == 'false'
       with:
-        dotnet-version: |
-          6
-          7
-
+        dotnet-version: "6\n8\n9\n"
+        
     - name: Clear & clean on release or cache miss
       run: |
         dotnet clean --configuration Release
