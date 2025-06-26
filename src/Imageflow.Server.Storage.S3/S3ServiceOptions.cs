@@ -3,14 +3,12 @@ using System.Collections.Generic;
 using Amazon;
 using Amazon.Runtime;
 using Amazon.S3;
-using Imageflow.Server.Storage.S3.Caching;
 
 namespace Imageflow.Server.Storage.S3
 {
     public class S3ServiceOptions
     {
         internal readonly List<PrefixMapping> Mappings = new List<PrefixMapping>();
-        internal readonly List<NamedCacheConfiguration> NamedCaches = new List<NamedCacheConfiguration>();
 
         public S3ServiceOptions MapPrefix(string prefix, string bucket)
             => MapPrefix(prefix, bucket, "");
@@ -76,16 +74,6 @@ namespace Imageflow.Server.Storage.S3
             return this;
         }
 
-        /// <summary>
-        /// Adds a named cache location to the S3Service. This allows you to use the same S3Service instance to provide persistence for caching result images.
-        /// You must also ensure that the bucket is located in the same AWS region as the Imageflow Server, that is uses S3 Standard, and that it is not publicly accessible. 
-        /// </summary>
-        /// <param name="namedCacheConfiguration"></param>
-        /// <returns></returns>
-        public S3ServiceOptions AddNamedCacheConfiguration(NamedCacheConfiguration namedCacheConfiguration)
-        {
-            NamedCaches.Add(namedCacheConfiguration);
-            return this;
-        }
+
     }
 }

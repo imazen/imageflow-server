@@ -3,17 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Amazon.S3;
-using Imageflow.Server.Storage.S3.Caching;
 using Imazen.Common.Storage;
-using Imazen.Common.Storage.Caching;
 using Microsoft.Extensions.Logging;
 
 namespace Imageflow.Server.Storage.S3
 {
-    public class S3Service : IBlobProvider, IDisposable, IBlobCacheProvider
+    public class S3Service : IBlobProvider, IDisposable
     {
         private readonly List<PrefixMapping> mappings = new List<PrefixMapping>();
-        private readonly List<S3BlobCache> namedCaches = new List<S3BlobCache>();
 
         private readonly IAmazonS3 s3client;
 
@@ -24,10 +21,7 @@ namespace Imageflow.Server.Storage.S3
             {
                 mappings.Add(m);
             }
-             foreach (var m in options.NamedCaches)
-            {
-                namedCaches.Add(new S3BlobCache(m, s3client, logger));
-            }
+
             //TODO: verify this sorts longest first
             mappings.Sort((a,b) => b.Prefix.Length.CompareTo(a.Prefix.Length));
         }
@@ -84,22 +78,7 @@ namespace Imageflow.Server.Storage.S3
             try { s3client?.Dispose(); } catch { }
         }
 
-        public bool TryGetCache(string name, out IBlobCache cache)
-        {
-            var c = namedCaches.FirstOrDefault(v => v.Name == name);
-            if (c != null)
-            {
-                cache = c;
-                return true;
-            }
-            cache = null;
-            return false;
-        }
 
-        public IEnumerable<string> GetCacheNames()
-        {
-            return namedCaches.Select(v => v.Name);
-        }
 
     }
 }

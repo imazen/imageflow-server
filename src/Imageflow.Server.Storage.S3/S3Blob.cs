@@ -2,11 +2,10 @@
 using System.IO;
 using Amazon.S3.Model;
 using Imazen.Common.Storage;
-using Imazen.Common.Storage.Caching;
 
 namespace Imageflow.Server.Storage.S3
 {
-    internal class S3Blob : IBlobData, IDisposable, ICacheBlobData, ICacheBlobDataExpiry
+    internal class S3Blob : IBlobData, IDisposable
     {
         private readonly GetObjectResponse response;
 

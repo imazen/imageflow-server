@@ -142,47 +142,6 @@ Imazen.Common.Storage.BlobMissingException
 Imazen.Common.Storage.BlobMissingException.BlobMissingException() -> void
 Imazen.Common.Storage.BlobMissingException.BlobMissingException(string! message) -> void
 Imazen.Common.Storage.BlobMissingException.BlobMissingException(string! message, System.Exception! inner) -> void
-Imazen.Common.Storage.Caching.BlobGroup
-Imazen.Common.Storage.Caching.BlobGroup.CacheEntry = 0 -> Imazen.Common.Storage.Caching.BlobGroup
-Imazen.Common.Storage.Caching.BlobGroup.CacheMetadata = 1 -> Imazen.Common.Storage.Caching.BlobGroup
-Imazen.Common.Storage.Caching.BlobGroup.Essential = 3 -> Imazen.Common.Storage.Caching.BlobGroup
-Imazen.Common.Storage.Caching.BlobGroup.SourceMetadata = 2 -> Imazen.Common.Storage.Caching.BlobGroup
-Imazen.Common.Storage.Caching.CacheBlobFetchResult
-Imazen.Common.Storage.Caching.CacheBlobFetchResult.CacheBlobFetchResult(Imazen.Common.Storage.Caching.ICacheBlobData! data, bool dataExists, int statusCode, string! statusMessage) -> void
-Imazen.Common.Storage.Caching.CacheBlobFetchResult.Data.get -> Imazen.Common.Storage.Caching.ICacheBlobData!
-Imazen.Common.Storage.Caching.CacheBlobFetchResult.DataExists.get -> bool
-Imazen.Common.Storage.Caching.CacheBlobFetchResult.Dispose() -> void
-Imazen.Common.Storage.Caching.CacheBlobFetchResult.StatusCode.get -> int
-Imazen.Common.Storage.Caching.CacheBlobFetchResult.StatusMessage.get -> string!
-Imazen.Common.Storage.Caching.CacheBlobPutOptions
-Imazen.Common.Storage.Caching.CacheBlobPutOptions.CacheBlobPutOptions() -> void
-Imazen.Common.Storage.Caching.CacheBlobPutResult
-Imazen.Common.Storage.Caching.CacheBlobPutResult.CacheBlobPutResult(int statusCode, string! statusMessage, bool success) -> void
-Imazen.Common.Storage.Caching.CacheBlobPutResult.StatusCode.get -> int
-Imazen.Common.Storage.Caching.CacheBlobPutResult.StatusMessage.get -> string!
-Imazen.Common.Storage.Caching.CacheBlobPutResult.Success.get -> bool
-Imazen.Common.Storage.Caching.IBlobCache
-Imazen.Common.Storage.Caching.IBlobCache.MayExist(Imazen.Common.Storage.Caching.BlobGroup group, string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
-Imazen.Common.Storage.Caching.IBlobCache.Put(Imazen.Common.Storage.Caching.BlobGroup group, string! key, Imazen.Common.Storage.IBlobData! data, Imazen.Common.Storage.Caching.ICacheBlobPutOptions! options, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Imazen.Common.Storage.Caching.ICacheBlobPutResult!>!
-Imazen.Common.Storage.Caching.IBlobCache.TryFetchBlob(Imazen.Common.Storage.Caching.BlobGroup group, string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Imazen.Common.Storage.Caching.ICacheBlobFetchResult!>!
-Imazen.Common.Storage.Caching.IBlobCacheProvider
-Imazen.Common.Storage.Caching.IBlobCacheProvider.GetCacheNames() -> System.Collections.Generic.IEnumerable<string!>!
-Imazen.Common.Storage.Caching.IBlobCacheProvider.TryGetCache(string! name, out Imazen.Common.Storage.Caching.IBlobCache! cache) -> bool
-Imazen.Common.Storage.Caching.IBlobCacheWithRenewals
-Imazen.Common.Storage.Caching.IBlobCacheWithRenewals.TryRenew(Imazen.Common.Storage.Caching.BlobGroup group, string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Imazen.Common.Storage.Caching.ICacheBlobPutResult!>!
-Imazen.Common.Storage.Caching.ICacheBlobData
-Imazen.Common.Storage.Caching.ICacheBlobDataExpiry
-Imazen.Common.Storage.Caching.ICacheBlobDataExpiry.EstimatedExpiry.get -> System.DateTimeOffset?
-Imazen.Common.Storage.Caching.ICacheBlobFetchResult
-Imazen.Common.Storage.Caching.ICacheBlobFetchResult.Data.get -> Imazen.Common.Storage.Caching.ICacheBlobData!
-Imazen.Common.Storage.Caching.ICacheBlobFetchResult.DataExists.get -> bool
-Imazen.Common.Storage.Caching.ICacheBlobFetchResult.StatusCode.get -> int
-Imazen.Common.Storage.Caching.ICacheBlobFetchResult.StatusMessage.get -> string!
-Imazen.Common.Storage.Caching.ICacheBlobPutOptions
-Imazen.Common.Storage.Caching.ICacheBlobPutResult
-Imazen.Common.Storage.Caching.ICacheBlobPutResult.StatusCode.get -> int
-Imazen.Common.Storage.Caching.ICacheBlobPutResult.StatusMessage.get -> string!
-Imazen.Common.Storage.Caching.ICacheBlobPutResult.Success.get -> bool
 Imazen.Common.Storage.IBlobData
 Imazen.Common.Storage.IBlobData.Exists.get -> bool?
 Imazen.Common.Storage.IBlobData.LastModifiedDateUtc.get -> System.DateTime?
