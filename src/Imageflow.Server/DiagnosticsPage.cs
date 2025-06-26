@@ -37,7 +37,8 @@ namespace Imageflow.Server
             this.blobProviders = blobProviders;
         }
 
-        public static bool MatchesPath(string path) => "/imageflow.debug".Equals(path, StringComparison.Ordinal);
+        public static bool MatchesPath(string path) => "/imageflow.debug".Equals(path, StringComparison.Ordinal) ||
+                                                       "/resizer.debug".Equals(path, StringComparison.Ordinal);
 
         private static bool IsLocalRequest(HttpContext context) =>
             context.Connection.RemoteIpAddress.Equals(context.Connection.LocalIpAddress) || 

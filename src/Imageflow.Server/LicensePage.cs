@@ -10,13 +10,14 @@ namespace Imageflow.Server
     internal class LicensePage
     {
         private readonly ImageflowMiddlewareOptions options;
-        
+
         internal LicensePage(ImageflowMiddlewareOptions options)
         {
             this.options = options;
         }
 
-        public bool MatchesPath(string path) => "/imageflow.license".Equals(path, StringComparison.Ordinal);
+        public bool MatchesPath(string path) => "/imageflow.license".Equals(path, StringComparison.Ordinal)
+                                                || "/resizer.license".Equals(path, StringComparison.Ordinal);
 
         public async Task Invoke(HttpContext context)
         {
