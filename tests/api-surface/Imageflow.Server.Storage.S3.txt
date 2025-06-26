@@ -1,0 +1,28 @@
+[assembly: Imazen.Common.Licensing.BuildDate("[removed]")]
+[assembly: Imazen.Common.Licensing.Commit("[removed]")]
+[assembly: System.Reflection.AssemblyMetadata("RepositoryUrl", "https://github.com/imazen/imageflow-server.git")]
+[assembly: System.Runtime.Versioning.TargetFramework(".NETStandard,Version=v2.0", FrameworkDisplayName=".NET Standard 2.0")]
+namespace Imageflow.Server.Storage.S3
+{
+    public class S3Service : Imazen.Common.Storage.IBlobProvider, System.IDisposable
+    {
+        public S3Service(Imageflow.Server.Storage.S3.S3ServiceOptions options, Amazon.S3.IAmazonS3 s3client, Microsoft.Extensions.Logging.ILogger<Imageflow.Server.Storage.S3.S3Service> logger) { }
+        public void Dispose() { }
+        public System.Threading.Tasks.Task<Imazen.Common.Storage.IBlobData> Fetch(string virtualPath) { }
+        public System.Collections.Generic.IEnumerable<string> GetPrefixes() { }
+        public bool SupportsPath(string virtualPath) { }
+    }
+    public static class S3ServiceExtensions
+    {
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddImageflowS3Service(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, Imageflow.Server.Storage.S3.S3ServiceOptions options) { }
+    }
+    public class S3ServiceOptions
+    {
+        public S3ServiceOptions() { }
+        public Imageflow.Server.Storage.S3.S3ServiceOptions MapPrefix(string prefix, string bucket) { }
+        public Imageflow.Server.Storage.S3.S3ServiceOptions MapPrefix(string prefix, string bucket, string blobPrefix) { }
+        public Imageflow.Server.Storage.S3.S3ServiceOptions MapPrefix(string prefix, string bucket, bool ignorePrefixCase, bool lowercaseBlobPath) { }
+        public Imageflow.Server.Storage.S3.S3ServiceOptions MapPrefix(string prefix, string bucket, string blobPrefix, bool ignorePrefixCase, bool lowercaseBlobPath) { }
+        public Imageflow.Server.Storage.S3.S3ServiceOptions MapPrefix(string prefix, Amazon.S3.IAmazonS3 s3Client, string bucket, string blobPrefix, bool ignorePrefixCase, bool lowercaseBlobPath) { }
+    }
+}

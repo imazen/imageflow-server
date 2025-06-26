@@ -1,0 +1,35 @@
+[assembly: Imazen.Common.Licensing.BuildDate("[removed]")]
+[assembly: Imazen.Common.Licensing.Commit("[removed]")]
+[assembly: System.Reflection.AssemblyMetadata("RepositoryUrl", "https://github.com/imazen/imageflow-server.git")]
+[assembly: System.Runtime.Versioning.TargetFramework(".NETStandard,Version=v2.0", FrameworkDisplayName=".NET Standard 2.0")]
+namespace Imageflow.Server.Storage.RemoteReader
+{
+    public class RemoteReaderBlob : Imazen.Common.Storage.IBlobData, System.IDisposable
+    {
+        public bool? Exists { get; }
+        public System.DateTime? LastModifiedDateUtc { get; }
+        public void Dispose() { }
+        public System.IO.Stream OpenRead() { }
+    }
+    public class RemoteReaderService : Imazen.Common.Storage.IBlobProvider
+    {
+        public RemoteReaderService(Imageflow.Server.Storage.RemoteReader.RemoteReaderServiceOptions options, Microsoft.Extensions.Logging.ILogger<Imageflow.Server.Storage.RemoteReader.RemoteReaderService> logger, System.Net.Http.IHttpClientFactory httpFactory) { }
+        public System.Threading.Tasks.Task<Imazen.Common.Storage.IBlobData> Fetch(string virtualPath) { }
+        public System.Collections.Generic.IEnumerable<string> GetPrefixes() { }
+        public bool SupportsPath(string virtualPath) { }
+        public static string EncodeAndSignUrl(string url, string key) { }
+    }
+    public static class RemoteReaderServiceExtensions
+    {
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddImageflowRemoteReaderService(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, Imageflow.Server.Storage.RemoteReader.RemoteReaderServiceOptions options) { }
+    }
+    public class RemoteReaderServiceOptions
+    {
+        public RemoteReaderServiceOptions() { }
+        public System.Func<System.Uri, string> HttpClientSelector { get; set; }
+        public bool IgnorePrefixCase { get; set; }
+        public string SigningKey { get; set; }
+        public System.Collections.Generic.IEnumerable<string> SigningKeys { get; set; }
+        public Imageflow.Server.Storage.RemoteReader.RemoteReaderServiceOptions AddPrefix(string prefix) { }
+    }
+}

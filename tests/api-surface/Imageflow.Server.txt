@@ -1,0 +1,124 @@
+[assembly: Imazen.Common.Licensing.BuildDate("[removed]")]
+[assembly: Imazen.Common.Licensing.Commit("[removed]")]
+[assembly: System.Reflection.AssemblyMetadata("RepositoryUrl", "https://github.com/imazen/imageflow-server.git")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Imageflow.Server.Tests")]
+[assembly: System.Runtime.Versioning.TargetFramework(".NETCoreApp,Version=v6.0", FrameworkDisplayName=".NET 6.0")]
+namespace Imageflow.Server
+{
+    public enum AccessDiagnosticsFrom
+    {
+        None = 0,
+        LocalHost = 1,
+        AnyHost = 2,
+    }
+    public enum EnforceLicenseWith
+    {
+        RedDotWatermark = 0,
+        Http422Error = 1,
+        Http402Error = 2,
+    }
+    public class ImageflowMiddleware
+    {
+        public ImageflowMiddleware(Microsoft.AspNetCore.Http.RequestDelegate next, Microsoft.AspNetCore.Hosting.IWebHostEnvironment env, System.Collections.Generic.IEnumerable<Microsoft.Extensions.Logging.ILogger<Imageflow.Server.ImageflowMiddleware>> logger, System.Collections.Generic.IEnumerable<Imazen.Common.Extensibility.ClassicDiskCache.IClassicDiskCache> diskCaches, System.Collections.Generic.IEnumerable<Imazen.Common.Extensibility.StreamCache.IStreamCache> streamCaches, System.Collections.Generic.IEnumerable<Imazen.Common.Storage.IBlobProvider> blobProviders, Imageflow.Server.ImageflowMiddlewareOptions options) { }
+        public System.Threading.Tasks.Task Invoke(Microsoft.AspNetCore.Http.HttpContext context) { }
+    }
+    public static class ImageflowMiddlewareExtensions
+    {
+        public static Microsoft.AspNetCore.Builder.IApplicationBuilder UseImageflow(this Microsoft.AspNetCore.Builder.IApplicationBuilder builder, Imageflow.Server.ImageflowMiddlewareOptions options) { }
+    }
+    public class ImageflowMiddlewareOptions
+    {
+        public ImageflowMiddlewareOptions() { }
+        public bool AllowCaching { get; set; }
+        public bool AllowDiskCaching { get; set; }
+        public bool ApplyDefaultCommandsToQuerylessUrls { get; set; }
+        public string DefaultCacheControlString { get; set; }
+        public Imageflow.Fluent.SecurityOptions JobSecurityOptions { get; set; }
+        public bool MapWebRoot { get; set; }
+        public System.Collections.Generic.IReadOnlyCollection<Imageflow.Server.PathMapping> MappedPaths { get; }
+        public string MyOpenSourceProjectUrl { get; set; }
+        public System.Collections.Generic.IReadOnlyCollection<Imageflow.Server.NamedWatermark> NamedWatermarks { get; }
+        public Imageflow.Server.RequestSignatureOptions RequestSignatureOptions { get; set; }
+        public bool UsePresetsExclusively { get; set; }
+        public Imageflow.Server.ImageflowMiddlewareOptions AddCommandDefault(string key, string value) { }
+        public Imageflow.Server.ImageflowMiddlewareOptions AddPostRewriteAuthorizationHandler(string pathPrefix, System.Func<Imageflow.Server.UrlEventArgs, bool> handler) { }
+        public Imageflow.Server.ImageflowMiddlewareOptions AddPreRewriteAuthorizationHandler(string pathPrefix, System.Func<Imageflow.Server.UrlEventArgs, bool> handler) { }
+        public Imageflow.Server.ImageflowMiddlewareOptions AddPreset(Imageflow.Server.PresetOptions preset) { }
+        public Imageflow.Server.ImageflowMiddlewareOptions AddRewriteHandler(string pathPrefix, System.Action<Imageflow.Server.UrlEventArgs> handler) { }
+        public Imageflow.Server.ImageflowMiddlewareOptions AddWatermark(Imageflow.Server.NamedWatermark watermark) { }
+        public Imageflow.Server.ImageflowMiddlewareOptions AddWatermarkingHandler(string pathPrefix, System.Action<Imageflow.Server.WatermarkingEventArgs> handler) { }
+        public Imageflow.Server.ImageflowMiddlewareOptions HandleExtensionlessRequestsUnder(string prefix, System.StringComparison prefixComparison = 4) { }
+        public Imageflow.Server.ImageflowMiddlewareOptions MapPath(string virtualPath, string physicalPath) { }
+        public Imageflow.Server.ImageflowMiddlewareOptions MapPath(string virtualPath, string physicalPath, bool ignorePrefixCase) { }
+        public Imageflow.Server.ImageflowMiddlewareOptions SetAllowCaching(bool value) { }
+        public Imageflow.Server.ImageflowMiddlewareOptions SetAllowDiskCaching(bool value) { }
+        public Imageflow.Server.ImageflowMiddlewareOptions SetApplyDefaultCommandsToQuerylessUrls(bool value) { }
+        public Imageflow.Server.ImageflowMiddlewareOptions SetDefaultCacheControlString(string cacheControlString) { }
+        public Imageflow.Server.ImageflowMiddlewareOptions SetDiagnosticsPageAccess(Imageflow.Server.AccessDiagnosticsFrom accessDiagnosticsFrom) { }
+        public Imageflow.Server.ImageflowMiddlewareOptions SetDiagnosticsPagePassword(string password) { }
+        public Imageflow.Server.ImageflowMiddlewareOptions SetJobSecurityOptions(Imageflow.Fluent.SecurityOptions securityOptions) { }
+        public Imageflow.Server.ImageflowMiddlewareOptions SetLicenseKey(Imageflow.Server.EnforceLicenseWith enforcementMethod, string licenseKey) { }
+        public Imageflow.Server.ImageflowMiddlewareOptions SetMapWebRoot(bool value) { }
+        public Imageflow.Server.ImageflowMiddlewareOptions SetMyOpenSourceProjectUrl(string myOpenSourceProjectUrl) { }
+        public Imageflow.Server.ImageflowMiddlewareOptions SetRequestSignatureOptions(Imageflow.Server.RequestSignatureOptions options) { }
+        public Imageflow.Server.ImageflowMiddlewareOptions SetUsePresetsExclusively(bool value) { }
+    }
+    public class NamedWatermark
+    {
+        public NamedWatermark(string name, string virtualPath, Imageflow.Fluent.WatermarkOptions watermark) { }
+        public string Name { get; }
+        public string VirtualPath { get; }
+        public Imageflow.Fluent.WatermarkOptions Watermark { get; }
+    }
+    public static class PathHelpers
+    {
+        public static System.Collections.Generic.IEnumerable<string> AcceptedImageExtensions { get; }
+        public static System.Collections.Generic.IEnumerable<string> SupportedQuerystringKeys { get; }
+        public static string GetImageExtensionFromContentType(string contentType) { }
+        public static string SanitizeImageExtension(string extension) { }
+    }
+    public readonly struct PathMapping
+    {
+        public PathMapping(string virtualPath, string physicalPath) { }
+        public PathMapping(string virtualPath, string physicalPath, bool ignorePrefixCase) { }
+        public bool IgnorePrefixCase { get; }
+        public string PhysicalPath { get; }
+        public string VirtualPath { get; }
+    }
+    public class PresetOptions
+    {
+        public PresetOptions(string name, Imageflow.Server.PresetPriority priority) { }
+        public string Name { get; }
+        public Imageflow.Server.PresetPriority Priority { get; }
+        public Imageflow.Server.PresetOptions SetCommand(string key, string value) { }
+    }
+    public enum PresetPriority
+    {
+        DefaultValues = 0,
+        OverrideQuery = 1,
+    }
+    public class RequestSignatureOptions
+    {
+        public RequestSignatureOptions(Imageflow.Server.SignatureRequired defaultRequirement, System.Collections.Generic.IEnumerable<string> defaultSigningKeys) { }
+        public Imageflow.Server.RequestSignatureOptions ForPrefix(string prefix, System.StringComparison prefixComparison, Imageflow.Server.SignatureRequired requirement, System.Collections.Generic.IEnumerable<string> signingKeys) { }
+    }
+    public enum SignatureRequired
+    {
+        ForAllRequests = 0,
+        ForQuerystringRequests = 1,
+        Never = 2,
+    }
+    public class UrlEventArgs
+    {
+        public Microsoft.AspNetCore.Http.HttpContext Context { get; }
+        public System.Collections.Generic.Dictionary<string, string> Query { get; set; }
+        public string VirtualPath { get; set; }
+    }
+    public class WatermarkingEventArgs
+    {
+        public System.Collections.Generic.List<Imageflow.Server.NamedWatermark> AppliedWatermarks { get; set; }
+        public Microsoft.AspNetCore.Http.HttpContext Context { get; }
+        public System.Collections.Generic.IReadOnlyDictionary<string, string> Query { get; }
+        public string VirtualPath { get; }
+    }
+}

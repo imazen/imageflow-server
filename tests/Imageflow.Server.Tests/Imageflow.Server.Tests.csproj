@@ -11,6 +11,7 @@
         <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="3.1.5" />
         <PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" Version="2.2.0" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.4.1" />
+        <PackageReference Include="PublicApiGenerator" Version="11.4.6" />
         <PackageReference Include="xunit" Version="2.4.1" />
         <PackageReference Include="xunit.runner.visualstudio" Version="2.4.5">
           <PrivateAssets>all</PrivateAssets>
@@ -23,11 +24,14 @@
     </ItemGroup>
 
     <ItemGroup>
+  
       <ProjectReference Include="..\..\src\Imageflow.Server.DiskCache\Imageflow.Server.DiskCache.csproj" />
+      <ProjectReference Include="..\..\src\Imageflow.Server.HybridCache\Imageflow.Server.HybridCache.csproj" />
       <ProjectReference Include="..\..\src\Imageflow.Server.Storage.AzureBlob\Imageflow.Server.Storage.AzureBlob.csproj" />
       <ProjectReference Include="..\..\src\Imageflow.Server.Storage.RemoteReader\Imageflow.Server.Storage.RemoteReader.csproj" />
       <ProjectReference Include="..\..\src\Imageflow.Server.Storage.S3\Imageflow.Server.Storage.S3.csproj" />
       <ProjectReference Include="..\..\src\Imageflow.Server\Imageflow.Server.csproj" />
+      <ProjectReference Include="..\..\src\Imazen.HybridCache\Imazen.HybridCache.csproj" />
       <ProjectReference Include="..\Imazen.Common.Tests\Imazen.Common.Tests.csproj" />
     </ItemGroup>
 

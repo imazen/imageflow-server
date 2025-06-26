@@ -1,0 +1,112 @@
+[assembly: Imazen.Common.Licensing.BuildDate("[removed]")]
+[assembly: Imazen.Common.Licensing.Commit("[removed]")]
+[assembly: System.Reflection.AssemblyMetadata("RepositoryUrl", "https://github.com/imazen/imageflow-server.git")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Imazen.HybridCache.Tests")]
+[assembly: System.Runtime.Versioning.TargetFramework(".NETStandard,Version=v2.0", FrameworkDisplayName=".NET Standard 2.0")]
+namespace Imazen.HybridCache
+{
+    public class AsyncCacheOptions
+    {
+        public AsyncCacheOptions() { }
+        public bool FailRequestsOnEnqueueLockTimeout { get; set; }
+        public long MaxQueuedBytes { get; set; }
+        public System.Action<string, string> MoveFileOverwriteFunc { get; set; }
+        public bool MoveFilesIntoPlace { get; set; }
+        public int WaitForIdenticalDiskWritesMs { get; set; }
+        public int WaitForIdenticalRequestsTimeoutMs { get; set; }
+        public bool WriteSynchronouslyWhenQueueFull { get; set; }
+    }
+    public class CleanupManagerOptions
+    {
+        public CleanupManagerOptions() { }
+        public int AccessTrackingBits { get; set; }
+        public int CleanupSelectBatchSize { get; set; }
+        public long MaxCacheBytes { get; set; }
+        public System.TimeSpan MinAgeToDelete { get; set; }
+        public long MinCleanupBytes { get; set; }
+        public System.Action<string, string> MoveFileOverwriteFunc { get; set; }
+        public System.TimeSpan RetryDeletionAfter { get; set; }
+    }
+    public class HashBasedPathBuilder
+    {
+        public HashBasedPathBuilder(string physicalCacheDir, int subfolders, char relativeDirSeparator, string fileExtension) { }
+        public int SubfolderBits { get; }
+        public long GetDirectoryEntriesBytesTotal() { }
+        public string GetDisplayPathForKeyBasis(byte[] keyBasis) { }
+        public byte[] GetHashFromString(string hashString) { }
+        public string GetPhysicalPathFromHash(byte[] hash) { }
+        public string GetPhysicalPathFromRelativePath(string relativePath) { }
+        public string GetRelativePathFromHash(byte[] hash) { }
+        public string GetStringFromHash(byte[] hash) { }
+        public byte[] HashKeyBasis(byte[] keyBasis) { }
+    }
+    public class HybridCache : Imazen.Common.Extensibility.StreamCache.IStreamCache, Imazen.Common.Issues.IIssueProvider, Microsoft.Extensions.Hosting.IHostedService
+    {
+        public HybridCache(Imazen.HybridCache.ICacheDatabase cacheDatabase, Imazen.HybridCache.HybridCacheOptions options, Microsoft.Extensions.Logging.ILogger logger) { }
+        public System.Threading.Tasks.Task AwaitEnqueuedTasks() { }
+        public System.Collections.Generic.IEnumerable<Imazen.Common.Issues.IIssue> GetIssues() { }
+        public System.Threading.Tasks.Task<Imazen.Common.Extensibility.StreamCache.IStreamCacheResult> GetOrCreateBytes(byte[] key, Imazen.Common.Extensibility.StreamCache.AsyncBytesResult dataProviderCallback, System.Threading.CancellationToken cancellationToken, bool retrieveContentType) { }
+        public System.Threading.Tasks.Task StartAsync(System.Threading.CancellationToken cancellationToken) { }
+        public System.Threading.Tasks.Task StopAsync(System.Threading.CancellationToken cancellationToken) { }
+    }
+    public class HybridCacheOptions
+    {
+        public HybridCacheOptions(string physicalCacheDir) { }
+        public Imazen.HybridCache.AsyncCacheOptions AsyncCacheOptions { get; set; }
+        public Imazen.HybridCache.CleanupManagerOptions CleanupManagerOptions { get; set; }
+        public string PhysicalCacheDir { get; set; }
+        public int Subfolders { get; set; }
+    }
+    public interface ICacheDatabase : Microsoft.Extensions.Hosting.IHostedService
+    {
+        System.Threading.Tasks.Task<bool> CreateRecordIfSpace(int shard, string relativePath, string contentType, long recordDiskSpace, System.DateTime createdDate, int accessCountKey, long diskSpaceLimit);
+        System.Threading.Tasks.Task DeleteRecord(int shard, Imazen.HybridCache.ICacheDatabaseRecord record);
+        int EstimateRecordDiskSpace(int stringLength);
+        System.Threading.Tasks.Task<string> GetContentType(int shard, string relativePath);
+        System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<Imazen.HybridCache.ICacheDatabaseRecord>> GetDeletionCandidates(int shard, System.DateTime maxLastDeletionAttemptTime, System.DateTime maxCreatedDate, int count, System.Func<int, ushort> getUsageCount);
+        System.Threading.Tasks.Task<Imazen.HybridCache.ICacheDatabaseRecord> GetRecord(int shard, string relativePath);
+        int GetShardCount();
+        int GetShardForKey(string key);
+        System.Threading.Tasks.Task<long> GetShardSize(int shard);
+        System.Threading.Tasks.Task ReplaceRelativePathAndUpdateLastDeletion(int shard, Imazen.HybridCache.ICacheDatabaseRecord record, string movedRelativePath, System.DateTime lastDeletionAttempt);
+        System.Threading.Tasks.Task UpdateCreatedDateAtomic(int shard, string relativePath, string contentType, long recordDiskSpace, System.DateTime createdDate, int accessCountKey);
+        System.Threading.Tasks.Task UpdateLastDeletionAttempt(int shard, string relativePath, System.DateTime when);
+    }
+    public interface ICacheDatabaseRecord
+    {
+        int AccessCountKey { get; }
+        string ContentType { get; }
+        System.DateTime CreatedAt { get; }
+        long DiskSize { get; }
+        System.DateTime LastDeletionAttempt { get; }
+        string RelativePath { get; }
+    }
+}
+namespace Imazen.HybridCache.MetaStore
+{
+    public class MetaStore : Imazen.HybridCache.ICacheDatabase, Microsoft.Extensions.Hosting.IHostedService
+    {
+        public MetaStore(Imazen.HybridCache.MetaStore.MetaStoreOptions options, Imazen.HybridCache.HybridCacheOptions cacheOptions, Microsoft.Extensions.Logging.ILogger logger) { }
+        public System.Threading.Tasks.Task<bool> CreateRecordIfSpace(int shard, string relativePath, string contentType, long recordDiskSpace, System.DateTime createdDate, int accessCountKey, long diskSpaceLimit) { }
+        public System.Threading.Tasks.Task DeleteRecord(int shard, Imazen.HybridCache.ICacheDatabaseRecord record) { }
+        public int EstimateRecordDiskSpace(int stringLength) { }
+        public System.Threading.Tasks.Task<string> GetContentType(int shard, string relativePath) { }
+        public System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<Imazen.HybridCache.ICacheDatabaseRecord>> GetDeletionCandidates(int shard, System.DateTime maxLastDeletionAttemptTime, System.DateTime maxCreatedDate, int count, System.Func<int, ushort> getUsageCount) { }
+        public System.Threading.Tasks.Task<Imazen.HybridCache.ICacheDatabaseRecord> GetRecord(int shard, string relativePath) { }
+        public int GetShardCount() { }
+        public int GetShardForKey(string key) { }
+        public System.Threading.Tasks.Task<long> GetShardSize(int shard) { }
+        public System.Threading.Tasks.Task ReplaceRelativePathAndUpdateLastDeletion(int shard, Imazen.HybridCache.ICacheDatabaseRecord record, string movedRelativePath, System.DateTime lastDeletionAttempt) { }
+        public System.Threading.Tasks.Task StartAsync(System.Threading.CancellationToken cancellationToken) { }
+        public System.Threading.Tasks.Task StopAsync(System.Threading.CancellationToken cancellationToken) { }
+        public System.Threading.Tasks.Task UpdateCreatedDateAtomic(int shard, string relativePath, string contentType, long recordDiskSpace, System.DateTime createdDate, int accessCountKey) { }
+        public System.Threading.Tasks.Task UpdateLastDeletionAttempt(int shard, string relativePath, System.DateTime when) { }
+    }
+    public class MetaStoreOptions
+    {
+        public MetaStoreOptions(string databaseDir) { }
+        public string DatabaseDir { get; set; }
+        public int MaxLogFilesPerShard { get; set; }
+        public int Shards { get; set; }
+    }
+}

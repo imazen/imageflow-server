@@ -1,0 +1,28 @@
+[assembly: Imazen.Common.Licensing.BuildDate("[removed]")]
+[assembly: Imazen.Common.Licensing.Commit("[removed]")]
+[assembly: System.Reflection.AssemblyMetadata("RepositoryUrl", "https://github.com/imazen/imageflow-server.git")]
+[assembly: System.Runtime.Versioning.TargetFramework(".NETStandard,Version=v2.0", FrameworkDisplayName=".NET Standard 2.0")]
+namespace Imageflow.Server.Storage.AzureBlob
+{
+    public class AzureBlobService : Imazen.Common.Storage.IBlobProvider
+    {
+        public AzureBlobService(Imageflow.Server.Storage.AzureBlob.AzureBlobServiceOptions options, Microsoft.Extensions.Logging.ILogger<Imageflow.Server.Storage.AzureBlob.AzureBlobService> logger) { }
+        public System.Threading.Tasks.Task<Imazen.Common.Storage.IBlobData> Fetch(string virtualPath) { }
+        public System.Collections.Generic.IEnumerable<string> GetPrefixes() { }
+        public bool SupportsPath(string virtualPath) { }
+    }
+    public static class AzureBlobServiceExtensions
+    {
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddImageflowAzureBlobService(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, Imageflow.Server.Storage.AzureBlob.AzureBlobServiceOptions options) { }
+    }
+    public class AzureBlobServiceOptions
+    {
+        public AzureBlobServiceOptions(string connectionString, Azure.Storage.Blobs.BlobClientOptions blobClientOptions = null) { }
+        public Azure.Storage.Blobs.BlobClientOptions BlobClientOptions { get; set; }
+        public string ConnectionString { get; set; }
+        public Imageflow.Server.Storage.AzureBlob.AzureBlobServiceOptions MapPrefix(string urlPrefix, string container) { }
+        public Imageflow.Server.Storage.AzureBlob.AzureBlobServiceOptions MapPrefix(string urlPrefix, string container, string blobPrefix) { }
+        public Imageflow.Server.Storage.AzureBlob.AzureBlobServiceOptions MapPrefix(string urlPrefix, string container, bool ignorePrefixCase, bool lowercaseBlobPath) { }
+        public Imageflow.Server.Storage.AzureBlob.AzureBlobServiceOptions MapPrefix(string urlPrefix, string container, string blobPrefix, bool ignorePrefixCase, bool lowercaseBlobPath) { }
+    }
+}
