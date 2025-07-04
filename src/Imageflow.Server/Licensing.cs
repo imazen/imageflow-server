@@ -81,7 +81,7 @@ namespace Imageflow.Server
                 return options.EnforcementMethod switch
                 {
                     EnforceLicenseWith.RedDotWatermark =>
-                        "You are using EnforceLicenseWith.RedDotWatermark. If there is a licensing error, an red dot will be drawn on the bottom-right corner of each image. This can be set to EnforceLicenseWith.Http402Error instead (valuable if you are externally caching or storing result images.)",
+                        "You are using EnforceLicenseWith.RedDotWatermark. If there is a licensing error, a red dot will be drawn on the bottom-right corner of each image. This can be set to EnforceLicenseWith.Http402Error instead (valuable if you are externally caching or storing result images.)",
                     EnforceLicenseWith.Http422Error =>
                         "You are using EnforceLicenseWith.Http422Error. If there is a licensing error, HTTP status code 422 will be returned instead of serving the image. This can also be set to EnforceLicenseWith.RedDotWatermark.",
                     EnforceLicenseWith.Http402Error =>
