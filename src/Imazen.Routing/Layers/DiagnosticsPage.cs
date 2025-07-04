@@ -46,7 +46,8 @@ internal class DiagnosticsPage(
     : IRoutingEndpoint, IRoutingLayer
 {
     
-    public static bool MatchesPath(string path) => "/imageflow.debug".Equals(path, StringComparison.Ordinal);
+    public static bool MatchesPath(string path) => "/imageflow.debug".Equals(path, StringComparison.Ordinal)
+    || "/resizer.debug".Equals(path, StringComparison.Ordinal);
 
  
 

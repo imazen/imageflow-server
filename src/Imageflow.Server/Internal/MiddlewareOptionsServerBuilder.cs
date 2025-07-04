@@ -285,7 +285,7 @@ internal class MiddlewareOptionsServerBuilder(
                 return SmallHttpResponse.NoStore(200, "Imageflow.Server is healthy.");
             });
             
-        builder.AddEndpoint(Conditions.HasPathSuffix("/imageflow.license"),
+        builder.AddEndpoint(Conditions.HasPathSuffix("/imageflow.license", "/resizer.license"),
             (req) =>
             {
                 var s = new StringBuilder(8096);
