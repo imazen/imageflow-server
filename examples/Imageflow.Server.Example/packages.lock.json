@@ -72,17 +72,11 @@
       },
       "Imageflow.AllPlatforms": {
         "type": "Transitive",
-        "resolved": "0.14.0-rc01",
-        "contentHash": "YOLTLMhYP36WYQDQfyEO/zQZ7UvymTutJJ7o/sYspJptLcVZVdEhnMwiatgibXJkq0b/GvDNavD5+0P4AFY8UQ==",
+        "resolved": "0.14.1",
+        "contentHash": "dsTd5+Jpq4HYY4FJaJZLyvbvLPtvMd+tjyDCt27tKD0gLoxr8zZzwrym0A6/7757f935TVySUjiC+5+vo646tA==",
         "dependencies": {
-          "Imageflow.NativeRuntime.osx-arm64": "2.1.0-rc02",
-          "Imageflow.NativeRuntime.osx-x86_64": "2.1.0-rc02",
-          "Imageflow.NativeRuntime.ubuntu-arm64": "2.1.0-rc02",
-          "Imageflow.NativeRuntime.ubuntu-x86_64": "2.1.0-rc02",
-          "Imageflow.NativeRuntime.win-arm64": "2.1.0-rc01",
-          "Imageflow.NativeRuntime.win-x86": "2.1.0-rc02",
-          "Imageflow.NativeRuntime.win-x86_64": "2.1.0-rc02",
-          "Imageflow.Net": "0.14.0-rc01"
+          "Imageflow.NativeRuntime.All": "2.1.1-rc10",
+          "Imageflow.Net": "0.14.1"
         }
       },
       "Imageflow.NativeRuntime.All": {
@@ -119,16 +113,6 @@
         "resolved": "2.1.1-rc10",
         "contentHash": "Gq6p8WRpelsDic7odmNismD5NsVreGcmFB6g3rmMl4pFENJ73egd3vpxPhm47qTvKVrhNKuEeBZKEEB0r+Ha6Q=="
       },
-      "Imageflow.NativeRuntime.ubuntu-arm64": {
-        "type": "Transitive",
-        "resolved": "2.1.0-rc02",
-        "contentHash": "gCZmufcYhwuomfPyMUgfrtRu4kimLPC4ISsduDMteSKj97DyxN+T+RWQdGYDauximWL08EI7Tus+659WtIaA2w=="
-      },
-      "Imageflow.NativeRuntime.ubuntu-x86_64": {
-        "type": "Transitive",
-        "resolved": "2.1.0-rc02",
-        "contentHash": "CI7oRCrR0oFYdrtNN9eV5JJZVRkBNmKdCcpnEEKLvKfitay/oxq7XuiboiqaCVsksHXIALreMKN9F+JYu1bfKg=="
-      },
       "Imageflow.NativeRuntime.win-arm64": {
         "type": "Transitive",
         "resolved": "2.1.1-rc10",
@@ -146,8 +130,8 @@
       },
       "Imageflow.Net": {
         "type": "Transitive",
-        "resolved": "0.14.0-rc01",
-        "contentHash": "e8HF8cI+Ny033da/w6fIfZQOkDCvCVhNryMoNBZjUOs6+5Qw5+1NboNLVfuFYApFBUM2ePMROTf0mRQWz74pbA==",
+        "resolved": "0.14.1",
+        "contentHash": "OmTWaMzdmrvz34i/7Wz6MrkJ3RTPLGQD7ssV80cm525YpOrgd3RYymr7O6EIi2d4iNOQ61n+P48tEWvZwShVGg==",
         "dependencies": {
           "Microsoft.IO.RecyclableMemoryStream": "[3.0.1, 4.0.0)",
           "System.Text.Json": "6.0.11"
@@ -299,7 +283,7 @@
       "imageflow.server": {
         "type": "Project",
         "dependencies": {
-          "Imageflow.AllPlatforms": "[0.14.0-rc01, )",
+          "Imageflow.AllPlatforms": "[0.14.1, )",
           "Imageflow.NativeRuntime.All": "[2.1.1-rc10, )",
           "Imazen.Common": "[0.1.0--notset, )",
           "System.Text.Json": "[6.0.11, )"

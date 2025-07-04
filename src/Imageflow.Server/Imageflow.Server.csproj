@@ -20,7 +20,7 @@
 
   <ItemGroup>
     <PackageReference Include="Imageflow.NativeRuntime.All" Version="2.1.1-rc10" />
-    <PackageReference Include="Imageflow.AllPlatforms" Version="0.14.0-rc01" />
+    <PackageReference Include="Imageflow.AllPlatforms" Version="0.14.1" />
     <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="3.3.4">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
