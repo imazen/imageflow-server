@@ -606,8 +606,8 @@
       },
       "System.IO.Pipelines": {
         "type": "Transitive",
-        "resolved": "9.0.4",
-        "contentHash": "luF2Xba+lTe2GOoNQdZLe8q7K6s7nSpWZl9jIwWNMszN4/Yv0lmxk9HISgMmwdyZ83i3UhAGXaSY9o6IJBUuuA=="
+        "resolved": "9.0.6",
+        "contentHash": "0nlr0reXrRmkZNKifKqh2DgGhQgfkT7Qa3gQxIn/JI7/y3WDiTz67M+Sq3vFhUqcG8O5zVrpqHvIHeGPGUBsEw=="
       },
       "System.Linq.Async": {
         "type": "Transitive",
@@ -647,16 +647,16 @@
       },
       "System.Text.Encodings.Web": {
         "type": "Transitive",
-        "resolved": "9.0.4",
-        "contentHash": "V+5cCPpk1S2ngekUs9nDrQLHGiWFZMg8BthADQr+Fwi59a8DdHFu26S2oi9Bfgv+d67bqmkPqctJXMEXiimXUg=="
+        "resolved": "9.0.6",
+        "contentHash": "uWRgViw2yJAUyGxrzDLCc6fkzE2dZIoXxs8V6YjCujKsJuP0pnpYSlbm2/7tKd0SjBnMtwfDQhLenk3bXonVOA=="
       },
       "System.Text.Json": {
         "type": "Transitive",
-        "resolved": "9.0.4",
-        "contentHash": "pYtmpcO6R3Ef1XilZEHgXP2xBPVORbYEzRP7dl0IAAbN8Dm+kfwio8aCKle97rAWXOExr292MuxWYurIuwN62g==",
+        "resolved": "9.0.6",
+        "contentHash": "h+ZtYTyTnTh5Ju6mHCKb3FPGx4ylJZgm9W7Y2psUnkhQRPMOIxX+TCN0ZgaR/+Yea+93XHWAaMzYTar1/EHIPg==",
         "dependencies": {
-          "System.IO.Pipelines": "9.0.4",
-          "System.Text.Encodings.Web": "9.0.4"
+          "System.IO.Pipelines": "9.0.6",
+          "System.Text.Encodings.Web": "9.0.6"
         }
       },
       "System.Threading.Tasks.Extensions": {
@@ -681,7 +681,7 @@
           "Imazen.Common": "[0.1.0--notset, )",
           "Imazen.Routing": "[0.1.0--notset, )",
           "Microsoft.IO.RecyclableMemoryStream": "[3.0.0, )",
-          "System.Text.Json": "[9.0.4, )"
+          "System.Text.Json": "[9.0.6, )"
         }
       },
       "imageflow.server.configuration": {
@@ -697,8 +697,7 @@
         "type": "Project",
         "dependencies": {
           "Imazen.Common": "[0.1.0--notset, )",
-          "Imazen.HybridCache": "[0.1.0--notset, )",
-          "Microsoft.Extensions.Hosting.Abstractions": "[2.2.0, )"
+          "Imazen.HybridCache": "[0.1.0--notset, )"
         }
       },
       "imageflow.server.storage.azureblob": {
@@ -719,15 +718,16 @@
       "imazen.abstractions": {
         "type": "Project",
         "dependencies": {
-          "CommunityToolkit.HighPerformance": "[8.*, )",
-          "Microsoft.Extensions.Hosting.Abstractions": "[2.*, )"
+          "CommunityToolkit.HighPerformance": "[8.4.0, )",
+          "Microsoft.Extensions.DependencyInjection": "[8.0.1, )",
+          "Microsoft.Extensions.Hosting.Abstractions": "[8.0.1, )"
         }
       },
       "imazen.common": {
         "type": "Project",
         "dependencies": {
           "Imazen.Abstractions": "[0.1.0--notset, )",
-          "Microsoft.Extensions.Hosting.Abstractions": "[2.2.0, )"
+          "Microsoft.Extensions.Hosting.Abstractions": "[8.0.1, )"
         }
       },
       "imazen.hybridcache": {
@@ -740,10 +740,11 @@
       "imazen.routing": {
         "type": "Project",
         "dependencies": {
-          "CommunityToolkit.HighPerformance": "[8.*, )",
+          "CommunityToolkit.HighPerformance": "[8.4.0, )",
           "Imageflow.Net": "[0.13.2, )",
           "Imazen.Abstractions": "[0.1.0--notset, )",
           "Imazen.Common": "[0.1.0--notset, )",
+          "Microsoft.Extensions.Hosting": "[8.0.1, )",
           "sly": "[3.7.3, )"
         }
       }

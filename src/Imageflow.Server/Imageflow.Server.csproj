@@ -27,11 +27,11 @@
   <ItemGroup>
     <PackageReference Include="Imageflow.AllPlatforms" Version="0.13.2" />
     <PackageReference Include="Microsoft.IO.RecyclableMemoryStream" Version="3.0.0" />
-    <PackageReference Include="System.Text.Json" Version="9.0.4" />
+    <PackageReference Include="System.Text.Json" Version="9.0.6" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="3.3.4">
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="4.14.0">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>

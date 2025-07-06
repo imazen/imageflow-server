@@ -10,5 +10,8 @@
         <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
         <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
         <GenerateProgramFile>false</GenerateProgramFile> -->
+        <!-- hide RS0016 -->
+        <NoWarn>$(NoWarn);RS0016</NoWarn>
+        <NoWarn>$(NoWarn);RS0037</NoWarn>
     </PropertyGroup>
 </Project>

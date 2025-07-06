@@ -4,6 +4,9 @@
        <EnableTrimAnalyzer Condition="'$(TargetFramework)' == 'net8.0'">true</EnableTrimAnalyzer>
        <EnableSingleFileAnalyzer Condition="'$(TargetFramework)' == 'net8.0'">true</EnableSingleFileAnalyzer>
        <EnableAotAnalyzer Condition="'$(TargetFramework)' == 'net8.0'">true</EnableAotAnalyzer>
+       <NoWarn>$(NoWarn);RS0016</NoWarn>
+       <NoWarn>$(NoWarn);RS0037</NoWarn>
    </PropertyGroup>
    <Import Project="NugetPackages.targets" />
+
 </Project>

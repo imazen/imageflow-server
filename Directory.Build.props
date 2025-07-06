@@ -43,7 +43,11 @@
 
     <PropertyGroup>
         <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
-        <NoWarn>NU1603</NoWarn>
+        <NoWarn>$(NoWarn);NU1603</NoWarn>
         <DisableImplicitNuGetFallbackFolder>true</DisableImplicitNuGetFallbackFolder>
+    </PropertyGroup>
+    <PropertyGroup>
+        <!--NU1605 is a warning as error, let's disable it for now-->
+        <NoWarn>$(NoWarn);NU1605</NoWarn>   
     </PropertyGroup>
 </Project>

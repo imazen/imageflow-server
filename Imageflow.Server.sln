@@ -69,6 +69,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Imageflow.Server.LegacyBlob
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Imageflow.Server.AzureFunctions", "src\Imageflow.Server.AzureFunctions\Imageflow.Server.AzureFunctions.csproj", "{4EEC76B7-6F4D-40E8-9818-91F4A8E7B744}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Imazen.Analyzers", "src\Imazen.Analyzers\Imazen.Analyzers.csproj", "{0FB5CF1D-699F-4270-8218-D759A7659865}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -171,6 +173,10 @@ Global
 		{4EEC76B7-6F4D-40E8-9818-91F4A8E7B744}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4EEC76B7-6F4D-40E8-9818-91F4A8E7B744}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4EEC76B7-6F4D-40E8-9818-91F4A8E7B744}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0FB5CF1D-699F-4270-8218-D759A7659865}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0FB5CF1D-699F-4270-8218-D759A7659865}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0FB5CF1D-699F-4270-8218-D759A7659865}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0FB5CF1D-699F-4270-8218-D759A7659865}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
