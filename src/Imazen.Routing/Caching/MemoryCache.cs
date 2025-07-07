@@ -109,7 +109,7 @@ public class MemoryCache(MemoryCacheOptions options) : IBlobCache
         if (__cache.TryGetValue(request.CacheKeyHashString, out var entry))
         {
             entry.UsageTracker.Used();
-            return Task.FromResult(BlobCacheFetchFailure.OkResult(entry.BlobWrapper));
+            return Task.FromResult(BlobCacheFetchFailure.OkResult(entry.BlobWrapper.ForkReference()));
         }
 
         return Task.FromResult(BlobCacheFetchFailure.MissResult(this, this));
@@ -120,6 +120,7 @@ public class MemoryCache(MemoryCacheOptions options) : IBlobCache
     private bool TryRemove(string cacheKey, [MaybeNullWhen(false)] out CacheEntry removed)
     {
         if (!__cache.TryRemove(cacheKey, out removed)) return false;
+        removed.BlobWrapper.Dispose();
         Interlocked.Add(ref memoryUsedSync, -removed.BlobWrapper.EstimateAllocatedBytes ?? 0);
         Interlocked.Decrement(ref itemCountSync);
         return true;
@@ -154,12 +155,10 @@ public class MemoryCache(MemoryCacheOptions options) : IBlobCache
         return true;
     }
 
-    private bool TryAdd(string cacheKey, IBlobWrapper blob)
+    private async Task<bool> TryAdd(string cacheKey, IBlobWrapper blob)
     {
-        if (!blob.IsReusable)
-        {
-            throw new InvalidOperationException("Cannot cache a blob that is not natively reusable");
-        }
+
+
         if (blob.EstimateAllocatedBytes == null)
         {
             throw new InvalidOperationException("Cannot cache a blob that does not have an EstimateAllocatedBytes");
@@ -182,7 +181,11 @@ public class MemoryCache(MemoryCacheOptions options) : IBlobCache
         {
             return false; // Can't make space? That's odd.
         }
-        
+        if (!blob.IsReusable)
+        {
+            //await blob.EnsureReusable();
+             throw new InvalidOperationException("Cannot cache a blob that is not natively reusable");
+        }
         var entry = new CacheEntry(cacheKey, blob, UsageTracker.Create());
         if (entry == __cache.AddOrUpdate(cacheKey, entry, (_, existing) => existing with { BlobWrapper = blob }))
         {
@@ -204,14 +207,14 @@ public class MemoryCache(MemoryCacheOptions options) : IBlobCache
         }
     }
     private IEnumerable<CacheEntry> AllEntries => __cache.Values;
-    public Task<CodeResult> CachePut(ICacheEventDetails e, CancellationToken cancellationToken = default)
+    public async Task<CodeResult> CachePut(ICacheEventDetails e, CancellationToken cancellationToken = default)
     {
         if (e.Result?.TryUnwrap(out var blob) == true)
         {
-            TryAdd(e.OriginalRequest.CacheKeyHashString, blob);
+            await TryAdd(e.OriginalRequest.CacheKeyHashString, blob.ForkReference());
         }
 
-        return Task.FromResult(CodeResult.Ok());
+        return CodeResult.Ok();
     }
 
     public Task<CodeResult<IAsyncEnumerable<IBlobStorageReference>>> CacheSearchByTag(SearchableBlobTag tag, CancellationToken cancellationToken = default)
