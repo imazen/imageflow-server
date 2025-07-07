@@ -1,11 +1,12 @@
 using Imazen.Abstractions.BlobCache;
 using Imazen.Abstractions.Logging;
 using Imazen.Common.Issues;
+using Imazen.Routing.Serving;
 using Microsoft.Extensions.Hosting;
 
 namespace Imageflow.Server.HybridCache
 {
-    public class HybridCacheService : IBlobCacheProvider, IHostedService
+    public class HybridCacheService : IBlobCacheProvider, IHostedService, IHostedImageServerService
     {
         private readonly List<HybridNamedCache> namedCaches = new List<HybridNamedCache>();
         public HybridCacheService(IEnumerable<HybridCacheOptions> namedCacheConfigurations, IReLoggerFactory loggerFactory)

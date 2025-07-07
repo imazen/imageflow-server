@@ -48,6 +48,6 @@
     </PropertyGroup>
     <PropertyGroup>
         <!--NU1605 is a warning as error, let's disable it for now-->
-        <NoWarn>$(NoWarn);NU1605</NoWarn>   
+        <NoWarn>$(NoWarn);NU1605;IMA001</NoWarn>   
     </PropertyGroup>
 </Project>

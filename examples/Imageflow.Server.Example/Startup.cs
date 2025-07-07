@@ -106,33 +106,14 @@ namespace Imageflow.Server.Example
                     CacheSizeMb = 1000,
                 });
 
-
-        }
-
-        // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
-        {
-            if (env.IsDevelopment())
-            {
-                app.UseDeveloperExceptionPage();
-            }
-            else
-            {
-                app.UseExceptionHandler("/Home/Error");
-                // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-                app.UseHsts();
-            }
-            app.UseHttpsRedirection();
-
-            // You have a lot of configuration options
-            app.UseImageflow(new ImageflowMiddlewareOptions()
+            services.ConfigureImageflowMiddleware(new ImageflowMiddlewareOptions()
                 // Maps / to WebRootPath
                 .SetMapWebRoot(true)
                 .SetMyOpenSourceProjectUrl("https://github.com/imazen/imageflow-dotnet-server")
                 // Maps /folder to WebRootPath/folder
                 .MapPath("/folder", Path.Combine(Env.ContentRootPath, "folder"))
                 // Allow localhost to access the diagnostics page or remotely via /imageflow.debug?password=fuzzy_caterpillar
-                .SetDiagnosticsPageAccess(env.IsDevelopment() ? AccessDiagnosticsFrom.AnyHost : AccessDiagnosticsFrom.LocalHost)
+                .SetDiagnosticsPageAccess(Env.IsDevelopment() ? AccessDiagnosticsFrom.AnyHost : AccessDiagnosticsFrom.LocalHost)
                 .SetDiagnosticsPagePassword("fuzzy_caterpillar")
                 // Allow HybridCache or other registered IStreamCache to run
                 .SetAllowCaching(true)
@@ -149,19 +130,19 @@ namespace Imageflow.Server.Example
                 .AddCommandDefault("f.sharpen", "15")
                 .AddCommandDefault("webp.quality", "90")
                 .AddCommandDefault("ignore_icc_errors", "true")
-                //When set to true, this only allows ?preset=value URLs, returning 403 if you try to use any other commands. 
+                //When set to true, this only allows ?preset=value URLs, returning 403 if you try to use any other commands.
                 .SetUsePresetsExclusively(false)
                 .AddPreset(new PresetOptions("large", PresetPriority.DefaultValues)
                     .SetCommand("width", "1024")
                     .SetCommand("height", "1024")
                     .SetCommand("mode", "max"))
-                // When set, this only allows urls with a &signature, returning 403 if missing/invalid. 
+                // When set, this only allows urls with a &signature, returning 403 if missing/invalid.
                 // Use Imazen.Common.Helpers.Signatures.SignRequest(string pathAndQuery, string signingKey) to generate
-                //.ForPrefix allows you to set less restrictive rules for subfolders. 
+                //.ForPrefix allows you to set less restrictive rules for subfolders.
                 // For example, you may want to allow unmodified requests through with SignatureRequired.ForQuerystringRequests
                 // .SetRequestSignatureOptions(
                 //     new RequestSignatureOptions(SignatureRequired.ForAllRequests, new []{"test key"})
-                //         .ForPrefix("/logos/", StringComparison.Ordinal, 
+                //         .ForPrefix("/logos/", StringComparison.Ordinal,
                 //             SignatureRequired.ForQuerystringRequests, new []{"test key"}))
                 // It's a good idea to limit image sizes for security. Requests causing these to be exceeded will fail
                 // The last argument to FrameSizeLimit() is the maximum number of megapixels
@@ -170,7 +151,7 @@ namespace Imageflow.Server.Example
                     .SetMaxFrameSize(new FrameSizeLimit(8000,8000, 40))
                     .SetMaxEncodeSize(new FrameSizeLimit(8000,8000, 20)))
                 // Register a named watermark that floats 10% from the bottom-right corner of the image
-                // With 70% opacity and some sharpness applied. 
+                // With 70% opacity and some sharpness applied.
                 .AddWatermark(
                     new NamedWatermark("imazen",
                         "/images/imazen_400.png",
@@ -192,6 +173,26 @@ namespace Imageflow.Server.Example
                         args.AppliedWatermarks.Add(new NamedWatermark(null, "/images/imazen_400.png", new WatermarkOptions()));
                     }
                 }));
+
+        }
+
+        // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
+        public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+        {
+            if (env.IsDevelopment())
+            {
+                app.UseDeveloperExceptionPage();
+            }
+            else
+            {
+                app.UseExceptionHandler("/Home/Error");
+                // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+                app.UseHsts();
+            }
+            app.UseHttpsRedirection();
+
+            // You have a lot of configuration options
+            app.UseImageflow();
             
             
             

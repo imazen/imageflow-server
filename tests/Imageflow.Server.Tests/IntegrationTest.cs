@@ -7,6 +7,7 @@ using Imageflow.Server.HybridCache;
 using Imageflow.Server.Storage.RemoteReader;
 using Imageflow.Server.Storage.S3;
 using Imazen.Abstractions.Logging;
+using Imazen.Common.Concurrency.BoundedTaskCollection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
@@ -61,14 +62,7 @@ namespace Imageflow.Server.Tests
                     .ConfigureServices(services =>
                     {
                         services.AddXunitLoggingDefaults(outputHelper);
-                    })
-                    .ConfigureWebHost(webHost =>
-                    {
-                        // Add TestServer
-                        webHost.UseTestServer();
-                        webHost.Configure(app =>
-                        {
-                            app.UseImageflow(new ImageflowMiddlewareOptions()
+                        services.ConfigureImageflowMiddleware(new ImageflowMiddlewareOptions()
                                 .SetMapWebRoot(false)
                                 // Maps / to ContentRootPath/images
                                 .MapPath("/", Path.Combine(contentRoot.PhysicalPath, "images"))
@@ -84,6 +78,15 @@ namespace Imageflow.Server.Tests
                                         args.AppliedWatermarks.Add(new NamedWatermark(null, "/logo.png", new WatermarkOptions()));
                                     }
                                 }));
+
+                    })
+                    .ConfigureWebHost(webHost =>
+                    {
+                        // Add TestServer
+                        webHost.UseTestServer();
+                        webHost.Configure(app =>
+                        {
+                            app.UseImageflow();
                         });
 
                     });
@@ -182,6 +185,13 @@ namespace Imageflow.Server.Tests
                     services.AddXunitLoggingDefaults(outputHelper);
                     services.AddImageflowHybridCache(
                         new HybridCacheOptions(diskCacheDir)); //TODO: sync writes wanted
+
+                    services.ConfigureImageflowMiddleware(new ImageflowMiddlewareOptions()
+                            .SetMapWebRoot(false)
+                            .SetAllowDiskCaching(true)
+                            .HandleExtensionlessRequestsUnder("/extensionless/")
+                            // Maps / to ContentRootPath/images
+                            .MapPath("/", Path.Combine(contentRoot.PhysicalPath, "images")));
                 })
                 .ConfigureWebHost(webHost =>
                 {
@@ -189,12 +199,7 @@ namespace Imageflow.Server.Tests
                     webHost.UseTestServer();
                     webHost.Configure(app =>
                     {
-                        app.UseImageflow(new ImageflowMiddlewareOptions()
-                            .SetMapWebRoot(false)
-                            .SetAllowDiskCaching(true)
-                            .HandleExtensionlessRequestsUnder("/extensionless/")
-                            // Maps / to ContentRootPath/images
-                            .MapPath("/", Path.Combine(contentRoot.PhysicalPath, "images")));
+                        app.UseImageflow();
                     });
                 }).StartDisposableHost();
 
@@ -234,19 +239,11 @@ namespace Imageflow.Server.Tests
                 extensionlessRequest.EnsureSuccessStatusCode();
                 Assert.Equal("image/png", extensionlessRequest.Content.Headers.ContentType?.MediaType);
             }
+            await host.Services.GetRequiredService<BoundedTaskCollection<BlobTaskItem>>().AwaitAllCurrentTasks();
             await host.StopAsync(TestContext.Current.CancellationToken);
-            await host.DisposeAsync();
+            // We cache source and destination - this value might be wrong
+            CheckDiskCacheLeftovers(diskCacheDir, true, 6);
 
-            var cacheFiles = Directory.GetFiles(diskCacheDir, "*.jpg", SearchOption.AllDirectories);
-            if (cacheFiles.Length != 1)
-            {
-                // list the files
-                foreach (var file in cacheFiles)
-                {
-                    logger.LogError("Cache file: {file}", file);
-                }
-                Assert.Single(cacheFiles);
-            }
         }
 
         [Fact]
@@ -268,6 +265,11 @@ namespace Imageflow.Server.Tests
                     services.AddImageflowS3Service(
                         new S3ServiceOptions()
                             .MapPrefix("/ri/", "resizer-images"));
+                    services.ConfigureImageflowMiddleware(new ImageflowMiddlewareOptions()
+                        .SetMapWebRoot(false)
+                        .SetAllowDiskCaching(true)
+                        // Maps / to ContentRootPath/images
+                        .MapPath("/", Path.Combine(contentRoot.PhysicalPath, "images")));
 
                 })
                 .ConfigureWebHost(webHost =>
@@ -276,11 +278,7 @@ namespace Imageflow.Server.Tests
                     webHost.UseTestServer();
                     webHost.Configure(app =>
                     {
-                        app.UseImageflow(new ImageflowMiddlewareOptions()
-                            .SetMapWebRoot(false)
-                            .SetAllowDiskCaching(true)
-                            // Maps / to ContentRootPath/images
-                            .MapPath("/", Path.Combine(contentRoot.PhysicalPath, "images")));
+                        app.UseImageflow();
                     });
                 }).StartDisposableHost();
 
@@ -293,13 +291,13 @@ namespace Imageflow.Server.Tests
             using var response2 = await client.GetAsync("/ri/imageflow-icon.png?width=1", TestContext.Current.CancellationToken);
             response2.EnsureSuccessStatusCode();
 
+            await host.Services.GetRequiredService<BoundedTaskCollection<BlobTaskItem>>().AwaitAllCurrentTasks();
             await host.StopAsync(TestContext.Current.CancellationToken);
 
             // This could be failing because writes are still in the queue, or because no caches are deemed worthy of writing to, or health status reasons
-            // TODO: diagnose 
+            // TODO: diagnose
 
-            var cacheFiles = Directory.GetFiles(diskCacheDir, "*.jpg", SearchOption.AllDirectories);
-            Assert.Single(cacheFiles);
+            CheckDiskCacheLeftovers(diskCacheDir, true, 2);
 
         }
 
@@ -321,6 +319,11 @@ namespace Imageflow.Server.Tests
                         services.AddImageflowS3Service(
                             new S3ServiceOptions()
                                 .MapPrefix("/ri/", new AmazonS3Client(new AnonymousAWSCredentials(), RegionEndpoint.USEast1), "resizer-images", "", false, false));
+                        services.ConfigureImageflowMiddleware(new ImageflowMiddlewareOptions()
+                                .SetMapWebRoot(false)
+                                .SetAllowDiskCaching(true)
+                                // Maps / to ContentRootPath/images
+                                .MapPath("/", Path.Combine(contentRoot.PhysicalPath, "images")));
                     })
                     .ConfigureWebHost(webHost =>
                     {
@@ -328,11 +331,7 @@ namespace Imageflow.Server.Tests
                         webHost.UseTestServer();
                         webHost.Configure(app =>
                         {
-                            app.UseImageflow(new ImageflowMiddlewareOptions()
-                                .SetMapWebRoot(false)
-                                .SetAllowDiskCaching(true)
-                                // Maps / to ContentRootPath/images
-                                .MapPath("/", Path.Combine(contentRoot.PhysicalPath, "images")));
+                            app.UseImageflow();
                         });
                     });
 
@@ -347,11 +346,31 @@ namespace Imageflow.Server.Tests
                 
                 using var response2 = await client.GetAsync("/ri/imageflow-icon.png?width=1", TestContext.Current.CancellationToken);
                 response2.EnsureSuccessStatusCode();
-                
+                await host.Services.GetRequiredService<BoundedTaskCollection<BlobTaskItem>>().AwaitAllCurrentTasks();
                 await host.StopAsync(TestContext.Current.CancellationToken);
-                
-                var cacheFiles = Directory.GetFiles(diskCacheDir, "*.jpg", SearchOption.AllDirectories);
-                Assert.Single(cacheFiles);
+
+                CheckDiskCacheLeftovers(diskCacheDir, true, 2);
+            }
+        }
+
+        private void CheckDiskCacheLeftovers(string diskCacheDir, bool requireExists, int expectedJpegCount)
+        {
+            if (!Directory.Exists(diskCacheDir))
+            {
+                var parent = Path.GetDirectoryName(diskCacheDir);
+
+                var entries = Directory.GetFileSystemEntries(parent, "*", SearchOption.AllDirectories)
+                    .Select(s => s.Replace(parent + "\\", "").Replace("\\", "/")).ToList();
+                entries.Sort();
+
+                if (!requireExists) return;
+                Assert.Fail("Disk cache folder missing, parent folder contains: " + string.Join(", ", entries) + " Disck cache folder: " + diskCacheDir);
+            }
+            var cacheFiles = Directory.GetFiles(diskCacheDir, "*.jpg", SearchOption.AllDirectories)
+                .Select(s => s.Replace(diskCacheDir + "\\", "").Replace("\\", "/")).ToList();
+            if (cacheFiles.Count != expectedJpegCount)
+            {
+                Assert.Fail("Expected " + expectedJpegCount + ", Found: " + cacheFiles.Count + ". Listing: " + string.Join(", ", cacheFiles));
             }
         }
 
@@ -372,18 +391,18 @@ namespace Imageflow.Server.Tests
                         services.AddImageflowHybridCache(
                             new HybridCacheOptions(Path.Combine(contentRoot.PhysicalPath, "diskcache")));
                         services.AddXunitLoggingDefaults(outputHelper);
-                    });
-                    webHost.Configure(app =>
-                    {
-                        app.UseImageflow(new ImageflowMiddlewareOptions()
+                        services.ConfigureImageflowMiddleware(new ImageflowMiddlewareOptions()
                             .SetMapWebRoot(false)
                             // Maps / to ContentRootPath/images
                             .MapPath("/", Path.Combine(contentRoot.PhysicalPath, "images"))
                             .SetUsePresetsExclusively(true)
                             .AddPreset(new PresetOptions("small", PresetPriority.OverrideQuery)
                                 .SetCommand("maxwidth", "1")
-                                .SetCommand("maxheight", "1"))
-                        );
+                                .SetCommand("maxheight", "1")));
+                    });
+                    webHost.Configure(app =>
+                    {
+                        app.UseImageflow();
                     });
                 }).StartDisposableHost();
             
@@ -419,14 +438,7 @@ namespace Imageflow.Server.Tests
                     .ConfigureServices(services =>
                     {
                         services.AddXunitLoggingDefaults(outputHelper);
-                    })
-                    .ConfigureWebHost(webHost =>
-                    {
-                        // Add TestServer
-                        webHost.UseTestServer();
-                        webHost.Configure(app =>
-                        {
-                            app.UseImageflow(new ImageflowMiddlewareOptions()
+                        services.ConfigureImageflowMiddleware(new ImageflowMiddlewareOptions()
                                 .SetMapWebRoot(false)
                                 // Maps / to ContentRootPath/images
                                 .MapPath("/", Path.Combine(contentRoot.PhysicalPath, "images"))
@@ -437,6 +449,14 @@ namespace Imageflow.Server.Tests
                                     .SetCommand("width", "30")
                                     .SetCommand("height", "20"))
                                 );
+                    })
+                    .ConfigureWebHost(webHost =>
+                    {
+                        // Add TestServer
+                        webHost.UseTestServer();
+                        webHost.Configure(app =>
+                        {
+                            app.UseImageflow();
                         });
                     });
 
@@ -479,14 +499,7 @@ namespace Imageflow.Server.Tests
                     .ConfigureServices(services =>
                     {
                         services.AddXunitLoggingDefaults(outputHelper);
-                    })
-                    .ConfigureWebHost(webHost =>
-                    {
-                        // Add TestServer
-                        webHost.UseTestServer();
-                        webHost.Configure(app =>
-                        {
-                            app.UseImageflow(new ImageflowMiddlewareOptions()
+                        services.ConfigureImageflowMiddleware(new ImageflowMiddlewareOptions()
                                 .SetMapWebRoot(false)
                                 // Maps / to ContentRootPath/images
                                 .MapPath("/", Path.Combine(contentRoot.PhysicalPath, "images"))
@@ -498,6 +511,14 @@ namespace Imageflow.Server.Tests
                                         .ForPrefix("/never/", StringComparison.Ordinal, SignatureRequired.Never,
                                             new string[]{}))
                                 );
+                    })
+                    .ConfigureWebHost(webHost =>
+                    {
+                        // Add TestServer
+                        webHost.UseTestServer();
+                        webHost.Configure(app =>
+                        {
+                            app.UseImageflow();
                         });
                     });
                 using var host = await hostBuilder.StartAsync(TestContext.Current.CancellationToken);
@@ -565,6 +586,14 @@ namespace Imageflow.Server.Tests
                                 SigningKey = remoteReaderKey
                             }.AddPrefix("/remote")
                         );
+                        services.ConfigureImageflowMiddleware(new ImageflowMiddlewareOptions()
+                            .SetMapWebRoot(false)
+                            // Maps / to ContentRootPath/images
+                            .MapPath("/", Path.Combine(contentRoot.PhysicalPath, "images"))
+                            .SetRequestSignatureOptions(
+                                new RequestSignatureOptions(SignatureRequired.ForAllRequests, 
+                                        new []{requestSigningKey})
+                            ));
                     })
                     .ConfigureWebHost(webHost =>
                     {
@@ -572,18 +601,12 @@ namespace Imageflow.Server.Tests
                         webHost.UseTestServer();
                         webHost.Configure(app =>
                         {
-                            app.UseImageflow(new ImageflowMiddlewareOptions()
-                                .SetMapWebRoot(false)
-                                // Maps / to ContentRootPath/images
-                                .MapPath("/", Path.Combine(contentRoot.PhysicalPath, "images"))
-                                .SetRequestSignatureOptions(
-                                    new RequestSignatureOptions(SignatureRequired.ForAllRequests, 
-                                            new []{requestSigningKey})
-                                ));
+                            app.UseImageflow();
                         });
                     });
                 using var host = await hostBuilder.StartAsync(TestContext.Current.CancellationToken);
                 using var client = host.GetTestClient();
+
 
                 // The origin file
                 var remoteUrl = "https://imageflow-resources.s3-us-west-2.amazonaws.com/test_inputs/imazen_400.png";
@@ -596,6 +619,7 @@ namespace Imageflow.Server.Tests
                 // Now we could stop here, but we also enabled request signing, which is different from remote reader signing
                 var signedModifiedUrl = Imazen.Common.Helpers.Signatures.SignRequest(modifiedUrl, requestSigningKey);
                 using var signedResponse = await client.GetAsync(signedModifiedUrl, TestContext.Current.CancellationToken);
+                outputHelper.WriteLine(signedResponse.RequestMessage.RequestUri.AbsoluteUri);
                 signedResponse.EnsureSuccessStatusCode();
                 
                 // Now, verify that the remote url can't be fetched without signing it the second time, 

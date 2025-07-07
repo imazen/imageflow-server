@@ -294,7 +294,7 @@ namespace Imazen.HybridCache.Benchmark
 
             internal bool UseMetaStore { get; set; }
             public int Seed { get; set; }
-            public MetaStoreOptions MetaStoreOptions { get; set; } = new MetaStoreOptions(null);
+            public MetaStoreOptions MetaStoreOptions { get; set; } = new MetaStoreOptions("");
             public bool WaitForKeypress { get; set; }
             public int RebootCount { get; set; } = 1;
             public int MaxLogEntries { get; set; } = 50;

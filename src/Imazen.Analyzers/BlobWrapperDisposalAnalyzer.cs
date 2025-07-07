@@ -100,12 +100,12 @@ namespace Imazen.Analyzers
             }
 
             // Check specific type names (including interfaces this type implements)
-            var typeName = typeSymbol.OriginalDefinition.ToDisplayString(); // Use OriginalDefinition for generics
+            var typeName = typeSymbol.OriginalDefinition?.ToDisplayString() ?? typeSymbol.ToDisplayString(); // Use OriginalDefinition for generics
             if (TrackedTypeNames.Contains(typeName)) return true;
 
             foreach (var iface in typeSymbol.AllInterfaces)
             {
-                if (TrackedTypeNames.Contains(iface.OriginalDefinition.ToDisplayString())) return true;
+                if (TrackedTypeNames.Contains(iface.OriginalDefinition?.ToDisplayString() ?? iface.ToDisplayString())) return true;
             }
 
             return false;

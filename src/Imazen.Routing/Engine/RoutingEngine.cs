@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Imazen.Routing.Engine;
 
-public class RoutingEngine : IBlobRequestRouter, IHasDiagnosticPageSection
+public class RoutingEngine : IRoutingEngine, IHasDiagnosticPageSection
 {
     private readonly RoutingLayerGroup[] layerGroups;
     private readonly IReLogger logger;

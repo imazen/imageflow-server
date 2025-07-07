@@ -9,7 +9,7 @@
         <Nullable>enable</Nullable>
     </PropertyGroup>
 
-    <Import Project="..\NugetPackages.targets" />
+    <Import Project="..\NugetPackageDefaults.targets" />
 
     <ItemGroup>
       <ProjectReference Include="..\Imazen.Common\Imazen.Common.csproj" />
@@ -22,6 +22,11 @@
           <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
           <PrivateAssets>all</PrivateAssets>
         </PackageReference>
+
+        <PackageReference Include="PolySharp" Version="1.15.0">
+          <PrivateAssets>all</PrivateAssets>
+          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      </PackageReference>
     </ItemGroup>
     <ItemGroup>
       <AdditionalFiles Include="PublicAPI.Shipped.txt" />

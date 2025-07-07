@@ -3,83 +3,74 @@ using System.Text;
 using Imageflow.Bindings;
 using Imazen.Abstractions.BlobCache;
 using Imazen.Abstractions.Blobs.LegacyProviders;
-using Imazen.Abstractions.DependencyInjection;
+
 using Imazen.Abstractions.Logging;
+using Imazen.Abstractions.Resulting;
 using Imazen.Common.Storage;
 using Imazen.Routing.Engine;
 using Imazen.Routing.Health;
 using Imazen.Routing.HttpAbstractions;
 using Imazen.Routing.Layers;
+using Imazen.Routing.Promises;
 using Imazen.Routing.Promises.Pipelines.Watermarking;
 using Imazen.Routing.Requests;
 using Imazen.Routing.Serving;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Imageflow.Server.Internal;
 
 internal class MiddlewareOptionsServerBuilder(
-    ImageServerContainer serverContainer,
-    IReLogger logger, 
-    IReLogStore logStore, 
-    ImageflowMiddlewareOptions options, 
-    IWebHostEnvironment env)
+
+        IServiceCollection services,
+        ImageflowMiddlewareOptions options)
 {
 
-    private DiagnosticsPage diagnosticsPage = null!;
-    public void PopulateServices()
+
+    public void RegisterServices()
     {
-        
-        var mappedPaths = options.MappedPaths.Cast<IPathMapping>().ToList();
-        if (options.MapWebRoot)
-        {
-            if (env?.WebRootPath == null)
-                throw new InvalidOperationException("Cannot call MapWebRoot if env.WebRootPath is null");
-            mappedPaths.Add(new PathMapping("/", env.WebRootPath));
-        }
-        
-        serverContainer.Register<IReLogger>(logger);
-        serverContainer.Register<IReLogStore>(logStore);
-        serverContainer.Register<IWebHostEnvironment>(env);
-        serverContainer.Register<ImageflowMiddlewareOptions>(options);
-        serverContainer.CopyFromOuter<IBlobCache>();
-        serverContainer.CopyFromOuter<IBlobCacheProvider>();
-        serverContainer.CopyFromOuter<ILicenseChecker>();
-#pragma warning disable CS0618 // Type or member is obsolete
-        serverContainer.CopyFromOuter<IBlobProvider>();
-#pragma warning restore CS0618 // Type or member is obsolete
-        serverContainer.CopyFromOuter<IBlobWrapperProvider>();
-        var perfTracker = new NullPerformanceTracker();
-        serverContainer.Register<IPerformanceTracker>(perfTracker);
 
 
-        var licensingOptions = new LicenseOptions
-        {
-            LicenseKey = options.LicenseKey,
-            MyOpenSourceProjectUrl = options.MyOpenSourceProjectUrl,
-            ProcessWideKeyPrefixDefault = "imageflow_",
-            ProcessWideCandidateCacheFoldersDefault = new[]
-            {
-                env.ContentRootPath,
-                Path.GetTempPath()
-            },
-            EnforcementMethod = (Imazen.Routing.Serving.EnforceLicenseWith)options.EnforcementMethod
+        // TODO: verify ASP.NET adds the webhostenvironment services.AddSingleton(env);
+        services.AddSingleton(options);
 
-        };
-        serverContainer.Register(licensingOptions);
-        
         var diagPageOptions = new DiagnosticsPageOptions(
             options.DiagnosticsPassword,
             (Imazen.Routing.Layers.DiagnosticsPageOptions.AccessDiagnosticsFrom)options.DiagnosticsAccess);
-        serverContainer.Register(diagPageOptions);
-        
-        diagnosticsPage = new DiagnosticsPage(serverContainer, logger, logStore,diagPageOptions);
+        services.AddDiagnosticsPage(diagPageOptions);
+        services.TryAddSingleton(
+            new GlobalInfoProviderServiceCollectionReference(services)
+        );
+        services.TryAddSingleton<GlobalInfoProvider>();
+
+
+        services.AddSingleton<LicenseOptions>(p =>
+        {
+            var env = p.GetRequiredService<IWebHostEnvironment>();
+            var options = p.GetRequiredService<ImageflowMiddlewareOptions>();
+            return new LicenseOptions
+            {
+                LicenseKey = options.LicenseKey,
+                MyOpenSourceProjectUrl = options.MyOpenSourceProjectUrl,
+                ProcessWideKeyPrefixDefault = "imageflow_",
+                ProcessWideCandidateCacheFoldersDefault = new[]
+                {
+                    env.ContentRootPath,
+                    Path.GetTempPath()
+                },
+                EnforcementMethod = (Imazen.Routing.Serving.EnforceLicenseWith)options.EnforcementMethod
+
+            };
+        });
+        services.TryAddSingleton<ILicenseChecker>(p => Licensing.CreateAndEnsureManagerSingletonCreated(p.GetRequiredService<LicenseOptions>()));
+
 
         // Do watermark settings mappings
         WatermarkingLogicOptions? watermarkingLogicOptions = null;
-        
-        
+
+
         watermarkingLogicOptions = new WatermarkingLogicOptions(
             (name) =>
             {
@@ -91,7 +82,7 @@ internal class MiddlewareOptionsServerBuilder(
                     match.VirtualPath,
                     match.Watermark);
             },
-            
+
             (IRequestSnapshot request, IList<WatermarkWithPath>? list) =>
             {
                 if (options.Watermarking.Count == 0) return list;
@@ -109,79 +100,50 @@ internal class MiddlewareOptionsServerBuilder(
                 list = args.AppliedWatermarks.Select(WatermarkWithPath.FromIWatermark).ToList();
                 return list;
             });
-        serverContainer.Register(watermarkingLogicOptions);
-        
-        
-        var licenseChecker = serverContainer.GetService<ILicenseChecker>() ??
-                             Licensing.CreateAndEnsureManagerSingletonCreated(licensingOptions);
+        services.AddSingleton(watermarkingLogicOptions);
+        services.AddSingleton<IRoutingEngine, LegacyRoutingEngine>();
+        services.AddImageServer<RequestStreamAdapter, ResponseStreamAdapter, HttpContext>();
 
-        var routingBuilder = new RoutingBuilder();
-        var router = CreateRoutes(routingBuilder,mappedPaths, options.ExtensionlessPaths, licenseChecker);
-        
-
-        if (options.ExtraMediaFileExtensions != null)
-        {
-            routingBuilder.ConfigureMedia((media) =>
-            {
-                media.ConfigurePreconditions((preconditions) =>
-                {
-                    preconditions.IncludeFileExtensions(options.ExtraMediaFileExtensions.ToArray());
-                });
-            });
-        }
-        if (options.RoutingConfigurationActions != null)
-        {
-            foreach (var action in options.RoutingConfigurationActions)
-            {
-                action(router);
-            }
-        }
-
-        var routingEngine = router.Build(logger);
-        
-        serverContainer.Register(routingEngine);
-        
-       
-        //TODO: Add a way to get the current ILicenseChecker
-        var imageServer = new ImageServer<RequestStreamAdapter,ResponseStreamAdapter, HttpContext>(
-            serverContainer,
-            licenseChecker,
-            licensingOptions,  
-            routingEngine, perfTracker, logger);
-        
-        serverContainer.Register<IImageServer<RequestStreamAdapter,ResponseStreamAdapter, HttpContext>>(imageServer);
-        
-        // Log any issues with the startup configuration
-        new StartupDiagnostics(serverContainer).LogIssues(logger);
     }
-    private PathPrefixHandler<Func<MutableRequestEventArgs, bool>> WrapUrlEventArgs(string pathPrefix,
-        Func<UrlEventArgs, bool> handler, bool readOnly)
-    {
-        return new PathPrefixHandler<Func<MutableRequestEventArgs, bool>>(pathPrefix, (args) =>
+}
+
+internal class LegacyRoutingEngine : IRoutingEngine
+{
+    private IRoutingEngine routingEngine;
+
+    public bool MightHandleRequest<TQ>(string path, TQ query) where TQ : IReadOnlyQueryWrapper => routingEngine.MightHandleRequest(path, query);
+    public ValueTask<CodeResult<IRoutingEndpoint>?> Route(MutableRequest request, CancellationToken cancellationToken = default) => routingEngine.Route(request, cancellationToken);
+
+    public ValueTask<CodeResult<ICacheableBlobPromise>?> RouteToPromiseAsync(MutableRequest request, CancellationToken cancellationToken = default) => routingEngine.RouteToPromiseAsync(request, cancellationToken);
+
+    public LegacyRoutingEngine(
+        ImageflowMiddlewareOptions options,
+        IWebHostEnvironment env,
+        IReLoggerFactory loggerFactory,
+        ILicenseChecker licenseChecker,
+        DiagnosticsPage diagnosticsPage,
+        IEnumerable<IBlobWrapperProvider> blobWrapperProviders, 
+        IEnumerable<IBlobWrapperProviderZoned> blobWrapperProvidersZoned,
+        #pragma warning disable CS0618
+        IEnumerable<IBlobProvider> blobProviders
+        #pragma warning restore CS0618
+        )
         {
-            var httpContext = args.Request.OriginatingRequest?.GetHttpContextUnreliable<HttpContext>();
-            var dict = args.Request.MutableQueryString.ToStringDictionary();
-            var e = new UrlEventArgs(httpContext, args.VirtualPath, dict);
-            var result = handler(e);
-            // We discard any changes to the query string or path.
-            if (readOnly)
-                return result;
-            args.Request.MutablePath = e.VirtualPath;
-            // Parse StringValues into a dictionary
-            args.Request.MutableQueryString = 
-                e.Query.ToStringValuesDictionary();
-                
-            return result;
-        });
-    }
-    private RoutingBuilder CreateRoutes(RoutingBuilder builder, IReadOnlyCollection<IPathMapping> mappedPaths,
-        IEnumerable<ImageflowMiddlewareOptions.ExtensionlessPath> optionsExtensionlessPaths, ILicenseChecker licenseChecker)
-    {
+
+        var mappedPaths = options.MappedPaths.Cast<IPathMapping>().ToList();
+        if (options.MapWebRoot)
+        {
+            if (env?.WebRootPath == null)
+                throw new InvalidOperationException("Cannot call MapWebRoot if env.WebRootPath is null");
+            mappedPaths.Add(new PathMapping("/", env.WebRootPath));
+        }
+
+        var builder = new RoutingBuilder();
         builder.ConfigureMedia((media) =>
         {
             media.ConfigurePreconditions((preconditions) =>
             {
-                preconditions.IncludeDefaultImageExtensions().IncludePathPrefixes(optionsExtensionlessPaths);
+                preconditions.IncludeDefaultImageExtensions().IncludePathPrefixes(options.ExtensionlessPaths);
             });
         });
         
@@ -197,7 +159,8 @@ internal class MiddlewareOptionsServerBuilder(
         
         //GlobalPerf.Singleton.PreRewriteQuery(request.GetQuery().Keys);
         
-        // MutableRequestEventLayer (PreRewriteAuthorization), use lambdas to inject Context, and possibly also copy/restore dictionary.
+        // MutableRequestEventLayer (PreRewriteAuthorization), use lambdas 
+        // to inject Context, and possibly also copy/restore dictionary.
         if (options.PreRewriteAuthorization.Count > 0)
         {
             builder.AddMediaLayer(new MutableRequestEventLayer("PreRewriteAuthorization",
@@ -256,14 +219,9 @@ internal class MiddlewareOptionsServerBuilder(
                 (IPathMapping)new PathMapping(a.VirtualPath, a.PhysicalPath, a.IgnorePrefixCase)).ToList()));
         }
 
-#pragma warning disable CS0618 // Type or member is obsolete
-        var blobProviders = serverContainer.GetService<IEnumerable<IBlobProvider>>()?.ToList();
-#pragma warning restore CS0618 // Type or member is obsolete
-        var blobWrapperProviders = serverContainer.GetService<IEnumerable<IBlobWrapperProvider>>()?.ToList();
-        if (blobProviders?.Count > 0 || blobWrapperProviders?.Count > 0)
-        {
-            builder.AddMediaLayer(new BlobProvidersLayer(blobProviders, blobWrapperProviders));
-        }
+
+        builder.AddMediaLayer(new BlobProvidersLayer(blobProviders, blobWrapperProviders));
+        
         
         builder.AddEndpointLayer(diagnosticsPage);
 
@@ -291,12 +249,56 @@ internal class MiddlewareOptionsServerBuilder(
                 var s = new StringBuilder(8096);
                 var now = DateTime.UtcNow.ToString(NumberFormatInfo.InvariantInfo);
                 s.AppendLine($"License page for Imageflow at {req.OriginatingRequest?.GetHost().Value} generated {now} UTC");
-                var licenser = serverContainer.GetRequiredService<ILicenseChecker>(); 
-                s.Append(licenser.GetLicensePageContents());
+                s.Append(licenseChecker.GetLicensePageContents());
                 return SmallHttpResponse.NoStoreNoRobots((200, s.ToString()));
             });
             
     
-        return builder;
+
+        if (options.ExtraMediaFileExtensions != null)
+        {
+            builder.ConfigureMedia((media) =>
+            {
+                media.ConfigurePreconditions((preconditions) =>
+                {
+                    preconditions.IncludeFileExtensions(options.ExtraMediaFileExtensions.ToArray());
+                });
+            });
+        }
+        if (options.RoutingConfigurationActions != null)
+        {
+            foreach (var action in options.RoutingConfigurationActions)
+            {
+                action(builder);
+            }
+        }
+
+        var logger = loggerFactory.CreateReLogger("Imageflow.Routing");
+
+        routingEngine = builder.Build(logger);
     }
+
+
+    private PathPrefixHandler<Func<MutableRequestEventArgs, bool>> WrapUrlEventArgs(string pathPrefix,
+        Func<UrlEventArgs, bool> handler, bool readOnly)
+    {
+        return new PathPrefixHandler<Func<MutableRequestEventArgs, bool>>(pathPrefix, (args) =>
+        {
+            var httpContext = args.Request.OriginatingRequest?.GetHttpContextUnreliable<HttpContext>();
+            var dict = args.Request.MutableQueryString.ToStringDictionary();
+            var e = new UrlEventArgs(httpContext, args.VirtualPath, dict);
+            var result = handler(e);
+            // We discard any changes to the query string or path.
+            if (readOnly)
+                return result;
+            args.Request.MutablePath = e.VirtualPath;
+            // Parse StringValues into a dictionary
+            args.Request.MutableQueryString = 
+                e.Query.ToStringValuesDictionary();
+                
+            return result;
+        });
+    }
+
+
 }

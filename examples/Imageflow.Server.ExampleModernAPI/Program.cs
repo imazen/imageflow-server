@@ -11,24 +11,11 @@ var builder = WebApplication.CreateBuilder(args);
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-
-builder.Services.AddImageflowLoggingSupport();
-
-var app = builder.Build();
-
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-
-app.UseHttpsRedirection();
-
-
-app.UseImageflow(new ImageflowMiddlewareOptions()
+#pragma warning disable CS0618
+builder.Services.ConfigureImageflowMiddleware(new ImageflowMiddlewareOptions()
     .MapPath("/images", Path.Join(builder.Environment.WebRootPath, "images"))
     .SetMyOpenSourceProjectUrl("https://github.com/imazen/imageflow-dotnet-server")
+    
     .AddRoutingConfiguration((routing) =>
     {
         routing.ConfigureEndpoints((endpoints) =>
@@ -39,7 +26,19 @@ app.UseImageflow(new ImageflowMiddlewareOptions()
             })));
         });
     }));
-    
+#pragma warning restore CS0618
+var app = builder.Build();
+
+// Configure the HTTP request pipeline.
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.UseHttpsRedirection();
+app.UseImageflow();
+
 
 var summaries = new[]
 {

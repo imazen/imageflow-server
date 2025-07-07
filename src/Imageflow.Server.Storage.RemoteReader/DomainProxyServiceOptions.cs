@@ -9,7 +9,7 @@ public class DomainProxyServiceOptions
     {
         Prefixes = new List<DomainProxyPrefix>();
     }
-    public DomainProxyServiceOptions AddPrefix(string prefix, string remoteUriBase, bool ignorePrefixCase, string httpClientName = null)
+    public DomainProxyServiceOptions AddPrefix(string prefix, string remoteUriBase, bool ignorePrefixCase, string? httpClientName = null)
     {
         Prefixes.Add(new DomainProxyPrefix(prefix, remoteUriBase, ignorePrefixCase, httpClientName));
         return this;

@@ -2,9 +2,11 @@ using Imageflow.Fluent;
 using Imazen.Common.Instrumentation.Support.InfoAccumulators;
 using Imazen.Routing.Engine;
 using Imazen.Routing.Layers;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Imageflow.Server
 {
+
     public class ImageflowMiddlewareOptions: IInfoProvider
     {
         internal record struct ExtensionlessPath(string StringToCompare, StringComparison StringComparison)

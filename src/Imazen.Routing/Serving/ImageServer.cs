@@ -3,7 +3,7 @@ using Imageflow.Server;
 using Imazen.Abstractions.BlobCache;
 using Imazen.Abstractions.Blobs;
 using Imazen.Abstractions.Blobs.LegacyProviders;
-using Imazen.Abstractions.DependencyInjection;
+
 using Imazen.Abstractions.Logging;
 using Imazen.Abstractions.Resulting;
 using Imazen.Common.Concurrency.BoundedTaskCollection;
@@ -21,9 +21,86 @@ using Imazen.Routing.Promises.Pipelines;
 using Imazen.Routing.Promises.Pipelines.Watermarking;
 using Imazen.Routing.Requests;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
-
+using Microsoft.Extensions.Logging;
 namespace Imazen.Routing.Serving;
+
+// Everything that implements IHostedService must register as a IHostedService singleton
+
+
+public static class ImageServerExtensions
+{
+
+    internal static IServiceCollection AddImageflowLoggingSupport(this IServiceCollection services, ReLogStoreOptions? logStorageOptions = null)
+    {
+        if (logStorageOptions != null)
+        {
+            services.AddSingleton(logStorageOptions);
+        }
+        services.AddSingleton<IReLogStore>((container) => new ReLogStore(container.GetService<ReLogStoreOptions>() ?? new ReLogStoreOptions()));
+        services.AddSingleton<IReLoggerFactory>((container) =>
+            new ReLoggerFactory(container.GetRequiredService<ILoggerFactory>(), container.GetRequiredService<IReLogStore>()));
+        services.AddSingleton(typeof(IReLogger<>), typeof(ReLogger<>));
+        return services;
+    }
+
+    internal static IServiceCollection TryAddImageflowLoggingSupport(this IServiceCollection services, ReLogStoreOptions? logStorageOptions = null)
+    {
+        services.TryAddSingleton(logStorageOptions ?? new ReLogStoreOptions());
+        services.TryAddSingleton<IReLogStore>((container) => new ReLogStore(container.GetRequiredService<ReLogStoreOptions>()));
+        services.TryAddSingleton<IReLoggerFactory>((container) =>
+            new ReLoggerFactory(container.GetRequiredService<ILoggerFactory>(), container.GetRequiredService<IReLogStore>()));
+        services.TryAddSingleton(typeof(IReLogger<>), typeof(ReLogger<>));
+        return services;
+    }
+    public static void AddImageServer<TRequest, TResponse, TContext>(this IServiceCollection services)
+        where TRequest : IHttpRequestStreamAdapter where TResponse : IHttpResponseStreamAdapter
+    {
+        services.TryAddDiagnosticsPageReportAndStartup();
+        services.TryAddImageflowLoggingSupport();
+        services.TryAddSingleton<IPerformanceTracker, NullPerformanceTracker>();
+        // Register WatermarkingLogicOptions if not already present
+        services.TryAddSingleton(new WatermarkingLogicOptions(null, null));
+
+        // Register CacheHealthTracker with a factory.
+        // The DI container will call this factory when someone asks for a CacheHealthTracker.
+        services.TryAddSingleton<CacheHealthTracker>(provider =>
+        {
+            // Now you can safely resolve the logger factory.
+            // GetRequiredService will throw if it's not registered, which is what we want.
+            var loggerFactory = provider.GetRequiredService<IReLoggerFactory>();
+            var logger = loggerFactory.CreateReLogger("CacheHealthTracker"); // Create a logger for this service
+            return new CacheHealthTracker(logger);
+        });
+
+        // Register MemoryCache if not already present
+        services.TryAddSingleton<MemoryCache>(_ => new MemoryCache(new MemoryCacheOptions(
+            "memCache", 100,
+            1000, 1000 * 10, TimeSpan.FromSeconds(10))));
+
+
+        services.AddSingleton<IBlobCache>(p => p.GetRequiredService<MemoryCache>());
+
+        // Register BoundedTaskCollection
+        services.TryAddSingleton<BoundedTaskCollection<BlobTaskItem>>(_ =>
+        {
+            // Note: You'll need a way to manage the CancellationTokenSource's lifecycle.
+            // A singleton might not be the right lifetime for this if it needs to be reset.
+            var uploadCancellationTokenSource = new CancellationTokenSource();
+            return new BoundedTaskCollection<BlobTaskItem>(150 * 1024 * 1024, uploadCancellationTokenSource);
+        });
+
+        // Finally, register the main ImageServer itself, which depends on all the above services.
+        // The container will automatically inject them into the constructor.
+        services.AddSingleton<IImageServer<TRequest, TResponse, TContext>, ImageServer<TRequest, TResponse, TContext>>();
+
+        // Add as IHostedService via provider lookup
+        services.AddSingleton<IHostedService>(p => (IHostedService)p.GetRequiredService<IImageServer<TRequest, TResponse, TContext>>());
+    }
+}
+
+
 
 internal class ImageServer<TRequest, TResponse, TContext> : IImageServer<TRequest,TResponse, TContext>, IHostedService
     where TRequest : IHttpRequestStreamAdapter 
@@ -31,65 +108,56 @@ internal class ImageServer<TRequest, TResponse, TContext> : IImageServer<TReques
 {
     private readonly IReLogger logger;
     private readonly ILicenseChecker licenseChecker;
-    private readonly RoutingEngine routingEngine;
+    private readonly IRoutingEngine routingEngine;
     private readonly IBlobPromisePipeline pipeline;
     private readonly IPerformanceTracker perf;
     private readonly CancellationTokenSource uploadCancellationTokenSource = new();
     private readonly BoundedTaskCollection<BlobTaskItem> uploadQueue;
     private readonly bool shutdownRegisteredServices;
-    private readonly IImageServerContainer container;
     private readonly CacheHealthTracker cacheHealthTracker;
-    public ImageServer(IImageServerContainer container,  
+    private readonly IList<IHostedImageServerService> registeredServices;
+    private readonly IServiceProvider serviceProvider;
+    public ImageServer(
+        IServiceProvider serviceProvider,
+        IEnumerable<IInfoProvider> infoProviders,
         ILicenseChecker licenseChecker,
         LicenseOptions licenseOptions,
-        RoutingEngine routingEngine, 
+        IRoutingEngine routingEngine, 
         IPerformanceTracker perfTracker,
-        IReLogger logger, 
+        IReLoggerFactory loggerFactory,
+        WatermarkingLogicOptions watermarkingLogic,
+        CacheHealthTracker cacheHealthTracker,
+        IEnumerable<IBlobCache> blobCaches,
+        IEnumerable<IBlobCacheProvider> blobCacheProviders,
+        MemoryCache memoryCache,
+        BoundedTaskCollection<BlobTaskItem> uploadQueue,
+        IEnumerable<IHostedImageServerService> registeredServices,
+        StartupDiagnostics startupDiagnostics,
         bool shutdownRegisteredServices = true)
     {
         this.shutdownRegisteredServices = shutdownRegisteredServices;
         perf = perfTracker;
-        this.container = container;
-        this.logger = logger.WithSubcategory("ImageServer");
+        this.logger = loggerFactory.CreateReLogger("ImageServer");
         this.routingEngine = routingEngine;
         this.licenseChecker = licenseChecker;
-
-
+        this.registeredServices = registeredServices.ToList();
+        this.serviceProvider = serviceProvider;
+        this.uploadQueue = uploadQueue;
+        this.perf = perfTracker;
+        this.cacheHealthTracker = cacheHealthTracker;
         licenseChecker.Initialize(licenseOptions);
                      
         licenseChecker.FireHeartbeat();
-        var infoProviders = container.GetService<IEnumerable<IInfoProvider>>()?.ToList();
-        if (infoProviders != null)
-            GlobalPerf.Singleton.SetInfoProviders(infoProviders);
+        GlobalPerf.Singleton.SetInfoProviders(infoProviders.ToList());
         
         
         var blobFactory = new SimpleReusableBlobFactory();
-        
-        // ensure routingengine is registered
-        if (!container.Contains<RoutingEngine>())
-            container.Register(routingEngine);
-        
-        uploadQueue = container.GetService<BoundedTaskCollection<BlobTaskItem>>();
-        if (uploadQueue == null)
-        {
-            uploadQueue = new BoundedTaskCollection<BlobTaskItem>(150 * 1024 * 1024, uploadCancellationTokenSource);
-            container.Register<BoundedTaskCollection<BlobTaskItem>>(uploadQueue);
-        }
 
-        var memoryCache = container.GetService<MemoryCache>();
-        if (memoryCache == null)
-        {
-            memoryCache = new MemoryCache(new MemoryCacheOptions(
-                "memCache", 100, 
-                1000, 1000 * 10, TimeSpan.FromSeconds(10)));
-            container.Register<MemoryCache>(memoryCache);
-        }
-
-        var allCachesFromProviders = container.GetService<IEnumerable<IBlobCacheProvider>>()
+        var allCachesFromProviders = blobCacheProviders
             ?.SelectMany(p => p.GetBlobCaches());
         
-        var allIndependentCaches = container.GetService<IEnumerable<IBlobCache>>();
-        var allCaches = (allCachesFromProviders ?? Enumerable.Empty<IBlobCache>()).Concat(allIndependentCaches ?? Enumerable.Empty<IBlobCache>()).ToList();
+        var allIndependentCaches = blobCaches;
+        var allCaches = (allCachesFromProviders ?? []).Concat(allIndependentCaches ?? []).ToList();
         
         foreach (var cache in allCaches)
         {
@@ -97,12 +165,8 @@ internal class ImageServer<TRequest, TResponse, TContext> : IImageServer<TReques
         }
         
         var allCachesExceptMemory = allCaches?.Where(c => c != memoryCache)?.ToList();
-        
-        cacheHealthTracker = container.GetService<CacheHealthTracker>();
-        cacheHealthTracker ??= new CacheHealthTracker(logger);
 
-        var watermarkingLogic = container.GetService<WatermarkingLogicOptions>() ??
-                                new WatermarkingLogicOptions(null, null);
+
         var sourceCacheOptions = new CacheEngineOptions
         {
             HealthTracker = cacheHealthTracker,
@@ -125,6 +189,10 @@ internal class ImageServer<TRequest, TResponse, TContext> : IImageServer<TReques
         pipeline = new CacheEngine(null, sourceCacheOptions);
         pipeline = new ImagingMiddleware(pipeline, imagingOptions);
         pipeline = new CacheEngine(pipeline, sourceCacheOptions);
+
+        startupDiagnostics.LogIssues(logger);
+
+
     }
 
     private Task AwaitBeforeShutdown()
@@ -312,8 +380,19 @@ internal class ImageServer<TRequest, TResponse, TContext> : IImageServer<TReques
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
+        //DependencyRegistrationHealth.ThrowOnProblems(serviceProvider);
         await uploadQueue.StartAsync(cancellationToken);
         await cacheHealthTracker.StartAsync(cancellationToken);
+        // startup
+        foreach (var service in this.registeredServices)
+        {
+            await service.StartAsync(cancellationToken);
+        }
+    }
+
+    public async Task AwaitAllCurrentTasks(CancellationToken cancellationToken)
+    {
+        await uploadQueue.AwaitAllCurrentTasks();
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
@@ -324,8 +403,7 @@ internal class ImageServer<TRequest, TResponse, TContext> : IImageServer<TReques
         await cacheHealthTracker.StopAsync(cancellationToken);
         if (shutdownRegisteredServices)
         {
-            var services = this.container.GetInstanceOfEverythingLocal<IHostedService>();
-            foreach (var service in services)
+            foreach (var service in this.registeredServices)
             {
                 await service.StopAsync(cancellationToken);
             }

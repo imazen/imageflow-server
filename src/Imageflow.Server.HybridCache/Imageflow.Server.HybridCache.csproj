@@ -19,6 +19,7 @@
     <ItemGroup>
       <ProjectReference Include="..\Imazen.Common\Imazen.Common.csproj" />
       <ProjectReference Include="..\Imazen.HybridCache\Imazen.HybridCache.csproj" />
+      <ProjectReference Include="..\Imazen.Routing\Imazen.Routing.csproj" />
     </ItemGroup>
     <ItemGroup>
       <AdditionalFiles Include="PublicAPI.Shipped.txt" />

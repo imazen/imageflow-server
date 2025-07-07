@@ -581,7 +581,7 @@ public class MatcherAstEvaluator
                 if (!string.IsNullOrEmpty(variable.Name))
                 {
                     _captures ??= new List<MatchExpressionCapture>();
-                    _captures.Add(new MatchExpressionCapture(variable.Name, capturedValue));
+                    _captures.Add(new MatchExpressionCapture(variable.Name!, capturedValue));
                 }
                 // Update consumed length *only if conditions met*
                 _charactersConsumed = variableEnd; // We consumed up to the boundary that closed this segment

@@ -11,12 +11,8 @@ namespace Imageflow.Server.LegacyBlob
             , RemoteReaderServiceOptions options
             )
         {
-            services.AddSingleton<IBlobProvider>((container) =>
-            {
-                var logger = container.GetRequiredService<ILogger<RemoteReaderService>>();
-                var http = container.GetRequiredService<IHttpClientFactory>();
-                return new RemoteReaderService(options, logger, http);
-            });
+            services.AddSingleton(options);
+            services.AddSingleton<IBlobProvider, RemoteReaderService>();
 
             return services;
         }

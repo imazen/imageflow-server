@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Http;
 
 namespace Imageflow.Server.Internal;
 
-internal readonly record struct ResponseStreamAdapter(HttpResponse Response) : IHttpResponseStreamAdapter
+public readonly record struct ResponseStreamAdapter(HttpResponse Response) : IHttpResponseStreamAdapter
 {
     public void SetHeader(string name, string value)
     {

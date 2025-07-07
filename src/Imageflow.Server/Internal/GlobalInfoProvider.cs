@@ -1,15 +1,19 @@
 using System.Reflection;
-using Imazen.Abstractions.DependencyInjection;
+
 using Imazen.Common.Helpers;
 using Imazen.Common.Instrumentation.Support.InfoAccumulators;
 using Imazen.Routing.Helpers;
-using Imazen.Routing.HttpAbstractions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using Imazen.Routing.HttpAbstractions;
+using System.Security.Cryptography.X509Certificates;
 
 namespace Imageflow.Server.Internal
 {
-    internal class GlobalInfoProvider(IImageServerContainer serviceProvider): IInfoProvider
+    
+    public record GlobalInfoProviderServiceCollectionReference(IServiceCollection Collection);
+
+    public class GlobalInfoProvider(GlobalInfoProviderServiceCollectionReference collection, IServiceProvider serviceProvider): IInfoProvider
     {
         
         private string? iisVersion;
@@ -27,11 +31,11 @@ namespace Imageflow.Server.Internal
         {
             var env = serviceProvider.GetService<IWebHostEnvironment>();
 
-            var everything = serviceProvider.GetInstanceOfEverythingLocal<object>().ToList();
-            var registeredObjectNames = everything
-                .Select(p =>
+            var registeredObjectNames = collection.Collection
+                .Select(descriptor =>
                 {
-                    var t = p.GetType();
+                    // Use ImplementationType if available, otherwise fall back to ServiceType
+                    var t = descriptor.ImplementationType ?? descriptor.ServiceType;
                     if (t.Namespace != null && 
                         (t.Namespace.StartsWith("Imazen") ||
                          t.Namespace.StartsWith("Imageflow") ||
@@ -44,7 +48,7 @@ namespace Imageflow.Server.Internal
                     {
                         return t.FullName;
                     }
-                }).ToList();
+                }).Distinct().ToList();
                 
             var q = query.WithPrefix("proc_");
             if (iisVersion != null) 
@@ -79,7 +83,7 @@ namespace Imageflow.Server.Internal
             {
                 query.Add("p",s);
             }
-            foreach (var p in everything.OfType<IInfoProvider>())
+            foreach (var p in serviceProvider.GetServices<IInfoProvider>())
             {
                 if (p != this)
                     p?.Add(query);

@@ -11,7 +11,6 @@ var builder = FunctionsApplication.CreateBuilder(args);
 
 builder.ConfigureFunctionsWebApplication();
 
-builder.Services.AddImageflowLoggingSupport();
 
 builder.Services.AddAzureClients(clientBuilder =>
 {
@@ -30,10 +29,10 @@ builder.Services.AddImageflowDomainProxyService(new DomainProxyServiceOptions()
     .AddPrefix("/iio/", "https://www.imazen.io/")
     );
 
-builder.Services.AddSingleton<ImageflowMiddlewareOptions>(
-    new ImageflowMiddlewareOptions()
+builder.Services.ConfigureImageflowMiddleware(new ImageflowMiddlewareOptions()
     .SetMyOpenSourceProjectUrl("https://github.com/imazen/imageflow-dotnet-server")
     );
+
 
 builder.UseMiddleware<ImageflowFunctionMiddleware>();
 

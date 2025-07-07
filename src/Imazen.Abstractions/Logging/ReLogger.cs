@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.Extensions.Logging;
 
 namespace Imazen.Abstractions.Logging
@@ -61,7 +62,9 @@ namespace Imazen.Abstractions.Logging
 
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull
         {
-            var instance = new ReLoggerScope<TState>(impl.BeginScope(state), state, this);
+            var implScope = impl.BeginScope(state);
+            if (implScope == null) return null;
+            var instance = new ReLoggerScope<TState>(implScope, state, this);
             parent.BeginScope(state, instance);
             return instance;
         }
@@ -69,5 +72,42 @@ namespace Imazen.Abstractions.Logging
         {
             parent.EndScope(state, scope);
         }
+    }
+
+    internal class ReLogger<T> : IReLogger<T> {
+        private readonly IReLogger impl;
+        public ReLogger(IReLoggerFactory factory) {
+            impl = factory.CreateReLogger(typeof(T).FullName ?? typeof(T).Name);
+        }
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            impl.Log(logLevel, eventId, state, exception, formatter);
+        }
+
+        public bool IsEnabled(LogLevel logLevel)
+        {
+            return impl.IsEnabled(logLevel);
+        }
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull
+        {
+            return impl.BeginScope(state);
+        }
+        public IReLogger WithRetain
+        {
+            get
+            {
+                return impl.WithRetain;
+            }
+        }
+        public IReLogger WithRetainUnique(string key)
+        {
+            return impl.WithRetainUnique(key);
+        }
+        public IReLogger WithSubcategory(string subcategoryString)
+        {
+            return impl.WithSubcategory(subcategoryString);
+        }
+        
     }
 }

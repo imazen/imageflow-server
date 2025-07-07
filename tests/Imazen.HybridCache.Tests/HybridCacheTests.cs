@@ -78,7 +78,7 @@ namespace Imazen.HybridCache.Tests
                 using var rd4 = result4 as IDisposable;
                 Assert.Equal("WriteSucceeded", result4.Status);
      
-                var result5 = await cache.GetOrCreateBytes(key2, DataProvider, cancellationToken, true);
+                var result5 = await cache.GetOrCreateBytes(key2, DataProvider, cancellationToken, false);
                 using var rd5 = result5 as IDisposable;
                 Assert.Equal("DiskHit", result5.Status);
                 Assert.Null(result5.ContentType);
@@ -88,7 +88,6 @@ namespace Imazen.HybridCache.Tests
             {
                 try
                 {
-                    await cache.AwaitAllCurrentTasks(cancellationToken);
                     await cache.StopAsync(cancellationToken);
                 }
                 finally

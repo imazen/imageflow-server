@@ -53,6 +53,7 @@ namespace Imageflow.Server.Tests
                 .ConfigureServices(services =>
                 {
                     services.AddSingleton((ILicenseChecker)l);
+                    services.ConfigureImageflowMiddleware(options);
                 })
                 .ConfigureWebHost(webHost =>
                 {
@@ -60,7 +61,7 @@ namespace Imageflow.Server.Tests
                     webHost.UseTestServer();
                     webHost.Configure(app =>
                     {
-                        app.UseImageflow(options);
+                        app.UseImageflow();
                     });
                 });
 

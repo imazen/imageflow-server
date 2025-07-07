@@ -8,6 +8,7 @@
             net8.0;net48</TargetFrameworks>
         <TargetFrameworks Condition="'$(TEST_DOTNET_48)' != 'true'">
             net8.0</TargetFrameworks>
+        <NoWarn>$(NoWarn);CS8892</NoWarn>
     </PropertyGroup>
     <ItemGroup>
 

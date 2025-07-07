@@ -10,7 +10,7 @@ using Imazen.Common.Storage;
 using Imazen.Abstractions.BlobCache;
 using Imageflow.Server.Internal;
 using Imazen.Abstractions.Blobs.LegacyProviders;
-using Imazen.Abstractions.DependencyInjection;
+
 using Imazen.Abstractions.Logging;
 using Imazen.Routing.Health;
 using Imazen.Routing.Serving;
@@ -22,53 +22,16 @@ namespace Imageflow.Server
     public class ImageflowMiddleware
     {
         private readonly RequestDelegate next;
-        private readonly ImageflowMiddlewareOptions options;
         private readonly GlobalInfoProvider globalInfoProvider;
         private readonly IImageServer<RequestStreamAdapter,ResponseStreamAdapter, HttpContext>  imageServer;
         public ImageflowMiddleware(
-            RequestDelegate next, 
-            IWebHostEnvironment env, 
-            IServiceProvider serviceProvider, // You can request IEnumerable<T> to get all of them.
-            IEnumerable<IReLoggerFactory> loggerFactories, ILoggerFactory legacyLoggerFactory,
-            IEnumerable<IReLogStore> retainedLogStores,
-#pragma warning disable CS0618 // Type or member is obsolete
-            IEnumerable<IClassicDiskCache> diskCaches, 
-            IEnumerable<IStreamCache> streamCaches, 
-            IEnumerable<IBlobProvider> blobProviders, 
-#pragma warning restore CS0618 // Type or member is obsolete
-            IEnumerable<IBlobWrapperProvider> blobWrapperProviders,
-            IEnumerable<IBlobCache> blobCaches, 
-            IEnumerable<IBlobCacheProvider> blobCacheProviders, 
-            ImageflowMiddlewareOptions options)
+            RequestDelegate next,
+            GlobalInfoProvider globalInfoProvider,
+            IImageServer<RequestStreamAdapter,ResponseStreamAdapter, HttpContext> imageServer)
         {
-            
-            var retainedLogStore = retainedLogStores.FirstOrDefault() ?? new ReLogStore(new ReLogStoreOptions());
-            var loggerFactory = loggerFactories.FirstOrDefault() ?? new ReLoggerFactory(legacyLoggerFactory, retainedLogStore);
-            var logger = loggerFactory.CreateReLogger("ImageflowMiddleware");
-
+            this.imageServer = imageServer;
             this.next = next;
-            this.options = options;
-
-            var container = new ImageServerContainer(serviceProvider);
-
-            globalInfoProvider = new GlobalInfoProvider(container);
-            container.Register(globalInfoProvider);
-            
-      
-            
-            container.Register(env);
-            container.Register(logger);
-            
-           
-   
-            new MiddlewareOptionsServerBuilder(container, logger, retainedLogStore, options,env).PopulateServices();
-            
-            
-            var startDiag = new StartupDiagnostics(container);
-            startDiag.LogIssues(logger);
-            startDiag.Validate(logger);
-            
-            imageServer = container.GetRequiredService<IImageServer<RequestStreamAdapter,ResponseStreamAdapter, HttpContext>>();
+            this.globalInfoProvider = globalInfoProvider;
         }
 
         private bool hasPopulatedHttpContextExample = false;

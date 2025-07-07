@@ -84,7 +84,7 @@ public class RoutingBuilder
         return this;
     }
 
-    public RoutingEngine Build(IReLogger logger)
+    public IRoutingEngine Build(IReLogger logger)
     {
         return new RoutingEngine(Groups.Concat(new[] { Media, Endpoints}).Select(g => g.Build()).ToArray(), logger);
     }

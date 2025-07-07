@@ -331,7 +331,7 @@ public class CacheEngine: IBlobPromisePipeline
         // Here's also a good place to handle the cachefetchresults; \
         // HealthTracker[cacheHit].ReportBehavior();
         //
-        
+        await blob.EnsureReusable(bufferCancellationToken);
         if (await EnqueueSaveToCaches(cacheRequest, blob, isFresh, cacheHit, fetchTasks))
         {
             await blob.EnsureReusable(bufferCancellationToken);
@@ -512,4 +512,3 @@ internal record ServerlessCachePromise(IRequestSnapshot FinalRequest, ICacheable
         return await CacheEngine.Fetch(FreshPromise, router, cancellationToken);
     }
 }
-  

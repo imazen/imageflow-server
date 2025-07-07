@@ -212,7 +212,8 @@ public class TemplateAstEvaluator
         foreach(var t in tokens)
         {
             var token = t.RawToken;
-             if (token.TokenID == ImazenRoutingToken.COMMA || token.TokenID == ImazenRoutingToken.PIPE) {
+            if (token == null) continue;
+            if (token.TokenID == ImazenRoutingToken.COMMA || token.TokenID == ImazenRoutingToken.PIPE) {
                  result.Add(current.ToString());
                  current.Clear();
              } else {

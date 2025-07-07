@@ -263,6 +263,8 @@ internal class Executor : IAppConfigurator{
         if (config.DiskCache?.Enabled ?? false){
             services.AddImageflowHybridCache(GetHybridCacheOptions());
         }
+
+        services.ConfigureImageflowMiddleware(GetImageflowMiddlewareOptions());
     }
     public void ConfigureApp(IApplicationBuilder app, IWebHostEnvironment env){
             var options = GetServerConfigurationOptions();
@@ -281,7 +283,7 @@ internal class Executor : IAppConfigurator{
             if (options.UseHttpsRedirection){
                 app.UseHttpsRedirection();
             }
-            app.UseImageflow(GetImageflowMiddlewareOptions());
+            app.UseImageflow();
 
             if (options.UseRouting){
                 app.UseRouting();

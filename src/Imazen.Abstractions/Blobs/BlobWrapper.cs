@@ -5,7 +5,7 @@ namespace Imazen.Abstractions.Blobs
     /// <summary>
     /// A reference to a blob (either consumable or reusable). 
     /// </summary>
-    public class BlobWrapper : IBlobWrapper
+    public sealed class BlobWrapper : IBlobWrapper
     {
         public IBlobAttributes Attributes => core?.Attributes ?? throw new ObjectDisposedException("The BlobWrapper has been disposed");
         public long? EstimateAllocatedBytes => core?.EstimateAllocatedBytes;

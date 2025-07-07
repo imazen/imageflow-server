@@ -1,5 +1,5 @@
 using Imageflow.Server;
-using Imazen.Abstractions.DependencyInjection;
+
 using Imazen.Abstractions.Logging;
 using Imazen.Routing.Promises.Pipelines.Watermarking;
 using Imazen.Routing.Engine;
@@ -11,23 +11,28 @@ using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using System.IO;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Imazen.Routing.Tests.Serving;
 
-using TContext = object;
+internal class TestHttpContext
+{
+}
 public class ImageServerTests : ReLoggerTestBase
 {
     private readonly ILicenseChecker licenseChecker;
-    private IImageServerContainer container;
+    private ServiceCollection sharedServices;
+    private readonly ITestOutputHelper _output;
 
-    public ImageServerTests() :base("ImageServerTests")
+    public ImageServerTests( ITestOutputHelper output) :base("ImageServerTests")
     {
+        _output = output;
         licenseChecker = MockLicenseChecker.AlwaysOK();
-        container = new ImageServerContainer(null);
-        container.Register<ILicenseChecker>(() => licenseChecker);
-        container.Register<IReLoggerFactory>(() => loggerFactory);
-        container.Register<IReLogStore>(() => logStore);
-        container.Register<LicenseOptions>(() => new LicenseOptions
+        sharedServices = new ServiceCollection();
+        sharedServices.AddSingleton<ILicenseChecker>(licenseChecker);
+        sharedServices.AddSingleton<IReLoggerFactory>(loggerFactory);
+        sharedServices.AddSingleton<IReLogStore>(logStore);
+        sharedServices.AddSingleton<LicenseOptions>((_) => new LicenseOptions
         {
             
             ProcessWideCandidateCacheFoldersDefault = new string[]
@@ -35,23 +40,44 @@ public class ImageServerTests : ReLoggerTestBase
                 Path.GetTempPath() // Typical env.ContentRootPath as well
             }
         });
-
+        sharedServices.AddSingleton(new DiagnosticsPageOptions(null, DiagnosticsPageOptions.AccessDiagnosticsFrom.AnyHost));
+        sharedServices.MakeReadOnly();
     }
 
-    internal ImageServer<MockRequestAdapter, MockResponseAdapter, TContext>
+    private ServiceCollection DuplicateServiceCollection()
+    {
+        var s = new ServiceCollection();
+        s.Add(sharedServices);
+        return s;
+    }
+
+    internal IImageServer<MockRequestAdapter, MockResponseAdapter, TestHttpContext>
         CreateImageServer(
-            RoutingEngine routingEngine,
+            IRoutingEngine routingEngine,
             ImageServerOptions imageServerOptions
         )
     {
-        return new ImageServer<MockRequestAdapter, MockResponseAdapter, TContext>(
-            container,
-            container.GetRequiredService<ILicenseChecker>(),
-            container.GetRequiredService<LicenseOptions>(),
-            routingEngine,
-            container.GetService<IPerformanceTracker>() ?? new NullPerformanceTracker(),
-            logger
-        );
+        var c= DuplicateServiceCollection();
+        c.AddSingleton(imageServerOptions);
+        c.TryAddSingleton<IPerformanceTracker, NullPerformanceTracker>();
+        c.AddSingleton(routingEngine);
+        c.AddImageServer<MockRequestAdapter, MockResponseAdapter, TestHttpContext>();
+
+
+        var provider = c.BuildServiceProvider();
+        try
+        {
+            return provider.GetRequiredService<IImageServer<MockRequestAdapter, MockResponseAdapter, TestHttpContext>>();
+        }catch (Exception e)
+        {
+            // List service descriptors
+            foreach (var descriptor in c)
+            {
+                _output.WriteLine(descriptor.ImplementationType?.FullName ?? descriptor.ServiceType?.FullName);
+
+            }
+            throw;
+        }
     }
 
     [Fact]
@@ -66,7 +92,7 @@ public class ImageServerTests : ReLoggerTestBase
             new ImageServerOptions());
        
         
-        Assert.True(imageServer.MightHandleRequest("/hi", DictionaryQueryWrapper.Empty, new TContext()));
+        Assert.True(imageServer.MightHandleRequest("/hi", DictionaryQueryWrapper.Empty, new TestHttpContext()));
 
     }
 
@@ -83,7 +109,7 @@ public class ImageServerTests : ReLoggerTestBase
         );
         var request = MockRequest.GetLocalRequest("/hi").ToAdapter();
         var response = new MockResponseAdapter();
-        var context = new TContext();
+        var context = new TestHttpContext();
         var handled = await imageServer.TryHandleRequestAsync(request, response, context, TestContext.Current.CancellationToken);
         Assert.True(handled);
         var r = await response.ToMockResponse();

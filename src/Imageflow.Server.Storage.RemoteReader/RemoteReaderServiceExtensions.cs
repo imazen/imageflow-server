@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using System.Net.Http;
 using Imazen.Abstractions.Blobs.LegacyProviders;
 using Imazen.Abstractions.Logging;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Imageflow.Server.Storage.RemoteReader
 {
@@ -13,12 +14,9 @@ namespace Imageflow.Server.Storage.RemoteReader
             , RemoteReaderServiceOptions options
             )
         {
-            services.AddSingleton<IBlobWrapperProviderZoned>((container) =>
-            {
-                var logger = container.GetRequiredService<ILogger<RemoteReaderService>>();
-                var http = container.GetRequiredService<IHttpClientFactory>();
-                return new RemoteReaderService(options, logger, http);
-            });
+            services.AddSingleton(options);
+
+            services.AddSingleton<IBlobWrapperProvider, RemoteReaderService>();
 
             return services;
         }

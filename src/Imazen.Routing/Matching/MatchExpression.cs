@@ -566,9 +566,9 @@ public partial record MatchExpression
             if (!string.IsNullOrEmpty(segment.Name))
             {
                 // Matcher parsing should have already caught duplicates
-                if (!dict.ContainsKey(segment.Name))
+                if (!dict.ContainsKey(segment.Name!))
                 {
-                    dict.Add(segment.Name, new MatcherVariableInfo(segment.Name, segment.IsOptional));
+                    dict.Add(segment.Name!, new MatcherVariableInfo(segment.Name!, segment.IsOptional));
                 }
             }
         }

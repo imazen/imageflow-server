@@ -9,22 +9,23 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using Imazen.Abstractions.Blobs;
 using Imazen.Abstractions.Blobs.LegacyProviders;
+using Imazen.Abstractions.Logging;
 using Imazen.Abstractions.Resulting;
 using BlobMissingException = Imazen.Abstractions.Blobs.LegacyProviders.BlobMissingException;
 
 namespace Imageflow.Server.Storage.RemoteReader
 {
-    public class RemoteReaderService : IBlobWrapperProviderZoned
+    public class RemoteReaderService : IBlobWrapperProviderZoned, IBlobWrapperProvider
     {
 
         private readonly List<string> prefixes = new List<string>();
         private readonly IHttpClientFactory httpFactory;
         private readonly RemoteReaderServiceOptions options;
-        private readonly ILogger<RemoteReaderService> logger;
+        private readonly IReLogger<RemoteReaderService> logger;
         private readonly Func<Uri, string> httpClientSelector;
 
         public RemoteReaderService(RemoteReaderServiceOptions options
-            , ILogger<RemoteReaderService> logger
+            , IReLogger<RemoteReaderService> logger
             , IHttpClientFactory httpFactory
             )
         {
@@ -88,7 +89,7 @@ namespace Imageflow.Server.Storage.RemoteReader
         /// <returns></returns>
 #pragma warning disable CS0618 // Type or member is obsolete
 
-        public async Task<IBlobData> Fetch(string virtualPath)
+        public async Task<CodeResult<IBlobWrapper>> Fetch(string virtualPath)
 #pragma warning restore CS0618 // Type or member is obsolete
 
         {
@@ -137,7 +138,17 @@ namespace Imageflow.Server.Storage.RemoteReader
                         $"RemoteReader blob \"{virtualPath}\" not found. The remote \"{url}\" responded with status: {resp.StatusCode}");
                 }
 
-                return new RemoteReaderBlob(resp);
+                var attributes = new BlobAttributes()
+                {
+                    ContentType = resp.Content.Headers.ContentType?.MediaType,
+                    EstimatedBlobByteCount = resp.Content.Headers.ContentLength,
+                    LastModifiedDateUtc = resp.Content.Headers.LastModified,
+                    Etag = resp.Headers.ETag?.ToString()
+                };
+                var disposeAfter = resp;
+                var stream = await resp.Content.ReadAsStreamAsync().ConfigureAwait(false);
+
+                return new BlobWrapper(GetLatencyZone(virtualPath), new StreamBlob(attributes, stream, disposeAfter));
             }
             catch (BlobMissingException)
             {

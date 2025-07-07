@@ -37,8 +37,15 @@ public class BlobProvidersLayer : IRoutingLayer
                 CheckAndAddPrefixes(provider.GetPrefixes(), provider);
             }
         }
-
-        FastPreconditions = Conditions.HasPathPrefixOrdinalIgnoreCase(blobPrefixes.Select(p => p.Prefix).ToArray());
+        // if count is 0, we don't want to do anything
+        if (this.blobProviders.Count == 0 && this.blobWrapperProviders.Count == 0)
+        {
+            FastPreconditions = Conditions.False;
+        }
+        else
+        {
+            FastPreconditions = Conditions.HasPathPrefixOrdinalIgnoreCase(blobPrefixes.Select(p => p.Prefix).ToArray());
+        }
     }
 
     private void CheckAndAddPrefixes(IEnumerable<string> prefix, object provider)

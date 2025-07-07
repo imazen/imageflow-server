@@ -1,7 +1,9 @@
 ﻿using Imazen.Abstractions.Logging;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Builder.Extensions;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -10,35 +12,38 @@ namespace Imageflow.Server
     public static class ImageflowMiddlewareExtensions
     {
 
-        public static IServiceCollection AddImageflowLoggingSupport(this IServiceCollection services, ReLogStoreOptions? logStorageOptions = null)
+
+        public static IServiceCollection ConfigureImageflowMiddleware(this IServiceCollection services,  ImageflowMiddlewareOptions options)
+
         {
-            services.AddSingleton<IReLogStore>((container) => new ReLogStore(logStorageOptions ?? new ReLogStoreOptions()));
-            services.AddSingleton<IReLoggerFactory>((container) => 
-                new ReLoggerFactory(container.GetRequiredService<ILoggerFactory>(), container.GetRequiredService<IReLogStore>()));
+            var builder = new Internal.MiddlewareOptionsServerBuilder(services,options);
+            builder.RegisterServices();
             return services;
         }
 
 
-        // ReSharper disable once UnusedMethodReturnValue.Global
-        public static IApplicationBuilder UseImageflow(this IApplicationBuilder builder, ImageflowMiddlewareOptions options)
-        {
-            if (builder.ApplicationServices.GetService<IReLoggerFactory>() == null)
-            {
-                var services = builder.ApplicationServices as IServiceCollection;
-                services?.AddImageflowLoggingSupport();
-            }
-            return builder.UseMiddleware<ImageflowMiddleware>(options);
-        }
-
-        public static WebApplication UseImageflow(this WebApplication app, ImageflowMiddlewareOptions options)
+        public static WebApplication UseImageflow(this WebApplication app)
         { 
-            if (app.Services.GetService<IReLoggerFactory>() == null)
+            var options = app.Services.GetService<ImageflowMiddlewareOptions>();
+            if (options == null)
             {
-                throw new System.Exception("You must call Services.AddImageflowLoggingSupport() before calling UseImageflow");
+                throw new System.Exception("You must call services.ConfigureImageflowMiddleware() before calling UseImageflow");
             }
-            app.UseMiddleware<ImageflowMiddleware>(options);
+
+            app.UseMiddleware<ImageflowMiddleware>();
             return app;
         }
+
+        public static IApplicationBuilder UseImageflow(this IApplicationBuilder builder)
+        {
+            var options = builder.ApplicationServices.GetService<ImageflowMiddlewareOptions>();
+            if (options == null)
+            {
+                throw new System.Exception("You must call services.ConfigureImageflowMiddleware() before calling UseImageflow");
+            }
+            return builder.UseMiddleware<ImageflowMiddleware>();
+        }
+
 
     }
 }

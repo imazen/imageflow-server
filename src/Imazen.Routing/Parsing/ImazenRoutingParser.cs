@@ -21,7 +21,7 @@ public class ImazenRoutingParser
     // --- Simplified Expression Structure --- 
     [Production("expression : pathPart flagPart?")] // Optional flagPart
     public IAstNode ExpressionWithPathAndFlags(PathExpression path, ValueOption<FlagList> flags)
-        => new Expression(path, null, flags.Match(f => f, () => null));
+        => new Expression(path, null, flags.Match<FlagList?>(f => f, () => null));
 
     [Production("expression : flagPart")] 
     public IAstNode ExpressionWithFlagsOnly(FlagList flags)
@@ -129,7 +129,7 @@ public class ImazenRoutingParser
                 if (group.Value(1) is ModifierListAstNode modifierListNode) {
                     modifiers.AddRange(modifierListNode.Modifiers);
                 }
-                return group;
+                return (Group<ImazenRoutingToken, IAstNode>?)group;
             },
             none: () => null
         );

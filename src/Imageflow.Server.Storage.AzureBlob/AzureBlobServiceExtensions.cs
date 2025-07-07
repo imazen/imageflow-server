@@ -16,8 +16,8 @@ namespace Imageflow.Server.Storage.AzureBlob
             services.AddSingleton<IBlobWrapperProvider>((container) =>
             {
                 var loggerFactory = container.GetRequiredService<IReLoggerFactory>();
-                var blobServiceClient = container.GetService<BlobServiceClient>();
-                var clientFactory = container.GetService<IAzureClientFactory<BlobServiceClient>>();
+                var blobServiceClient = container.GetRequiredService<BlobServiceClient>();
+                var clientFactory = container.GetRequiredService<IAzureClientFactory<BlobServiceClient>>();
               
                 return new AzureBlobService(options, loggerFactory, blobServiceClient, clientFactory);
             });

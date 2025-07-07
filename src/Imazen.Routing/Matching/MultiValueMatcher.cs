@@ -109,7 +109,7 @@ public record MultiValueMatcher(
         if (ParsingOptions.RequireAcceptWebP && 
             (headers == null
              || !headers.TryGetValue(HttpHeaderNames.Accept, out var accept)
-             || !accept.Any(s => s.Contains("image/webp"))))
+             || !accept.Any(s => s != null && s.Contains("image/webp"))))
         {
             return new MultiMatchResult()
                 { Success = false, Error = "'image/webp' was not found in the HTTP Accept header string" };

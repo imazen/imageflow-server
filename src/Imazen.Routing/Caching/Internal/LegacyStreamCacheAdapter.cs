@@ -7,6 +7,7 @@ using Imazen.Common.Concurrency;
 using Imazen.Common.Concurrency.BoundedTaskCollection;
 using Imazen.Common.Extensibility.StreamCache;
 using Imazen.Common.Issues;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 #pragma warning disable CS0618 // Type or member is obsolete
@@ -84,9 +85,11 @@ internal class LegacyStreamCacheAdapter : IStreamCache
         return Task.CompletedTask;
     }
 
-    public Task StopAsync(CancellationToken cancellationToken)
+    public async Task StopAsync(CancellationToken cancellationToken)
     {
-        return AwaitAllCurrentTasks(cancellationToken);
+        if (cache is IHostedService service)
+            await service.StopAsync(cancellationToken);
+        await  AwaitAllCurrentTasks(cancellationToken);
     }
 
     private async Task<IStreamCacheResult?> CacheFetch(IBlobCacheRequest cacheRequest,CancellationToken cancellationToken)
@@ -106,7 +109,8 @@ internal class LegacyStreamCacheAdapter : IStreamCache
         CancellationToken cancellationToken,
         bool retrieveContentType)
     {
-        var cacheRequest = new BlobCacheRequest(BlobGroup.GeneratedCacheEntry, key);
+        IBlobCacheRequest cacheRequest = new BlobCacheRequest(BlobGroup.GeneratedCacheEntry, key);
+        cacheRequest = cacheRequest.WithFetchAllMetadata(retrieveContentType);
         
         var wrappedCallback = new Func<CancellationToken, Task<IResult<BlobSuccessResult, HttpStatus>>>(async (ct) =>
         {
@@ -145,6 +149,7 @@ internal class LegacyStreamCacheAdapter : IStreamCache
         CancellationToken cancellationToken,
         bool retrieveContentType)
     {
+        cacheRequest = cacheRequest.WithFetchAllMetadata(retrieveContentType);
         if (cancellationToken.IsCancellationRequested)
             throw new OperationCanceledException(cancellationToken);
         var swGetOrCreateBytes = Stopwatch.StartNew();

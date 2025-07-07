@@ -16,7 +16,7 @@ public record BlobPipelineHarnessOptions(
 
 public class BlobPipelineHarness
 {
-    readonly RoutingEngine router;
+    readonly IRoutingEngine router;
     IBlobPromisePipeline pipeline;
     IReLogger logger;
 

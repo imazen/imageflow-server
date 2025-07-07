@@ -5,7 +5,6 @@ using System.Text;
 using Imazen.Abstractions;
 using Imazen.Abstractions.BlobCache;
 using Imazen.Abstractions.Blobs.LegacyProviders;
-using Imazen.Abstractions.DependencyInjection;
 using Imazen.Abstractions.Logging;
 using Imazen.Common.Extensibility.ClassicDiskCache;
 using Imazen.Common.Extensibility.StreamCache;
@@ -18,17 +17,16 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Imazen.Routing.Health;
-
-public class StartupDiagnostics(IImageServerContainer serviceProvider)
-{
+#pragma warning disable CS0618 // Type or member is obsolete
+internal class StartupDiagnostics(IEnumerable<IUniqueNamed> uniqueNames,
+    IEnumerable<IClassicDiskCache> classicDiskCaches,IEnumerable<IStreamCache> streamCaches,
+    IEnumerable<IBlobProvider> blobProviders, IEnumerable<IBlobWrapperProvider> blobWrapperProviders, IEnumerable<IBlobCache> blobCaches,
+    IEnumerable<IBlobCacheProvider> blobCacheProviders){
+#pragma warning restore CS0618 // Type or member is obsolete
     public void LogIssues(IReLogger logger)
     {
-        DetectNamingConflicts(logger, false);
         // Log an error warning if IStreamCache or IClassicDiskCache has any registrations
         // Each implementation gets its own error so users know what class & assembly to search for
-#pragma warning disable CS0618 // Type or member is obsolete
-        var classicDiskCaches = serviceProvider.GetService<IEnumerable<IClassicDiskCache>>();
-#pragma warning restore CS0618 // Type or member is obsolete
         if (classicDiskCaches != null)
         {
             foreach (var cache in classicDiskCaches)
@@ -38,10 +36,7 @@ public class StartupDiagnostics(IImageServerContainer serviceProvider)
                     cache.GetType().FullName, cache.GetType().Assembly.FullName);
             }
         }
-        
-#pragma warning disable CS0618 // Type or member is obsolete
-        var streamCaches = serviceProvider.GetService<IEnumerable<IStreamCache>>();
-#pragma warning restore CS0618 // Type or member is obsolete
+
         if (streamCaches == null) return;
         foreach (var cache in streamCaches)
         {
@@ -49,12 +44,11 @@ public class StartupDiagnostics(IImageServerContainer serviceProvider)
                 "IStreamCache is obsolete and ignored. Please use the official caches or implement IBlobCache instead. {FullName} is registered in {Assembly}",
                 cache.GetType().FullName, cache.GetType().Assembly.FullName);
         }
-        
+
     }
 
     private void DetectNamingConflicts(IReLogger logger, bool throwOnConflict = true)
     {
-        var blobCacheProviders = serviceProvider.GetService<IEnumerable<IBlobCacheProvider>>();
         var all = new List<IUniqueNamed>();
         if (blobCacheProviders != null)
         {
@@ -64,10 +58,24 @@ public class StartupDiagnostics(IImageServerContainer serviceProvider)
                 all.AddRange(caches);
             }
         }
-        all.AddRange(serviceProvider.GetInstanceOfEverythingLocal<IUniqueNamed>());
+        foreach (var provider in blobProviders.Where(p => p is IUniqueNamed).Cast<IUniqueNamed>())
+        {
+            all.Add(provider);
+        }
+        foreach (var provider in blobWrapperProviders.Where(p => p is IUniqueNamed).Cast<IUniqueNamed>())
+        {
+            all.Add(provider);
+        }
+        foreach (var provider in blobCaches.Where(p => p is IUniqueNamed).Cast<IUniqueNamed>())
+        {
+            all.Add(provider);
+        }
+
+
+        all.AddRange(uniqueNames);
         // deduplicate instances by reference
         all = all.Distinct().ToList();
-        
+
         // throw exception if any duplicate names exist, and put the type names in the exception message
         var duplicateNames = all.GroupBy(x => x.UniqueName).Where(x => x.Count() > 1)
             .ToList();
@@ -91,30 +99,38 @@ public class StartupDiagnostics(IImageServerContainer serviceProvider)
 
     }
 
-    public void Validate(IReLogger logger)
+    internal void Validate(IReLogger logger)
     {
+        LogIssues(logger);
         DetectNamingConflicts(logger, true);
     }
 }
 
-public class DiagnosticsReport(IServiceProvider serviceProvider, IReLogStore logStore)
+
+internal class DiagnosticsReport(IReLogger<DiagnosticsReport> logger,  IReLogStore logStore,
+    StartupDiagnostics startupDiagnostics,
+    IEnumerable<IHasDiagnosticPageSection> hasDiagnosticPageSections, IEnumerable<IIssueProvider> issueProviders)
 {
 
+    private bool startupValidated = false;
     /// <summary>
     /// SectionProviders should include Licensing and ImageServer at minimum
     /// </summary>
-    /// <param name="request"></param>
-    /// <param name="sectionProviders"></param>
     /// <returns></returns>
-    public ValueTask<string> GetReport(IHttpRequestStreamAdapter? request, IReadOnlyCollection<IHasDiagnosticPageSection> sectionProviders)
+    public ValueTask<string> GetReport(IHttpRequestStreamAdapter? request)
     {
+        if (!startupValidated)
+        {
+            startupDiagnostics.Validate(logger); //TODO: May cause duplication if called from multiple loggers of different
+            // names, clean this up
+            startupValidated = true;
+        }
         // TODO: add support for beginning tasks and having a refresh header that reloads the page in time for those health
         // checks to complete
-        
-        var sections =
-            GetAllImplementers<IHasDiagnosticPageSection>(serviceProvider).Concat(sectionProviders).Distinct().ToList();
-        
-            
+
+        var providers = issueProviders.Distinct().ToList();
+        var sections = hasDiagnosticPageSections.Distinct().ToList();
+
         var s = new StringBuilder(8096);
         var now = DateTime.UtcNow.ToString(NumberFormatInfo.InvariantInfo);
         s.AppendLine($"Diagnostics for Imageflow at {request?.GetHost().Value} generated {now} UTC");
@@ -131,8 +147,8 @@ public class DiagnosticsReport(IServiceProvider serviceProvider, IReLogStore log
         }
 
         s.AppendLine("Please remember to provide this page when contacting support.");
-        
-        
+
+
         // get array of loaded assemblies
         var assemblies = AppDomain.CurrentDomain.GetAssemblies();
         var summary = assemblies.ExplainVersionMismatches(true);
@@ -142,34 +158,33 @@ public class DiagnosticsReport(IServiceProvider serviceProvider, IReLogStore log
         }
 
 
-        var issueProviders = GetAllImplementers<IIssueProvider>(serviceProvider).ToList();
-        if (issueProviders.Count == 0)
+        if (providers.Count == 0)
         {
             s.AppendLine("No IIssueProvider implementations detected.");
         }
         else
         {
-            var issues = issueProviders
+            var issues = providers
                 .SelectMany(p => p.GetIssues()).ToList();
             s.AppendLine(
-                $"{issues.Count} issues from {issueProviders.Count} legacy plugins (those implementing IIssueProvider instead of calling IReLogger.WithRetain.) detected:\r\n");
+                $"{issues.Count} issues from {providers.Count} legacy plugins (those implementing IIssueProvider instead of calling IReLogger.WithRetain.) detected:\r\n");
             foreach (var i in issues.OrderBy(i => i?.Severity))
                 s.AppendLine(
                     $"{i?.Source}({i?.Severity}):\t{i?.Summary}\n\t\t\t{i?.Details?.Replace("\n", "\r\n\t\t\t")}\n");
         }
-        
+
         foreach (var sectionProvider in sections)
         {
             s.AppendLine(sectionProvider.GetDiagnosticsPageSection(DiagnosticsPageArea.Start));
         }
-        
+
         // ReStore report
         var shortReport = logStore.GetReport(new ReLogStoreReportOptions()
         {
             ReportType = ReLogStoreReportType.FullReport,
         });
         s.AppendLine(shortReport);
-        
+
         s.AppendLine("\nAccepted querystring keys:\n");
         s.AppendLine(string.Join(", ", PathHelpers.SupportedQuerystringKeys));
 
@@ -195,7 +210,7 @@ public class DiagnosticsReport(IServiceProvider serviceProvider, IReLogStore log
                 "Failed to detect operating system architecture - security restrictions prevent reading environment variables");
         }
 
-        
+
         //List loaded assemblies, and also detect plugin assemblies that are not being used.
         s.AppendLine("\nLoaded assemblies:\n");
 
@@ -218,9 +233,9 @@ public class DiagnosticsReport(IServiceProvider serviceProvider, IReLogStore log
 
             s.AppendLine(line);
         }
-        
+
         // Now get the sections while passing in DiagnosticsPageArea.End
-        
+
         foreach (var sectionProvider in sections)
         {
             var section = sectionProvider.GetDiagnosticsPageSection(DiagnosticsPageArea.End);
@@ -229,39 +244,11 @@ public class DiagnosticsReport(IServiceProvider serviceProvider, IReLogStore log
                 s.AppendLine(section);
             }
         }
-        
+
         return Tasks.ValueResult(s.ToString());
     }
 
-    private static List<T> GetAllImplementers<T>(IServiceProvider serviceProvider) where T: class
-    {
-        void Add<TV>(ICollection<T> candidates) 
-        {
-            var items = serviceProvider.GetService<IEnumerable<TV>>();
-            if (items == null) return;
-            foreach (var tvObj in items)
-            {
-                if (tvObj is not T t) continue;
-                if (!candidates.Contains(t))
-                {
-                    candidates.Add(t);
-                }
-            }
-        }
-        var c = new List<T>();
-        Add<IIssueProvider>(c);
-        Add<IBlobWrapperProvider>(c);
-        Add<IBlobCache>(c);
-        Add<IBlobCacheProvider>(c);
-        
-#pragma warning disable CS0618 // Type or member is obsolete
-        Add<IBlobProvider>(c);
-        Add<IClassicDiskCache>(c);
-        Add<IStreamCache>(c);
-        Add<IHasDiagnosticPageSection>(c);
-#pragma warning restore CS0618 // Type or member is obsolete
-        return c.Distinct().ToList();
-    }
+
     private static string GetNetCoreVersion()
     {
         return System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription;

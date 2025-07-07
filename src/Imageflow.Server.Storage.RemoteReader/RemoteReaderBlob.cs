@@ -6,6 +6,7 @@ using Imazen.Common.Storage;
 
 namespace Imageflow.Server.Storage.RemoteReader
 {
+    #pragma warning disable CS0618
     public class RemoteReaderBlob : IBlobData
     {
         private readonly HttpResponseMessage response;
@@ -29,4 +30,5 @@ namespace Imageflow.Server.Storage.RemoteReader
             return response.Content.ReadAsStreamAsync().Result;
         }
     }
+    #pragma warning restore CS0618
 }

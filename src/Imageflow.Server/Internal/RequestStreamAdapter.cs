@@ -10,7 +10,7 @@ using Microsoft.Extensions.Primitives;
 
 namespace Imageflow.Server.Internal;
 
-internal readonly record struct RequestStreamAdapter(HttpRequest Request) : IHttpRequestStreamAdapter
+public readonly record struct RequestStreamAdapter(HttpRequest Request) : IHttpRequestStreamAdapter
 {
 
     public UrlPathString GetPath() => new UrlPathString(Request.Path.Value);

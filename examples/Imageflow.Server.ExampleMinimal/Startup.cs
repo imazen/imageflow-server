@@ -12,11 +12,13 @@ namespace Imageflow.Server.ExampleMinimal
     {
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddImageflowReLogStoreAndReLoggerFactoryIfMissing();
             services.AddLogging(builder => builder.AddConsole(options =>
             {
                 options.LogToStandardErrorThreshold = LogLevel.Trace;
             }));
+            services.ConfigureImageflowMiddleware(new ImageflowMiddlewareOptions()
+                .SetMapWebRoot(true)
+                .SetMyOpenSourceProjectUrl("https://github.com/imazen/imageflow-dotnet-server"));
         }
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
@@ -24,11 +26,7 @@ namespace Imageflow.Server.ExampleMinimal
             {
                 app.UseDeveloperExceptionPage();
             }
-
-            app.UseImageflow(new ImageflowMiddlewareOptions()
-                .SetMapWebRoot(true)
-                .SetMyOpenSourceProjectUrl("https://github.com/imazen/imageflow-dotnet-server"));
-            
+            app.UseImageflow();
             app.UseRouting();
 
             app.UseEndpoints(endpoints =>

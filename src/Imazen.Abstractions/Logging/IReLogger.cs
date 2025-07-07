@@ -33,4 +33,8 @@ namespace Imazen.Abstractions.Logging
 
 
     }
+
+    public interface IReLogger<T> : IReLogger
+    {
+    }
 }

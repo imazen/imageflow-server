@@ -58,7 +58,7 @@ namespace Imageflow.Server.Storage.RemoteReader
             return prefix.Zone ?? _defaultZone;
         }
 
-        private DomainProxyPrefix GetPrefix(string virtualPath)
+        private DomainProxyPrefix? GetPrefix(string virtualPath)
         {
             return _options.Prefixes.FirstOrDefault(p => virtualPath.StartsWith(p.Prefix));
         }

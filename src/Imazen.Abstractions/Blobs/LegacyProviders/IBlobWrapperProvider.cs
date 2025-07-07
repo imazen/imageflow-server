@@ -1,4 +1,5 @@
 ﻿using Imazen.Abstractions.Resulting;
+using Imazen.Abstractions;
 
 namespace Imazen.Abstractions.Blobs.LegacyProviders
 {

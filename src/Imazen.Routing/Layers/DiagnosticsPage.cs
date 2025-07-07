@@ -1,4 +1,4 @@
-using Imazen.Abstractions.DependencyInjection;
+
 using Imazen.Abstractions.Logging;
 using Imazen.Abstractions.Resulting;
 using Imazen.Routing.Health;
@@ -7,11 +7,26 @@ using Imazen.Routing.HttpAbstractions;
 using Imazen.Routing.Promises;
 using Imazen.Routing.Requests;
 using Imazen.Routing.Serving;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 
 namespace Imazen.Routing.Layers;
 
-
+public static class DiagnosticsPageExtensions
+{ // register StartupDiagnostics, DiagnosticsReport, DiagnosticsPage, and DiagnosticsPageOptions
+    public static void AddDiagnosticsPage(this IServiceCollection services, DiagnosticsPageOptions options)
+    {
+        services.AddSingleton(options);
+        services.TryAddDiagnosticsPageReportAndStartup();
+   }
+    internal static void TryAddDiagnosticsPageReportAndStartup(this IServiceCollection services)
+    {
+        services.TryAddSingleton<StartupDiagnostics>();
+        services.TryAddSingleton<DiagnosticsReport>();
+        services.TryAddSingleton<DiagnosticsPage>();
+    }
+}
 
 public record DiagnosticsPageOptions(
     string? DiagnosticsPassword,
@@ -39,9 +54,8 @@ public record DiagnosticsPageOptions(
 }
     
 internal class DiagnosticsPage(
-    IImageServerContainer serviceProvider,
-    IReLogger logger,
-    IReLogStore retainedLogStore,
+    DiagnosticsReport diagnosticsReport,
+    IReLogger<DiagnosticsPage> logger,
     DiagnosticsPageOptions options)
     : IRoutingEndpoint, IRoutingLayer
 {
@@ -96,12 +110,7 @@ internal class DiagnosticsPage(
     {
 
         var request = r.OriginatingRequest;
-        var diagnostics = new DiagnosticsReport(serviceProvider, retainedLogStore);
-        
-        var sectionProviders = 
-            serviceProvider.GetInstanceOfEverythingLocal<IHasDiagnosticPageSection>().ToList();
-
-        var result = await diagnostics.GetReport(request, sectionProviders);
+        var result = await diagnosticsReport.GetReport(request);
         return result;
     }
         
