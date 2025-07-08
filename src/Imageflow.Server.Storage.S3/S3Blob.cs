@@ -3,12 +3,13 @@ using System.IO;
 using System.Linq;
 using Amazon.S3.Model;
 using Imazen.Abstractions.Blobs;
+using Imazen.Abstractions.Logging;
 
 namespace Imageflow.Server.Storage.S3
 {
     internal static class S3BlobHelpers
     {
-        public static StreamBlob CreateS3Blob(GetObjectResponse r)
+        public static StreamBlob CreateS3Blob(GetObjectResponse r, IReLogger logger)
         {
             if (r.HttpStatusCode != System.Net.HttpStatusCode.OK)
             {
@@ -28,7 +29,7 @@ namespace Imageflow.Server.Storage.S3
                 EstimatedExpiry = r.Expiration?.ExpiryDateUtc,
                 BlobStorageReference = new S3BlobStorageReference(r.BucketName, r.Key)
             };
-            return new StreamBlob(a, r.ResponseStream, r);
+            return new StreamBlob(a, r.ResponseStream, logger?.WithReScopeData("s3",a.BlobStorageReference.GetFullyQualifiedRepresentation()), r);
         }
     }
 }

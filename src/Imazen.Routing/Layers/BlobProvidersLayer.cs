@@ -9,6 +9,7 @@ using Imazen.Routing.Helpers;
 using Imazen.Routing.Promises;
 using Imazen.Routing.Requests;
 using BlobMissingException = Imazen.Abstractions.Blobs.LegacyProviders.BlobMissingException;
+using Imazen.Abstractions.Logging;
 
 #pragma warning disable CS0618 // Type or member is obsolete
 
@@ -16,8 +17,10 @@ namespace Imazen.Routing.Layers;
 
 public class BlobProvidersLayer : IRoutingLayer
 {
-    public BlobProvidersLayer(IEnumerable<IBlobProvider>? blobProviders, IEnumerable<IBlobWrapperProvider>? blobWrapperProviders)
+    private readonly IReLogger logger;
+    public BlobProvidersLayer(IEnumerable<IBlobProvider>? blobProviders, IEnumerable<IBlobWrapperProvider>? blobWrapperProviders, IReLogger logger)
     {
+        this.logger = logger;
         if (blobProviders == null) blobProviders = Array.Empty<IBlobProvider>();
         foreach (var provider in blobProviders)
         {
@@ -113,12 +116,13 @@ public class BlobProvidersLayer : IRoutingLayer
             {
                 var latencyZone = prefix.LatencyZone;
                 ICacheableBlobPromise? promise = null;
+                var subLogger = logger.WithReScopeData("blobProvider", $"{prefix.Prefix} provider {prefix.Provider.GetType().Name}");
                 if (prefix.Provider is IBlobWrapperProvider wp && wp.SupportsPath(request.Path))
                 {
-                    promise = new BlobWrapperProviderPromise(request.ToSnapshot(true), request.Path, wp, (wp as IBlobWrapperProviderZoned)?.GetLatencyZone(request.Path) ?? latencyZone);
+                    promise = new BlobWrapperProviderPromise(request.ToSnapshot(true), request.Path, wp, (wp as IBlobWrapperProviderZoned)?.GetLatencyZone(request.Path) ?? latencyZone, subLogger);
                 }else if (prefix.Provider is IBlobProvider p && p.SupportsPath(request.Path))
                 {
-                    promise = new BlobProviderPromise(request.ToSnapshot(true), request.Path, p, latencyZone);
+                    promise = new BlobProviderPromise(request.ToSnapshot(true), request.Path, p, latencyZone, subLogger);
                 }
 
                 if (promise == null) break;
@@ -160,7 +164,7 @@ public class BlobProvidersLayer : IRoutingLayer
     
 }
 
-internal record BlobProviderPromise(IRequestSnapshot FinalRequest, String VirtualPath, IBlobProvider Provider, LatencyTrackingZone LatencyZone): LocalFilesLayer.CacheableBlobPromiseBase(FinalRequest, LatencyZone)
+internal record BlobProviderPromise(IRequestSnapshot FinalRequest, String VirtualPath, IBlobProvider Provider, LatencyTrackingZone LatencyZone, IReLogger logger): LocalFilesLayer.CacheableBlobPromiseBase(FinalRequest, LatencyZone, logger)
 {
     public override void WriteCacheKeyBasisPairsToRecursive(IBufferWriter<byte> writer)
     {
@@ -185,15 +189,18 @@ internal record BlobProviderPromise(IRequestSnapshot FinalRequest, String Virtua
         {
             LastModifiedDateUtc = blobData.LastModifiedDateUtc,
         };
+        var scopeData = new[] { 
+            new KeyValuePair<string, object>("blobProvider", $"{Provider.GetType().Name}"),
+            new KeyValuePair<string, object>("blobPath", VirtualPath) };
         var stream = blobData.OpenRead();
-        return CodeResult<IBlobWrapper>.Ok(new BlobWrapper(LatencyZone, new StreamBlob(attrs, stream, blobData)));
+        return CodeResult<IBlobWrapper>.Ok(new BlobWrapper(LatencyZone, new StreamBlob(attrs, stream, logger?.WithReScopeData(scopeData), blobData)));
     }
 }
 
 internal record BlobWrapperProviderPromise(
     IRequestSnapshot FinalRequest,
     String VirtualPath,
-    IBlobWrapperProvider Provider, LatencyTrackingZone LatencyZone) : LocalFilesLayer.CacheableBlobPromiseBase(FinalRequest, LatencyZone)
+    IBlobWrapperProvider Provider, LatencyTrackingZone LatencyZone, IReLogger LoggerForPath) : LocalFilesLayer.CacheableBlobPromiseBase(FinalRequest, LatencyZone, LoggerForPath)
 {
     public override async ValueTask<CodeResult<IBlobWrapper>> TryGetBlobAsync(IRequestSnapshot request,
         IBlobRequestRouter router, IBlobPromisePipeline pipeline,

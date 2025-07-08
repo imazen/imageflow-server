@@ -24,9 +24,11 @@ namespace Imageflow.Server.Storage.S3.Caching
         private readonly IReLoggerFactory loggerFactory;
 
         private readonly S3LifecycleUpdater lifecycleUpdater;
+        private readonly IReLogger logger;
 
         public S3BlobCache(NamedCacheConfiguration config, IAmazonS3 s3Client, IReLoggerFactory loggerFactory)
         {
+            this.logger = loggerFactory.CreateReLogger($"S3BlobCache('{config.CacheName}')");
             this.config = config;
             this.s3Client = s3Client;
             this.loggerFactory = loggerFactory;
@@ -184,7 +186,7 @@ namespace Imageflow.Server.Storage.S3.Caching
                 {
                     var latencyZone = new LatencyTrackingZone($"s3::bucket/{bucket}", 100);
                     return BlobCacheFetchFailure.OkResult(
-                        new BlobWrapper(latencyZone,S3BlobHelpers.CreateS3Blob(result)));
+                        new BlobWrapper(latencyZone,S3BlobHelpers.CreateS3Blob(result, logger)));
                 }
                 
                 // 404/403 are cache misses and return these

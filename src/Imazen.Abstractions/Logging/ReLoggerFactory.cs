@@ -2,7 +2,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Imazen.Abstractions.Logging
 {
-    public class ReLoggerFactory : IReLoggerFactory
+    public sealed class ReLoggerFactory : IReLoggerFactory
     {
         private readonly ILoggerFactory impl; 
         private readonly IReLogStore store;
@@ -27,9 +27,9 @@ namespace Imazen.Abstractions.Logging
             impl.AddProvider(provider);
         }
         
-        internal void Log<TState>(string categoryName, LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter, bool retain, string? retainUniqueKey)
+        internal void Log<TState>(string categoryName, KeyValuePair<string, object>[]? reScopeData, LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter, bool retain, string? retainUniqueKey)
         {
-            store.Log(categoryName, scopes.Value, logLevel, eventId, state, exception, formatter, retain, retainUniqueKey);
+            store.Log(categoryName, reScopeData, scopes.Value, logLevel, eventId, state, exception, formatter, retain, retainUniqueKey);
         }
 
         //  AsyncLocal is thread-local style storage that is async-aware, and is used by the official implementation 

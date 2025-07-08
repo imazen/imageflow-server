@@ -30,8 +30,8 @@ namespace Imazen.Abstractions.Logging
         /// <returns></returns>
         IReLogger WithSubcategory(string subcategoryString);
         
-
-
+        IReLogger WithReScopeData(string key, object value);
+        IReLogger WithReScopeData(KeyValuePair<string, object>[] pairs);
     }
 
     public interface IReLogger<T> : IReLogger

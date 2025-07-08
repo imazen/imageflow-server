@@ -7,7 +7,7 @@
 using Imazen.Abstractions.Blobs;
 
 namespace Imazen.Common.Concurrency.BoundedTaskCollection {
-    public class BlobTaskItem : IBoundedTaskItem {
+    public sealed class BlobTaskItem : IBoundedTaskItem, IDisposable {
 
         /// <summary>
         /// Throws an exception if the blob is not natively reusable (call EnsureReusable first)
@@ -54,6 +54,11 @@ namespace Imazen.Common.Concurrency.BoundedTaskCollection {
         public long GetTaskSizeInMemory()
         {
             return estimateAllocatedBytes + 100;
+        }
+
+        public void Dispose()
+        {
+            data?.Dispose();
         }
         
     }

@@ -1,11 +1,15 @@
 using System.Buffers;
 using CommunityToolkit.HighPerformance;
+using Imazen.Abstractions.Logging;
 
 namespace Imazen.Abstractions.Blobs;
 
 public sealed class MemoryBlob : IConsumableMemoryBlob, IReusableBlob
 {
     public IBlobAttributes Attributes { get; }
+
+    public IReLogger? TryGetLogger() => logger;
+    private readonly IReLogger? logger;
 
     /// <summary>
     /// Creates a consumable wrapper over owner-less memory (I.E. owned by the garbage collector - it cannot be manually disposed)
@@ -14,7 +18,7 @@ public sealed class MemoryBlob : IConsumableMemoryBlob, IReusableBlob
     /// <param name="attrs"></param>
     /// <param name="memory"></param>
     /// <param name="backingAllocationSize"></param>
-    public MemoryBlob(ReadOnlyMemory<byte> memory,IBlobAttributes attrs, TimeSpan creationDuration, int? backingAllocationSize = null):this(memory,attrs,creationDuration,backingAllocationSize,null)
+    public MemoryBlob(ReadOnlyMemory<byte> memory,IBlobAttributes attrs, TimeSpan creationDuration, int? backingAllocationSize = null, IReLogger? logger = null):this(memory,attrs,creationDuration,backingAllocationSize,null,logger)
     {
     }
 
@@ -26,8 +30,9 @@ public sealed class MemoryBlob : IConsumableMemoryBlob, IReusableBlob
     /// <param name="memory"></param>
     /// <param name="backingAllocationSize"></param>
     /// <param name="owner"></param>
-    internal MemoryBlob(ReadOnlyMemory<byte> memory,IBlobAttributes attrs, TimeSpan creationDuration, int? backingAllocationSize, IMemoryOwner<byte>? owner)
+    internal MemoryBlob(ReadOnlyMemory<byte> memory,IBlobAttributes attrs, TimeSpan creationDuration, int? backingAllocationSize, IMemoryOwner<byte>? owner, IReLogger? logger = null)
     {
+        this.logger = logger;
         this.Attributes = attrs;
         this.memory = memory;
         this.owner = owner;

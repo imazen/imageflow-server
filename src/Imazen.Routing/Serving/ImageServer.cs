@@ -74,13 +74,18 @@ public static class ImageServerExtensions
             return new CacheHealthTracker(logger);
         });
 
-        // Register MemoryCache if not already present
-        services.TryAddSingleton<MemoryCache>(_ => new MemoryCache(new MemoryCacheOptions(
+
+        services.TryAddSingleton(new MemoryCacheOptions(
             "memCache", 100,
-            1000, 1000 * 10, TimeSpan.FromSeconds(10))));
+            1000, 1000 * 10, TimeSpan.FromSeconds(10)));
+
+        // Register MemoryCache if not already present
+        services.TryAddSingleton<MemoryCache>();
 
 
         services.AddSingleton<IBlobCache>(p => p.GetRequiredService<MemoryCache>());
+        services.AddSingleton<IHostedImageServerService>(p => p.GetRequiredService<MemoryCache>());
+        services.AddSingleton<IHostedService>(p => p.GetRequiredService<MemoryCache>());
 
         // Register BoundedTaskCollection
         services.TryAddSingleton<BoundedTaskCollection<BlobTaskItem>>(_ =>
@@ -90,6 +95,8 @@ public static class ImageServerExtensions
             var uploadCancellationTokenSource = new CancellationTokenSource();
             return new BoundedTaskCollection<BlobTaskItem>(150 * 1024 * 1024, uploadCancellationTokenSource);
         });
+
+        services.AddSingleton<IHostedService>(p => p.GetRequiredService<BoundedTaskCollection<BlobTaskItem>>());
 
         // Finally, register the main ImageServer itself, which depends on all the above services.
         // The container will automatically inject them into the constructor.
@@ -113,7 +120,7 @@ internal class ImageServer<TRequest, TResponse, TContext> : IImageServer<TReques
     private readonly IPerformanceTracker perf;
     private readonly CancellationTokenSource uploadCancellationTokenSource = new();
     private readonly BoundedTaskCollection<BlobTaskItem> uploadQueue;
-    private readonly bool shutdownRegisteredServices;
+    private readonly bool shutdownRegisteredServices = true;
     private readonly CacheHealthTracker cacheHealthTracker;
     private readonly IList<IHostedImageServerService> registeredServices;
     private readonly IServiceProvider serviceProvider;
@@ -132,8 +139,7 @@ internal class ImageServer<TRequest, TResponse, TContext> : IImageServer<TReques
         MemoryCache memoryCache,
         BoundedTaskCollection<BlobTaskItem> uploadQueue,
         IEnumerable<IHostedImageServerService> registeredServices,
-        StartupDiagnostics startupDiagnostics,
-        bool shutdownRegisteredServices = true)
+        StartupDiagnostics startupDiagnostics)
     {
         this.shutdownRegisteredServices = shutdownRegisteredServices;
         perf = perfTracker;
@@ -157,7 +163,7 @@ internal class ImageServer<TRequest, TResponse, TContext> : IImageServer<TReques
             ?.SelectMany(p => p.GetBlobCaches());
         
         var allIndependentCaches = blobCaches;
-        var allCaches = (allCachesFromProviders ?? []).Concat(allIndependentCaches ?? []).ToList();
+        List<IBlobCache> allCaches = (allCachesFromProviders ?? []).Concat(allIndependentCaches ?? []).ToList();
         
         foreach (var cache in allCaches)
         {
@@ -166,6 +172,7 @@ internal class ImageServer<TRequest, TResponse, TContext> : IImageServer<TReques
         
         var allCachesExceptMemory = allCaches?.Where(c => c != memoryCache)?.ToList();
 
+        logger.LogInformation("Caches: {Caches}", string.Join(",", allCaches?.Select(c => c.UniqueName).ToArray() ?? [])); //string.Format("Caches: {Caches}",
 
         var sourceCacheOptions = new CacheEngineOptions
         {
@@ -399,14 +406,23 @@ internal class ImageServer<TRequest, TResponse, TContext> : IImageServer<TReques
     {
         //TODO: error handling or no?
         //await uploadCancellationTokenSource.CancelAsync();
+        //await uploadQueue.AwaitAllCurrentTasks(); // Too slow?
         await uploadQueue.StopAsync(cancellationToken);
         await cacheHealthTracker.StopAsync(cancellationToken);
         if (shutdownRegisteredServices)
         {
             foreach (var service in this.registeredServices)
             {
+                logger.LogInformation("ImageServer is shutting down service {ServiceName}", service.GetType().Name);
                 await service.StopAsync(cancellationToken);
             }
         }
+#if DEBUG
+        if (BlobWrapperCore.GetActiveInstanceCount(this.logger) > 0)
+        {
+            //TODO: Make a better exception - or a better way to handle this
+            throw new InvalidOperationException(BlobWrapperCore.GetActiveInstanceInfo(this.logger));
+        }
+#endif
     }
 }

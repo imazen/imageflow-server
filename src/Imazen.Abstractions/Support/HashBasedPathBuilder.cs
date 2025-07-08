@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.Text;
 
@@ -24,6 +25,20 @@ namespace Imazen.Common.Extensibility.Support
         }
 
         public byte[] HashKeyBasis(byte[] keyBasis) => HashKeyBasisStatic(keyBasis);
+
+        internal string GetShortVersionOfRelativePath(string relativePath, int charsPerSegment = 4)
+        {
+            var segments = relativePath.Split(RelativeDirSeparator);
+            // truncate each segment length and add ..
+            var sb = new StringBuilder();
+            foreach (var segment in segments)
+            {
+                sb.Append(segment.Substring(0, Math.Min(segment.Length, charsPerSegment)));
+                sb.Append("..");
+                if (segment != segments[^1]) sb.Append(RelativeDirSeparator);
+            }
+            return sb.ToString();
+        }
         
         internal static byte[] HashKeyBasisStatic(byte[] keyBasis)
         {

@@ -1,4 +1,5 @@
 namespace Imazen.Abstractions.Blobs;
+using Imazen.Abstractions.Logging;
 
 /// <summary>
 /// Not thread safe
@@ -28,4 +29,6 @@ public interface IConsumableBlob : IDisposable
     /// </summary>
     /// <returns></returns>
     Stream BorrowStream(DisposalPromise callerPromises);
+
+    IReLogger? TryGetLogger();
 }

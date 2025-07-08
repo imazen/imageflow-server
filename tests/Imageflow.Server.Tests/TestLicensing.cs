@@ -1,5 +1,7 @@
 using System.Net;
 using System.Text;
+using Imageflow.Server.HybridCache;
+using Imazen.Common.Concurrency.BoundedTaskCollection;
 using Imazen.Common.Licensing;
 using Imazen.Common.Tests.Licensing;
 using Imazen.Routing.Layers;
@@ -52,6 +54,7 @@ namespace Imageflow.Server.Tests
             var hostBuilder = new HostBuilder()
                 .ConfigureServices(services =>
                 {
+                    services.AddXunitLoggingDefaults(output);
                     services.AddSingleton((ILicenseChecker)l);
                     services.ConfigureImageflowMiddleware(options);
                 })
@@ -66,7 +69,7 @@ namespace Imageflow.Server.Tests
                 });
 
             // Build and start the IHost
-            return hostBuilder.StartAsync();
+            return hostBuilder.StartAsync(TestContext.Current.CancellationToken);
         }
         
         [Fact]
@@ -113,7 +116,7 @@ namespace Imageflow.Server.Tests
                 Assert.Contains("To get a license key, visit", page);
                 Assert.Contains("You are using EnforceLicenseWith.Http402Error", page);
                 
-                await host.StopAsync(CancellationToken.None);
+                await host.StopAsync(TestContext.Current.CancellationToken);
             }
         }
         
@@ -374,7 +377,7 @@ namespace Imageflow.Server.Tests
 
                 
 
-                await host.StopAsync(CancellationToken.None);
+                await host.StopAsync(TestContext.Current.CancellationToken);
             
             }
         }

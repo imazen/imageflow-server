@@ -6,6 +6,7 @@ using Imazen.Abstractions.Resulting;
 using Imazen.Common.Concurrency;
 using Imazen.Common.Extensibility.Support;
 using Imazen.HybridCache.MetaStore;
+using Imazen.Abstractions.Logging;
 using Microsoft.Extensions.Logging;
 
 namespace Imazen.HybridCache
@@ -32,7 +33,7 @@ namespace Imazen.HybridCache
         public string UniqueName { get; }
 
         public AsyncCache(AsyncCacheOptions options, ICacheCleanupManager cleanupManager,
-            ICacheDatabase<ICacheDatabaseRecord> database, HashBasedPathBuilder pathBuilder, ILogger logger)
+            ICacheDatabase<ICacheDatabaseRecord> database, HashBasedPathBuilder pathBuilder, IReLogger? logger)
         {
             UniqueName = options.UniqueName;
             Database = database;
@@ -72,7 +73,7 @@ namespace Imazen.HybridCache
         
         private AsyncCacheOptions Options { get; }
         private HashBasedPathBuilder PathBuilder { get; }
-        private ILogger Logger { get; }
+        private IReLogger? Logger { get; }
 
         private ICacheCleanupManager CleanupManager { get; }
 
@@ -175,7 +176,7 @@ namespace Imazen.HybridCache
             if (openedStream != null)
             {
                 //TODO:  add contended hit detail
-                return AsyncCacheResult.FromHit(record, entry.RelativePath, PathBuilder, openedStream, LatencyZone, this, this);
+                return AsyncCacheResult.FromHit(record, entry.RelativePath, PathBuilder, openedStream, LatencyZone, this, this, Logger);
             }
 
             return null;
@@ -200,7 +201,7 @@ namespace Imazen.HybridCache
             {
                 return AsyncCacheResult.FromHit(record, entry.RelativePath, PathBuilder, new FileStream(
                     entry.PhysicalPath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096,
-                    FileOptions.Asynchronous | FileOptions.SequentialScan), LatencyZone, this, this);
+                    FileOptions.Asynchronous | FileOptions.SequentialScan), LatencyZone, this, this, Logger);
 
             }
             catch (FileNotFoundException)
@@ -750,7 +751,7 @@ namespace Imazen.HybridCache
 
             internal static IResult<IBlobWrapper, IBlobCacheFetchFailure> FromHit(ICacheDatabaseRecord? record,
                 string entryRelativePath, HashBasedPathBuilder interpreter,
-                FileStream stream, LatencyTrackingZone latencyZone, IBlobCache notifyOfResult, IBlobCache notifyOfExternalHit)
+                FileStream stream, LatencyTrackingZone latencyZone, IBlobCache notifyOfResult, IBlobCache notifyOfExternalHit, IReLogger? logger)
             {
                 var blob = new StreamBlob(new BlobAttributes()
                 {
@@ -761,7 +762,7 @@ namespace Imazen.HybridCache
                     StorageTags = record?.Tags,
                     BlobStorageReference = new FileBlobStorageReference(entryRelativePath, interpreter, record)
 
-                }, stream);
+                }, stream, logger?.WithReScopeData("file", interpreter.GetShortVersionOfRelativePath(entryRelativePath)));
                 return Result<IBlobWrapper, IBlobCacheFetchFailure>.Ok( new BlobWrapper(latencyZone, blob));
 
             }

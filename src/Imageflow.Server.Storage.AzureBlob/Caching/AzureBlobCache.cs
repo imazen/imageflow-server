@@ -11,6 +11,7 @@ using System.Runtime.CompilerServices;
 using Azure;
 using Imazen.Abstractions.Blobs;
 using Imazen.Abstractions.Resulting;
+using Imazen.Abstractions.Logging;
 
 namespace Imageflow.Server.Storage.AzureBlob.Caching
 {
@@ -22,7 +23,7 @@ namespace Imageflow.Server.Storage.AzureBlob.Caching
     {
         private NamedCacheConfiguration config;
         private BlobServiceClient defaultBlobServiceClient;
-        private ILogger logger;
+        private IReLogger logger;
         private ContainerExistenceCache containerExists;
         private Dictionary<BlobGroup, BlobServiceClient> serviceClients;
 
@@ -30,7 +31,7 @@ namespace Imageflow.Server.Storage.AzureBlob.Caching
 // https://devblogs.microsoft.com/azure-sdk/best-practices-for-using-azure-sdk-with-asp-net-core/
 
         public AzureBlobCache(NamedCacheConfiguration config, Func<string?, BlobServiceClient> blobServiceFactory,
-            ILoggerFactory loggerFactory)
+            IReLoggerFactory loggerFactory)
         {
             this.config = config;
             // Map BlobGroupConfigurations dict, replacing those keys with the .Location.BlobClient value
@@ -40,7 +41,7 @@ namespace Imageflow.Server.Storage.AzureBlob.Caching
                     p.Value.Location.AzureClient.Resolve(blobServiceFactory))).ToDictionary(x => x.Key, x => x.Value);
 
             this.defaultBlobServiceClient = blobServiceFactory(null);
-            this.logger = loggerFactory.CreateLogger("AzureBlobCache");
+            this.logger = loggerFactory.CreateReLogger("AzureBlobCache");
 
             this.containerExists =
                 new ContainerExistenceCache(config.BlobGroupConfigurations.Values.Select(x => x.Location.ContainerName));
@@ -167,7 +168,7 @@ namespace Imageflow.Server.Storage.AzureBlob.Caching
             {
                 var response = await blob.DownloadStreamingAsync(new BlobDownloadOptions(), cancellationToken);
                 containerExists.Set(groupConfig.Location.ContainerName, true);
-                return BlobCacheFetchFailure.OkResult(new BlobWrapper(null,AzureBlobHelper.CreateConsumableBlob(storage, response)));
+                return BlobCacheFetchFailure.OkResult(new BlobWrapper(null,AzureBlobHelper.CreateConsumableBlob(storage, response, logger)));
 
             }
             catch (Azure.RequestFailedException ex)

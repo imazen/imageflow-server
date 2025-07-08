@@ -11,6 +11,7 @@ using Imazen.Abstractions.Blobs.LegacyProviders;
 using Imazen.Abstractions.Resulting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Imazen.Abstractions.Logging;
 
 namespace Imageflow.Server.Example
 {
@@ -22,8 +23,8 @@ namespace Imageflow.Server.Example
         {
             services.AddSingleton<IBlobWrapperProvider>((container) =>
             {
-                var logger = container.GetRequiredService<ILogger<CustomBlobService>>();
-                return new CustomBlobService(options, logger);
+                var loggerFactory = container.GetRequiredService<IReLoggerFactory>();
+                return new CustomBlobService(options, loggerFactory);
             });
 
             return services;
@@ -67,10 +68,15 @@ namespace Imageflow.Server.Example
     {
         private readonly BlobServiceClient client;
 
-        private CustomBlobServiceOptions options;
-        public CustomBlobService(CustomBlobServiceOptions options, ILogger<CustomBlobService> logger)
+        private readonly CustomBlobServiceOptions options;
+        private readonly IReLoggerFactory loggerFactory;
+        private readonly IReLogger logger;
+        
+        public CustomBlobService(CustomBlobServiceOptions options, IReLoggerFactory loggerFactory)
         {
             this.options = options;
+            this.loggerFactory = loggerFactory;
+            this.logger = loggerFactory.CreateReLogger("CustomBlobService");
             client = new BlobServiceClient(options.ConnectionString, options.BlobClientOptions);
         }
 
@@ -113,7 +119,7 @@ namespace Imageflow.Server.Example
                 var blobClient = client.GetBlobContainerClient(container).GetBlobClient(blobKey);
                 var latencyZone = new LatencyTrackingZone($"azure::blob/{container}", 100);
                 var s = await blobClient.DownloadAsync();
-                return CodeResult<IBlobWrapper>.Ok(new BlobWrapper(latencyZone,CustomAzureBlobHelpers.CreateAzureBlob(s)));
+                return CodeResult<IBlobWrapper>.Ok(new BlobWrapper(latencyZone,CustomAzureBlobHelpers.CreateAzureBlob(s, logger.WithReScopeData("virtualPath", virtualPath))));
 
             }
             catch (RequestFailedException e)
@@ -132,7 +138,7 @@ namespace Imageflow.Server.Example
     }
     internal static class CustomAzureBlobHelpers
     {
-        public static StreamBlob CreateAzureBlob(Response<BlobDownloadInfo> response)
+        public static StreamBlob CreateAzureBlob(Response<BlobDownloadInfo> response, IReLogger logger)
         {
             var a = new BlobAttributes()
             {
@@ -142,7 +148,7 @@ namespace Imageflow.Server.Example
                 
             };
             var stream = response.Value.Content;
-            return new StreamBlob(a, stream);
+            return new StreamBlob(a, stream, logger, null);
         }
     }
 }

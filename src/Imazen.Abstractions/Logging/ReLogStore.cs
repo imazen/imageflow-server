@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Text;
 using Imazen.Abstractions.Internal;
 using Microsoft.Extensions.Logging;
+using Microsoft.VisualBasic;
 
 namespace Imazen.Abstractions.Logging
 {
@@ -13,7 +14,7 @@ namespace Imazen.Abstractions.Logging
         {
             this.options = options; 
         }
-        public void Log<TState>(string categoryName, Stack<IDisposable>? scopeStack, LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter, bool retain, string? retainUniqueKey)
+        public void Log<TState>(string categoryName, KeyValuePair<string,object>[]? scopeData, Stack<IDisposable>? scopeStack, LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter, bool retain, string? retainUniqueKey)
         {
             // Check if it meets the criteria
             // If so, store it
@@ -30,13 +31,16 @@ namespace Imazen.Abstractions.Logging
             hash.Add((int)logLevel);
             var exceptionType = exception?.GetType().GetHashCode();
             hash.Add(exceptionType?.GetHashCode() ?? 0);
-            
+
+            string? scopeString = null;
+
             if (retainUniqueKey == null && exceptionType == null)
             {
+                scopeString = GetScopeString(scopeStack, scopeData);
                 //TOOD: work around this alloc
                 hash.Add(state?.ToString());
                 // loop scope stack and add to hash
-                hash.Add(scopeStack.GetScopeString());
+                hash.Add(scopeString);
             }
             else
             {
@@ -62,11 +66,12 @@ namespace Imazen.Abstractions.Logging
                     return;
                 }
             }
+            scopeString ??= GetScopeString(scopeStack, scopeData);
        
             entries.Add(new LogEntry()
             {
                 CategoryName = categoryName,
-                ScopeString = scopeStack.GetScopeString(),
+                ScopeString = scopeString,
                 LogLevel = logLevel,
                 EventId = eventId,
                 Message = formatter(state, exception),
@@ -95,16 +100,21 @@ namespace Imazen.Abstractions.Logging
 
             return sb.ToString();
         }
-        
-    }
-
-    internal static class ScopeStringExtensions
-    {
-        // loop through stack and build string
-        public static string? GetScopeString(this Stack<IDisposable>? scopeStack)
+        public static string? GetScopeString(Stack<IDisposable>? scopeStack, KeyValuePair<string, object>[]? scopeData)
         {
             if (scopeStack == null) return null;
             var sb = new StringBuilder();
+            if (scopeData != null)
+            {
+                foreach (var scope in scopeData)
+                {
+                    sb.Append(scope.Key);
+                    sb.Append("=");
+                    sb.Append(scope.Value);
+                    sb.Append(">");
+                }
+            }
+            sb.Append(" ");
             foreach (var scope in scopeStack)
             {
                 sb.Append(scope.ToString());
@@ -114,6 +124,7 @@ namespace Imazen.Abstractions.Logging
             return sb.ToString();
         }
     }
+
 
     internal class LogEntryGroup : ConcurrentBag<LogEntry>
     {
@@ -138,6 +149,7 @@ namespace Imazen.Abstractions.Logging
     internal struct LogEntry
     {
         public string CategoryName { get; set; }
+
         public string? ScopeString { get; set; }
         public LogLevel LogLevel { get; set; }
         public EventId EventId { get; set; }

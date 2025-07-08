@@ -2,8 +2,11 @@ using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using Imazen.Abstractions.BlobCache;
 using Imazen.Abstractions.Blobs;
+using Imazen.Abstractions.Logging;
 using Imazen.Abstractions.Resulting;
 using Imazen.Common.Extensibility.Support;
+using Imazen.Routing.Serving;
+using Microsoft.Extensions.Logging;
 
 namespace Imazen.Routing.Caching;
 
@@ -55,7 +58,7 @@ public static class AsyncEnumerableExtensions
 /// Items that are under the MinKeepNewItemsFor grace period should be kept in a separate list.
 /// They can graduate to the main list if they are accessed more than x times
 /// </summary>
-public class MemoryCache(MemoryCacheOptions options) : IBlobCache
+public class MemoryCache(MemoryCacheOptions options, IReLogger<MemoryCache> logger) : IBlobCache, IHostedImageServerService
 {
     private record CacheEntry(string CacheKey, IBlobWrapper BlobWrapper, UsageTracker UsageTracker)
     {
@@ -120,10 +123,26 @@ public class MemoryCache(MemoryCacheOptions options) : IBlobCache
     private bool TryRemove(string cacheKey, [MaybeNullWhen(false)] out CacheEntry removed)
     {
         if (!__cache.TryRemove(cacheKey, out removed)) return false;
+        var bytes = removed.BlobWrapper.EstimateAllocatedBytes;
         removed.BlobWrapper.Dispose();
-        Interlocked.Add(ref memoryUsedSync, -removed.BlobWrapper.EstimateAllocatedBytes ?? 0);
+        Interlocked.Add(ref memoryUsedSync, -bytes ?? 0);
         Interlocked.Decrement(ref itemCountSync);
         return true;
+    }
+
+    private void ClearAll()
+    {
+        logger.LogInformation("Clearing all cache entries");
+        while (true)
+        {
+            var next = __cache.FirstOrDefault();
+            if (next.Key == null) break;
+            TryRemove(next.Key, out _);
+        }
+        if (!__cache.IsEmpty) logger.LogWarning("Failed to clear all cache entries");
+
+        if (__cache.IsEmpty && (memoryUsedSync != 0 || itemCountSync != 0))
+            logger.LogWarning("Memory usage accounting error after ClearAll: values are {MemoryUsed} bytes, {ItemCount} items", memoryUsedSync, itemCountSync);
     }
     
     private bool TryEnsureCapacity(long size)
@@ -155,25 +174,25 @@ public class MemoryCache(MemoryCacheOptions options) : IBlobCache
         return true;
     }
 
-    private async Task<bool> TryAdd(string cacheKey, IBlobWrapper blob)
+    private async Task<bool> TryAdd(string cacheKey, IBlobWrapper unforkedBlobWrapper)
     {
-
-
-        if (blob.EstimateAllocatedBytes == null)
+        var estimateAllocatedBytes = unforkedBlobWrapper.EstimateAllocatedBytes;
+        if (estimateAllocatedBytes == null)
         {
             throw new InvalidOperationException("Cannot cache a blob that does not have an EstimateAllocatedBytes");
         }
+
         IBlobWrapper? existingBlob = null;
         if (__cache.TryGetValue(cacheKey, out var oldEntry))
         {
+            // Something already exists with this key.
+            // Not sure why previous code wanted to replace entries. We'd have to immutably swap the whole entry anyway.
             existingBlob = oldEntry.BlobWrapper;
-            if (existingBlob == blob)
-            {
-                return false; // Why are we adding the same blob twice? 
-            }
+            // We can exit.
+            return false;
         }
-        var replacementSizeDifference = (long)blob.EstimateAllocatedBytes! - (existingBlob?.EstimateAllocatedBytes ?? 0);
-        if (blob.EstimateAllocatedBytes > options.MaxItemSizeKb * 1024)
+        var replacementSizeDifference = (long)estimateAllocatedBytes! - (existingBlob?.EstimateAllocatedBytes ?? 0);
+        if (estimateAllocatedBytes > options.MaxItemSizeKb * 1024)
         {
             return false;
         }
@@ -181,21 +200,24 @@ public class MemoryCache(MemoryCacheOptions options) : IBlobCache
         {
             return false; // Can't make space? That's odd.
         }
-        if (!blob.IsReusable)
+        if (!unforkedBlobWrapper.IsReusable)
         {
-            //await blob.EnsureReusable();
-             throw new InvalidOperationException("Cannot cache a blob that is not natively reusable");
+            // await unforkedBlobWrapper.EnsureReusable();
+            throw new InvalidOperationException("Cannot cache a blob that is not natively reusable");
         }
-        var entry = new CacheEntry(cacheKey, blob, UsageTracker.Create());
-        if (entry == __cache.AddOrUpdate(cacheKey, entry, (_, existing) => existing with { BlobWrapper = blob }))
+        var entry = new CacheEntry(cacheKey, unforkedBlobWrapper.ForkReference(), UsageTracker.Create());
+        if (entry == __cache.AddOrUpdate(cacheKey, entry, (_, existing) => existing))
         {
             Interlocked.Increment(ref itemCountSync);
-            Interlocked.Add(ref memoryUsedSync, blob.EstimateAllocatedBytes ?? 0);
+            Interlocked.Add(ref memoryUsedSync, estimateAllocatedBytes ?? 0);
             itemCountSync++;
             return true;
         }
-        Interlocked.Add(ref memoryUsedSync, replacementSizeDifference);
-        
+        else
+        {
+            entry.BlobWrapper.Dispose();
+            // If we updated instead of leaving in place, we would call Interlocked.Add(ref memoryUsedSync, replacementSizeDifference);
+        }
         return false;
     }
 
@@ -211,7 +233,7 @@ public class MemoryCache(MemoryCacheOptions options) : IBlobCache
     {
         if (e.Result?.TryUnwrap(out var blob) == true)
         {
-            await TryAdd(e.OriginalRequest.CacheKeyHashString, blob.ForkReference());
+            await TryAdd(e.OriginalRequest.CacheKeyHashString, blob);
         }
 
         return CodeResult.Ok();
@@ -271,4 +293,15 @@ public class MemoryCache(MemoryCacheOptions options) : IBlobCache
         // We could be low on memory, but we wouldn't turn off features, we'd just evict smarter.
         return new ValueTask<IBlobCacheHealthDetails>(BlobCacheHealthDetails.FullHealth(InitialCacheCapabilities));
     }
+
+    public Task StopAsync(CancellationToken cancellationToken = default)
+    {
+        ClearAll();
+        return Task.CompletedTask;
+    }
+    public Task StartAsync(CancellationToken cancellationToken = default)
+    {
+        return Task.CompletedTask;
+    }
+
 }

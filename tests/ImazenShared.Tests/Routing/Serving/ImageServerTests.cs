@@ -68,12 +68,12 @@ public class ImageServerTests : ReLoggerTestBase
         try
         {
             return provider.GetRequiredService<IImageServer<MockRequestAdapter, MockResponseAdapter, TestHttpContext>>();
-        }catch (Exception e)
+        }catch 
         {
             // List service descriptors
             foreach (var descriptor in c)
             {
-                _output.WriteLine(descriptor.ImplementationType?.FullName ?? descriptor.ServiceType?.FullName);
+                _output.WriteLine(descriptor.ImplementationType?.FullName ?? descriptor.ServiceType?.FullName ?? "null");
 
             }
             throw;

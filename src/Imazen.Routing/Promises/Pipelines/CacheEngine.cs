@@ -158,6 +158,7 @@ public class CacheEngine: IBlobPromisePipeline
                     throw;
                 }
 
+                // TODO: can this cause blob leakage?
                 // cancel all cacheFetchTasks, they won't cancel if they are already done/canceled/succeeded
                 subCancel.Cancel(); // We don't want to wait for them to cancel.
                 
@@ -363,7 +364,7 @@ public class CacheEngine: IBlobPromisePipeline
         else
         {
             // We need to dispose of our forked reference to prevent memory leaks.
-            mainBlob.Dispose();
+            blob.Dispose();
             //TODO: log a bug, we should be able to find cacheHit among the set 
             throw new InvalidOperationException();
         }
@@ -378,7 +379,6 @@ public class CacheEngine: IBlobPromisePipeline
                 var tasks = cachesToSaveTo.Select(PerCacheUpload)
                     .ToArray();
                 return Task.WhenAll(tasks);
-
                 async Task<PutResult> PerCacheUpload(IBlobCache cache)
                 {
                     var waitingInQueue = DateTime.UtcNow - taskItem.JobCreatedAt;
@@ -433,6 +433,10 @@ public class CacheEngine: IBlobPromisePipeline
         if (enqueueResult == TaskEnqueueResult.Enqueued && Log.IsEnabled(LogLevel.Trace))
         {
             Log.LogTrace("Enqueued {CacheKeyHashString} for upload to {Caches}", cacheRequest.CacheKeyHashString, string.Join(", ", cachesToSaveTo.Select(x => x.UniqueName)));
+        }
+        if (enqueueResult != TaskEnqueueResult.Enqueued)
+        {
+            blob.Dispose();
         }
 
         return new ValueTask<bool>(enqueueResult == TaskEnqueueResult.Enqueued);

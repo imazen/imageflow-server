@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using Imazen.Abstractions.Logging;
 
 namespace Imazen.Abstractions.Blobs;
 
@@ -16,10 +17,13 @@ public sealed class StreamBlob : IConsumableBlob
     private readonly string streamType;
     private int instanceId;
     
+    private readonly IReLogger? logger;
+    public IReLogger? TryGetLogger() => logger;
+
     private static int _instanceCount = 0;
 #if DEBUG
     private static readonly ConcurrentDictionary<StreamBlob,bool> Instances = new();
-    private StackTrace creationStackTrace = new StackTrace();
+    private StackTrace? creationStackTrace;
 #endif 
     internal static string DebugInstances()
     {
@@ -29,12 +33,14 @@ public sealed class StreamBlob : IConsumableBlob
         return "Debug mode not enabled";
 #endif
     }
-    public StreamBlob(IBlobAttributes attrs, Stream stream, IDisposable? disposeAfterStream = null)
+    
+    public StreamBlob(IBlobAttributes attrs, Stream stream, IReLogger? logger = null, IDisposable? disposeAfterStream = null)
     {
+        this.logger = logger;
         disposeAfterStream1 = disposeAfterStream;
         Attributes = attrs;
         _stream = stream;
-        StreamLength = stream.CanSeek ? (int?)stream.Length : null;
+        StreamLength = stream.CanSeek ? (long?)stream.Length : null;
         streamType = stream.GetType().Name;
         if (stream is FileStream fs)
         {
@@ -44,6 +50,7 @@ public sealed class StreamBlob : IConsumableBlob
         _instanceCount++;
 #if DEBUG
         Instances[this] = true;
+        creationStackTrace = new StackTrace();
         // cleanup disposed instances
         foreach (var key in Instances.Where(x => x.Key.disposed).Select(x => x.Key))
         {
@@ -55,7 +62,7 @@ public sealed class StreamBlob : IConsumableBlob
     private string WhoCreatedMe()
     {
         #if DEBUG
-        return "Created by: " + creationStackTrace.ToString();
+        return "Created by: " + creationStackTrace?.ToString();
         #else
         return "";
 #endif
@@ -70,6 +77,7 @@ public sealed class StreamBlob : IConsumableBlob
 
     public void Dispose()
     {
+        if (disposed) return;
         disposed = true;
         if (disposalPromise != DisposalPromise.CallerDisposesStreamThenBlob)
         {

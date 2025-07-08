@@ -87,6 +87,7 @@ namespace Imazen.Common.Concurrency.BoundedTaskCollection {
                             {
                                 Interlocked.Add(ref queuedBytes, -taskItem.GetTaskSizeInMemory());
                             }
+                            (taskItem as IDisposable)?.Dispose();
                         }
                     }));
             }
@@ -109,14 +110,19 @@ namespace Imazen.Common.Concurrency.BoundedTaskCollection {
             return Task.CompletedTask;
         }
 
-        public Task StopAsync(CancellationToken cancellationToken)
+        public async Task StopAsync(CancellationToken cancellationToken)
         {
             stopped = true;
             lock (syncStopping)
             {
                 cts.Cancel();
-                return AwaitAllCurrentTasks();
             }
+            await AwaitAllCurrentTasks();
+            foreach (var item in c.Values)
+            {
+                (item as IDisposable)?.Dispose();
+            }
+            c.Clear();
         }
     }
 }

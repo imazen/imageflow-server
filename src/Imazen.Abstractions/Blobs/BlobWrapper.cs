@@ -43,12 +43,14 @@ namespace Imazen.Abstractions.Blobs
         private BlobWrapperCore? core;
         public BlobWrapper(LatencyTrackingZone? latencyZone, StreamBlob consumable)
         {
-            core = new BlobWrapperCore(latencyZone, consumable);
+            var logger = consumable.TryGetLogger();
+            core = new BlobWrapperCore(latencyZone, consumable, logger);
             core.AddWeakReference(this);
         }
         public BlobWrapper(LatencyTrackingZone? latencyZone, MemoryBlob reusable)
         {
-            core = new BlobWrapperCore(latencyZone, reusable);
+            var logger = reusable.TryGetLogger();
+            core = new BlobWrapperCore(latencyZone, reusable, logger);
             core.AddWeakReference(this);
         }
         private BlobWrapper(BlobWrapperCore core)
@@ -65,23 +67,13 @@ namespace Imazen.Abstractions.Blobs
         // /// <param name="borrowedFactory"></param>
         // /// <returns>False if the factory is already set, or the blob is already reusable</returns>
         // bool TrySetReusableBlobFactory(IReusableBlobFactory borrowedFactory);
-        //
-        /// <summary>
-        /// Sets the logger to be used by the blob.
-        /// </summary>
-        /// <param name="logger"></param>
-        /// <returns>False if the logger is already set</returns>
-        bool TrySetLogger(ILogger logger)
-        {
-            if (core == null) throw new ObjectDisposedException("The BlobWrapper has been disposed");
-            return core.TrySetLogger(logger);
-        }
 
 
         public void Dispose()
         {
-            core?.RemoveReference(this);
+            var c = core;
             core = null;
+            c?.RemoveReference(this);
         }
     }
 
@@ -89,4 +81,3 @@ namespace Imazen.Abstractions.Blobs
 
 
 }
-        

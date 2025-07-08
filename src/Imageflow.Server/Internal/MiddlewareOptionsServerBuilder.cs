@@ -116,6 +116,7 @@ internal class LegacyRoutingEngine : IRoutingEngine
 
     public ValueTask<CodeResult<ICacheableBlobPromise>?> RouteToPromiseAsync(MutableRequest request, CancellationToken cancellationToken = default) => routingEngine.RouteToPromiseAsync(request, cancellationToken);
 
+    private readonly IReLogger logger;
     public LegacyRoutingEngine(
         ImageflowMiddlewareOptions options,
         IWebHostEnvironment env,
@@ -129,7 +130,7 @@ internal class LegacyRoutingEngine : IRoutingEngine
         #pragma warning restore CS0618
         )
         {
-
+            this.logger = loggerFactory.CreateReLogger("LegacyRoutingEngine");
         var mappedPaths = options.MappedPaths.Cast<IPathMapping>().ToList();
         if (options.MapWebRoot)
         {
@@ -216,11 +217,11 @@ internal class LegacyRoutingEngine : IRoutingEngine
         if (mappedPaths.Count > 0)
         {
             builder.AddMediaLayer(new LocalFilesLayer(mappedPaths.Select(a => 
-                (IPathMapping)new PathMapping(a.VirtualPath, a.PhysicalPath, a.IgnorePrefixCase)).ToList()));
+                (IPathMapping)new PathMapping(a.VirtualPath, a.PhysicalPath, a.IgnorePrefixCase)).ToList(), logger));
         }
 
 
-        builder.AddMediaLayer(new BlobProvidersLayer(blobProviders, blobWrapperProviders));
+        builder.AddMediaLayer(new BlobProvidersLayer(blobProviders, blobWrapperProviders, logger));
         
         
         builder.AddEndpointLayer(diagnosticsPage);
@@ -272,8 +273,6 @@ internal class LegacyRoutingEngine : IRoutingEngine
                 action(builder);
             }
         }
-
-        var logger = loggerFactory.CreateReLogger("Imageflow.Routing");
 
         routingEngine = builder.Build(logger);
     }

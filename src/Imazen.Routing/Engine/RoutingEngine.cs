@@ -19,7 +19,7 @@ public class RoutingEngine : IRoutingEngine, IHasDiagnosticPageSection
     internal RoutingEngine(RoutingLayerGroup[] layerGroups, IReLogger logger)
     {
         this.layerGroups = layerGroups;
-        this.logger = logger;
+        this.logger = logger.WithSubcategory("RoutingEngine");
         
         // Build a precondition that is as specific as possible, so we can exit early if we know we can't handle the request.
         // This reduces allocations of wrappers etc.

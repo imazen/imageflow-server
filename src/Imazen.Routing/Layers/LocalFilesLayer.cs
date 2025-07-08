@@ -6,6 +6,7 @@ using Imazen.Routing.Helpers;
 using Imazen.Routing.HttpAbstractions;
 using Imazen.Routing.Promises;
 using Imazen.Routing.Requests;
+using Imazen.Abstractions.Logging;
 
 namespace Imazen.Routing.Layers;
 public interface IPathMapping : IStringAndComparison
@@ -31,7 +32,6 @@ public class PathMapper
     public record struct PathMapperResult(string MappedPhysicalPath, IPathMapping MappingUsed);
     public IReadOnlyList<IPathMapping> PathMappings { get; }
     public IFastCond? FastPreconditions { get; }
-
     public PathMapper(IEnumerable<IPathMapping> pathMappings)
     {
         var list = pathMappings.ToList(); 
@@ -73,7 +73,7 @@ public class PathMapper
         return null;
     }
 }
-public class LocalFilesLayer(IEnumerable<IPathMapping> pathMappings) : PathMapper(pathMappings), IRoutingLayer
+public class LocalFilesLayer(IEnumerable<IPathMapping> pathMappings, IReLogger logger) : PathMapper(pathMappings), IRoutingLayer
 {
     public string Name => "LocalFiles";
 
@@ -90,9 +90,10 @@ public class LocalFilesLayer(IEnumerable<IPathMapping> pathMappings) : PathMappe
             return new ValueTask<CodeResult<IRoutingEndpoint>?>((CodeResult<IRoutingEndpoint>?)null);
         }
         var latencyZone = new LatencyTrackingZone(mappingUsed.PhysicalPath, 10);
+        var loggerForPath = logger.WithReScopeData("requestPath", request.Path);
         return Tasks.ValueResult<CodeResult<IRoutingEndpoint>?>(CodeResult<IRoutingEndpoint>.Ok(
             new PromiseWrappingEndpoint(
-                new FilePromise(request.ToSnapshot(true), mappedPhysicalPath, latencyZone, lastWriteTimeUtc))));
+                new FilePromise(request.ToSnapshot(true), mappedPhysicalPath, latencyZone, lastWriteTimeUtc, loggerForPath))));
     
     }
 
@@ -105,7 +106,7 @@ public class LocalFilesLayer(IEnumerable<IPathMapping> pathMappings) : PathMappe
     }
 
     
-    internal record FilePromise(IRequestSnapshot FinalRequest, string PhysicalPath,LatencyTrackingZone LatencyZone, DateTime LastWriteTimeUtc): CacheableBlobPromiseBase(FinalRequest, LatencyZone)
+    internal record FilePromise(IRequestSnapshot FinalRequest, string PhysicalPath,LatencyTrackingZone LatencyZone, DateTime LastWriteTimeUtc, IReLogger LoggerForPath): CacheableBlobPromiseBase(FinalRequest, LatencyZone, LoggerForPath)
     {
         
         public override void WriteCacheKeyBasisPairsToRecursive(IBufferWriter<byte> writer)
@@ -117,11 +118,11 @@ public class LocalFilesLayer(IEnumerable<IPathMapping> pathMappings) : PathMappe
         public override ValueTask<CodeResult<IBlobWrapper>> TryGetBlobAsync(IRequestSnapshot request, IBlobRequestRouter router, IBlobPromisePipeline pipeline,
             CancellationToken cancellationToken = default)
         {
-            return Tasks.ValueResult(CodeResult<IBlobWrapper>.Ok(new BlobWrapper(LatencyZone, PhysicalFileBlobHelper.CreateConsumableBlob(PhysicalPath, LastWriteTimeUtc))));
+            return Tasks.ValueResult(CodeResult<IBlobWrapper>.Ok(new BlobWrapper(LatencyZone, PhysicalFileBlobHelper.CreateConsumableBlob(PhysicalPath, LastWriteTimeUtc, LoggerForPath))));
         }
     }
 
-    internal abstract record CacheableBlobPromiseBase(IRequestSnapshot FinalRequest, LatencyTrackingZone? LatencyZone) : ICacheableBlobPromise
+    internal abstract record CacheableBlobPromiseBase(IRequestSnapshot FinalRequest, LatencyTrackingZone? LatencyZone, IReLogger LoggerForPath) : ICacheableBlobPromise
     {
         public bool IsCacheSupporting => true;
 

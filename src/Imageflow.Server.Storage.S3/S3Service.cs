@@ -9,6 +9,7 @@ using Imazen.Abstractions.Blobs;
 using Imazen.Abstractions.Blobs.LegacyProviders;
 using Imazen.Abstractions.Logging;
 using Imazen.Abstractions.Resulting;
+using Microsoft.Extensions.Logging;
 
 namespace Imageflow.Server.Storage.S3
 {
@@ -18,9 +19,11 @@ namespace Imageflow.Server.Storage.S3
         private readonly List<S3BlobCache> namedCaches = [];
 
         private readonly IAmazonS3 s3Client;
+        private readonly IReLogger logger;
 
         public S3Service(S3ServiceOptions options, IAmazonS3 s3Client, IReLoggerFactory loggerFactory)
         {
+            this.logger = loggerFactory.CreateReLogger("s3");
             this.s3Client = s3Client;
             UniqueName = options.UniqueName;
             foreach (var m in options.Mappings)
@@ -70,6 +73,7 @@ namespace Imageflow.Server.Storage.S3
                 m.IgnorePrefixCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal));
             if (mapping.Prefix == null)
             {
+                logger?.LogInformation("No S3 mapping found for virtual path \"{virtualPath}\"", virtualPath);
                 return CodeResult<IBlobWrapper>.Err((HttpStatus.NotFound, $"No S3 mapping found for virtual path \"{virtualPath}\""));
                 
             }
@@ -91,7 +95,7 @@ namespace Imageflow.Server.Storage.S3
 
                 var latencyZone = new LatencyTrackingZone($"s3::bucket/{mapping.Bucket}", 100);
                 var s = await client.GetObjectAsync(req);
-                return new BlobWrapper(latencyZone,S3BlobHelpers.CreateS3Blob(s));
+                return new BlobWrapper(latencyZone,S3BlobHelpers.CreateS3Blob(s, logger));
 
             } catch (AmazonS3Exception se) {
                 if (se.StatusCode == System.Net.HttpStatusCode.NotFound || "NoSuchKey".Equals(se.ErrorCode, StringComparison.OrdinalIgnoreCase)) 

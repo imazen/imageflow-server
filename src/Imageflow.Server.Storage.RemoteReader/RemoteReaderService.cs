@@ -21,16 +21,18 @@ namespace Imageflow.Server.Storage.RemoteReader
         private readonly List<string> prefixes = new List<string>();
         private readonly IHttpClientFactory httpFactory;
         private readonly RemoteReaderServiceOptions options;
-        private readonly IReLogger<RemoteReaderService> logger;
+        private readonly IReLogger logger;
+        private readonly IReLoggerFactory loggerFactory;
         private readonly Func<Uri, string> httpClientSelector;
 
         public RemoteReaderService(RemoteReaderServiceOptions options
-            , IReLogger<RemoteReaderService> logger
+            , IReLoggerFactory loggerFactory
             , IHttpClientFactory httpFactory
             )
         {
             this.options = options;
-            this.logger = logger;
+            this.loggerFactory = loggerFactory;
+            this.logger = loggerFactory.CreateReLogger("RemoteReader");
             this.httpFactory = httpFactory;
             httpClientSelector = options.HttpClientSelector ?? (_ => "");
 
@@ -148,7 +150,7 @@ namespace Imageflow.Server.Storage.RemoteReader
                 var disposeAfter = resp;
                 var stream = await resp.Content.ReadAsStreamAsync().ConfigureAwait(false);
 
-                return new BlobWrapper(GetLatencyZone(virtualPath), new StreamBlob(attributes, stream, disposeAfter));
+                return new BlobWrapper(GetLatencyZone(virtualPath), new StreamBlob(attributes, stream, logger?.WithReScopeData("virtualPath", virtualPath), disposeAfter));
             }
             catch (BlobMissingException)
             {

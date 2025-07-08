@@ -21,6 +21,7 @@ namespace Imageflow.Server.Storage.AzureBlob
 
         private readonly IAzureClientFactory<BlobServiceClient> clientFactory;
 
+        private readonly IReLogger logger;
         
         public string UniqueName { get; }
         public IEnumerable<BlobWrapperPrefixZone> GetPrefixesAndZones()
@@ -40,6 +41,7 @@ namespace Imageflow.Server.Storage.AzureBlob
         public AzureBlobService(AzureBlobServiceOptions options, IReLoggerFactory loggerFactory,  BlobServiceClient defaultClient, IAzureClientFactory<BlobServiceClient> clientFactory)
         {
             UniqueName = options.UniqueName ?? "azure-blob";
+            logger = loggerFactory.CreateReLogger(UniqueName);
             var nameOrInstance = options.GetOrCreateClient();
             if (nameOrInstance.HasValue)
             {   
@@ -110,7 +112,7 @@ namespace Imageflow.Server.Storage.AzureBlob
                 var reference = new AzureBlobStorageReference(containerClient.Uri.AbsoluteUri, key);
                 var s = await blobClient.DownloadStreamingAsync();
                 var latencyZone = new LatencyTrackingZone($"azure::blob/{mapping.Container}", 100);
-                return CodeResult<IBlobWrapper>.Ok(new BlobWrapper(latencyZone,AzureBlobHelper.CreateConsumableBlob(reference, s.Value)));
+                return CodeResult<IBlobWrapper>.Ok(new BlobWrapper(latencyZone,AzureBlobHelper.CreateConsumableBlob(reference, s.Value, logger)));
 
             }
             catch (RequestFailedException e)

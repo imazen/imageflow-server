@@ -28,15 +28,18 @@ namespace Imageflow.Server.Tests
                 builder.AddXUnit(outputHelper, configuration =>
                 {
                     configuration.Filter = (category, level) => level >= LogLevel.Trace;
+                    configuration.IncludeScopes = true;
                    
                 });
                 builder.SetMinimumLevel(LogLevel.Trace);
                 // builder.AddFilter("Microsoft", LogLevel.Warning);
                 // builder.AddFilter("System", LogLevel.Warning);
                 // trace log to console for when xunit crashes with stack overflow
+                //builder.AddConsoleFormatter
                 builder.AddConsole(options =>
                 {
                     options.LogToStandardErrorThreshold = LogLevel.Trace;
+                    
                 });
             });
             services.AddImageflowReLogStoreAndReLoggerFactoryIfMissing();
@@ -358,6 +361,10 @@ namespace Imageflow.Server.Tests
             if (!Directory.Exists(diskCacheDir))
             {
                 var parent = Path.GetDirectoryName(diskCacheDir);
+                if (parent == null)
+                {
+                    Assert.Fail("Disk cache folder missing Cache dir: " + diskCacheDir);
+                }
 
                 var entries = Directory.GetFileSystemEntries(parent, "*", SearchOption.AllDirectories)
                     .Select(s => s.Replace(parent + "\\", "").Replace("\\", "/")).ToList();
@@ -619,7 +626,7 @@ namespace Imageflow.Server.Tests
                 // Now we could stop here, but we also enabled request signing, which is different from remote reader signing
                 var signedModifiedUrl = Imazen.Common.Helpers.Signatures.SignRequest(modifiedUrl, requestSigningKey);
                 using var signedResponse = await client.GetAsync(signedModifiedUrl, TestContext.Current.CancellationToken);
-                outputHelper.WriteLine(signedResponse.RequestMessage.RequestUri.AbsoluteUri);
+                outputHelper.WriteLine(signedResponse?.RequestMessage?.RequestUri?.AbsoluteUri ?? "null");
                 signedResponse.EnsureSuccessStatusCode();
                 
                 // Now, verify that the remote url can't be fetched without signing it the second time, 

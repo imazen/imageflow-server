@@ -90,9 +90,9 @@ namespace Imageflow.Server.Storage.RemoteReader
                 if (!resp.IsSuccessStatusCode)
                 {
                     logger?.LogWarning(
-                        "RemoteReader blob {VirtualPath} not found. The remote {Url} responded with status: {StatusCode}",
+                        "DomainProxy blob {VirtualPath} not found. The remote {Url} responded with status: {StatusCode}",
                         virtualPath, url, resp.StatusCode);
-                    return CodeResult<IBlobWrapper>.Err(HttpStatus.NotFound.WithMessage("RemoteReader blob \"{virtualPath}\" not found. The remote \"{url}\" responded with status: {resp.StatusCode}"));
+                    return CodeResult<IBlobWrapper>.Err(HttpStatus.NotFound.WithMessage("DomainProxy blob \"{virtualPath}\" not found. The remote \"{url}\" responded with status: {resp.StatusCode}"));
                 }
 
                 var attrs = new BlobAttributes()
@@ -106,7 +106,7 @@ namespace Imageflow.Server.Storage.RemoteReader
                 var stream = await resp.Content.ReadAsStreamAsync().ConfigureAwait(false);
 
                 return CodeResult<IBlobWrapper>.Ok(new BlobWrapper(prefix.Zone,
-                    new StreamBlob(attrs, stream, resp)));
+                    new StreamBlob(attrs, stream,logger?.WithReScopeData("virtualPath", virtualPath), resp)));
             }
             catch (BlobMissingException)
             {
@@ -114,10 +114,10 @@ namespace Imageflow.Server.Storage.RemoteReader
             }
             catch (Exception ex)
             {
-                logger?.LogWarning(ex, "RemoteReader blob error retrieving {Url} for {VirtualPath}", url,
+                logger?.LogWarning(ex, "DomainProxy blob error retrieving {Url} for {VirtualPath}", url,
                     virtualPath);
                 return CodeResult<IBlobWrapper>.Err(HttpStatus.ServerError
-                .WithMessage("RemoteReader blob error retrieving \"{url}\" for \"{virtualPath}\".")
+                .WithMessage("DomainProxy blob error retrieving \"{url}\" for \"{virtualPath}\".")
                 .WithAppend(ex.Message));
             }
         
