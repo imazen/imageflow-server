@@ -83,10 +83,10 @@ where a capture starts and stops. **
 - `length(min,max)` (alias: `len`): Matches a segment with a length within the specified range (inclusive).
 - `length(min,)` (alias: `len`): Matches a segment with a length greater than or equal to the specified minimum length.
 - `length(,max)` (alias: `len`): Matches a segment with a length less than or equal to the specified maximum length.
-- `image-ext-supported()` (aliases: `image-extension-supported`, `image-type-supported`): Matches a segment that represents a supported image file extension.
+
 - `allow(CharacterClass)` (alias: `only`): Matches a segment that contains only characters from the specified character class. (*Note: `allow` is the canonical name used internally.*)
 - `starts-with-chars(count,CharacterClass)` (aliases: `starts-with-only`, `starts-chars`): Matches a segment that starts with a specified number of characters from the given character class.
-- `image-ext-supported()` (aliases: `image-extension-supported`, `image-type-supported`): Matches a segment that represents a supported (for image processing) image file extension. (*Duplicate entry? Should be consolidated or removed*)
+
 
 ## Optional and Wildcard Segments
 

@@ -685,7 +685,7 @@ public class MatcherAstEvaluator
             case "uint32": /*case "uint": case "u32":*/ return value.IsU32();
             case "uint64": /*case "u64":*/ return value.IsU64();
             case "guid": return value.IsGuid();
-            case "image-ext-supported": return _context.EndsWithSupportedImageExtension(value);
+            case "image-ext-supported": return false; //_context.EndsWithSupportedImageExtension(value);
 
             // --- Conditions using extracted string arguments ---
             case "equals": 

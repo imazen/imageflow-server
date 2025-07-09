@@ -3,6 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using Imazen.Abstractions.HttpStrings;
 using Imazen.Routing.HttpAbstractions;
 using Microsoft.Extensions.Primitives;
+using Imazen.Routing.Matching.Templating;
 
 namespace Imazen.Routing.Matching;
 
@@ -12,6 +13,12 @@ public record MultiValueMatcher(
     ParsingOptions ParsingOptions,
     ExpressionFlags? UnusedFlags)
 {
+    public Dictionary<string, MatcherVariableInfo>? GetMatcherVariableInfo()
+    {
+        return PathMatcher?.GetMatcherVariableInfo().Concat(
+            QueryValueMatchers?.SelectMany(x => x.Value.GetMatcherVariableInfo()) ?? [])
+            .ToDictionary(p => p.Key, p => p.Value);
+    }
     public string? GetValidationErrors()
     {
         if (ParsingOptions.RawQueryAndPath && PathMatcher == null)
@@ -47,16 +54,14 @@ public record MultiValueMatcher(
         return null;
     }
 
-    public static MultiValueMatcher Parse(ReadOnlyMemory<char> expressionWithFlags)
+
+
+    // as string
+    public static bool TryParse(string expressionWithFlags,
+        [NotNullWhen(true)] out MultiValueMatcher? result, [NotNullWhen(false)] out string? error)
     {
-        if (!MultiValueMatcher.TryParse(expressionWithFlags, out var result, out var error))
-        {
-            throw new ArgumentException(error, nameof(expressionWithFlags));
-        }
-
-        return result!;
+        return TryParse(expressionWithFlags.AsMemory(), out result, out error);
     }
-
     public static bool TryParse(ReadOnlyMemory<char> expressionWithFlags,
         [NotNullWhen(true)] out MultiValueMatcher? result, [NotNullWhen(false)] out string? error)
     {
@@ -174,13 +179,13 @@ public record MultiValueMatcher(
             return new MultiMatchResult
             {
                 Success = true, ExcessQueryKeys = query is { Count: > 0 } ? query.Keys.ToArray() : null, OriginalQuery = query,
-                Captures = pathMatchResult?.Captures?.ToDictionary(x => x.Name, x => x.Value)
+                Captures = pathMatchResult?.Captures?.ToDictionary(x => x.Name, x => x.Value.ToString())
             };
         }
 
         List<string>? matchedKeysList = null;
-        Dictionary<string, ReadOnlyMemory<char>>? captures =
-            pathMatchResult?.Captures?.ToDictionary(x => x.Name, x => x.Value);
+        Dictionary<string, string>? captures =
+            pathMatchResult?.Captures?.ToDictionary(x => x.Name, x => x.Value.ToString());
 
         // We have query matchers. Now, some or all may be optional, so we can't short circuit.
         foreach (var pair in QueryValueMatchers!)
@@ -224,13 +229,13 @@ public record MultiValueMatcher(
                 }
 
                 //Combine the success captures into the result.
-                captures ??= new Dictionary<string, ReadOnlyMemory<char>>();
+                captures ??= new Dictionary<string, string>();
                 if (valueMatchResult.Value.Captures != null)
                 {
                     foreach (var capture in valueMatchResult.Value.Captures)
                     {
                         // Will fail on dupe names.
-                        captures.Add(capture.Name, capture.Value);
+                        captures.Add(capture.Name, capture.Value.ToString());
                     }
                 }
 

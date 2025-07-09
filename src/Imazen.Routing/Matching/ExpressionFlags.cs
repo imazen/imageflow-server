@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics.CodeAnalysis;
+using System.Text.RegularExpressions;
 
 namespace Imazen.Routing.Matching;
 
@@ -13,9 +14,9 @@ public record ExpressionFlags(ReadOnlyCollection<string> Flags)
     /// <param name="result"></param>
     /// <param name="error"></param>
     /// <returns></returns>
-    public static bool TryParseFromEnd(ReadOnlyMemory<char> expression,out ReadOnlyMemory<char> remainingExpression, out List<string> result, 
+    public static bool TryParseFromEnd(ReadOnlyMemory<char> expression, out ReadOnlyMemory<char> remainingExpression, out List<string> result, 
         [NotNullWhen(false)]
-        out string? error)
+        out string? error, Regex? validationRegex = null)
     {
         var flags = new List<string>();
         var span = expression.Span;
@@ -44,20 +45,27 @@ public record ExpressionFlags(ReadOnlyCollection<string> Flags)
             var commaIndex = innerSpan.IndexOf(',');
             if (commaIndex == -1)
             {
-                flags.Add(inner.ToString());
+                flags.Add(inner.Trim().ToString());
                 break;
             }
-            flags.Add(inner[..commaIndex].ToString());
+            flags.Add(inner[..commaIndex].Trim().ToString());
             inner = inner[(commaIndex + 1)..];
             innerSpan = inner.Span;
         }
-        // validate only a-z-
+        // validate 
         foreach (var flag in flags)
         {
-            if (!flag.All(x => x == '-' || (x >= 'a' && x <= 'z')))
+            if (validationRegex == null){
+                if (!flag.All(x => x == '-' || (x >= 'a' && x <= 'z'))){
+                    result = flags;
+                    error = $"Invalid flag '{flag}', only a-z- are allowed in match expressions.";
+                    return false;
+                }
+            }
+            else if (!validationRegex.IsMatch(flag))
             {
                 result = flags;
-                error = $"Invalid flag '{flag}', only a-z- are allowed";
+                error = $"Invalid flag '{flag}', it does not match the required format {validationRegex}.";
                 return false;
             }
         }

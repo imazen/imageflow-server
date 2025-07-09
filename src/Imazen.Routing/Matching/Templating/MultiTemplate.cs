@@ -123,9 +123,15 @@ public record MultiTemplate(StringTemplate? PathTemplate,
         return null;
     }
 
-    public string Evaluate(IDictionary<string, string> variables)
+    public bool TryEvaluate(IDictionary<string, string> variables, [NotNullWhen(true)] out string? result, [NotNullWhen(false)] out string? error)
     {
         var pathResult = PathTemplate?.Evaluate(variables, out _) ?? "";
+        if (pathResult.Contains(".."))
+        {
+            result = null;
+            error = "Evaluated path template contains banned string '..'";
+            return false;
+        }
 
         var sb = new StringBuilder();
         bool firstQueryParam = true;
@@ -150,7 +156,9 @@ public record MultiTemplate(StringTemplate? PathTemplate,
                 sb.Append(valueResult);
             }
         }
-        return pathResult + sb.ToString();
+        result = pathResult + sb.ToString();
+        error = null;
+        return true;
     }
 
     public static bool TryParse(ReadOnlyMemory<char> expressionWithFlags,

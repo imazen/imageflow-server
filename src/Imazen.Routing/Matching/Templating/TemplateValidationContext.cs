@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using Imazen.Routing.Matching;
 
 namespace Imazen.Routing.Matching.Templating;
@@ -12,5 +13,6 @@ namespace Imazen.Routing.Matching.Templating;
 public record TemplateValidationContext(
     IReadOnlyDictionary<string, MatcherVariableInfo>? MatcherVariables,
     ExpressionFlags? MatcherFlags,
-    ExpressionFlags? TemplateFlags
+    ExpressionFlags? TemplateFlags,
+    Regex? TemplateFlagRegex
 ); 
