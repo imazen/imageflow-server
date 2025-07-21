@@ -104,9 +104,12 @@ public class LocalFilesLayer(IEnumerable<IPathMapping> pathMappings, IReLogger l
         var mappingPairs = PathMappings.Select(m => $"  {m.VirtualPath}{(m.IgnorePrefixCase ? @"(i)" : @"")} => {m.PhysicalPath}").ToArray();
         return $"Routing Layer {Name}: {PathMappings.Count} mappings, Preconditions: {FastPreconditions}\n{string.Join("\n", mappingPairs)}";
     }
+  
+   
 
-    
-    internal record FilePromise(IRequestSnapshot FinalRequest, string PhysicalPath,LatencyTrackingZone LatencyZone, DateTime LastWriteTimeUtc, IReLogger LoggerForPath): CacheableBlobPromiseBase(FinalRequest, LatencyZone, LoggerForPath)
+}
+
+ internal record FilePromise(IRequestSnapshot FinalRequest, string PhysicalPath,LatencyTrackingZone LatencyZone, DateTime LastWriteTimeUtc, IReLogger LoggerForPath): CacheableBlobPromiseBase(FinalRequest, LatencyZone, LoggerForPath)
     {
         
         public override void WriteCacheKeyBasisPairsToRecursive(IBufferWriter<byte> writer)
@@ -157,5 +160,3 @@ public class LocalFilesLayer(IEnumerable<IPathMapping> pathMappings, IReLogger l
             IBlobRequestRouter router, IBlobPromisePipeline pipeline,
             CancellationToken cancellationToken = default);
     }
-
-}

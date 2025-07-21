@@ -164,7 +164,7 @@ public class BlobProvidersLayer : IRoutingLayer
     
 }
 
-internal record BlobProviderPromise(IRequestSnapshot FinalRequest, String VirtualPath, IBlobProvider Provider, LatencyTrackingZone LatencyZone, IReLogger logger): LocalFilesLayer.CacheableBlobPromiseBase(FinalRequest, LatencyZone, logger)
+internal record BlobProviderPromise(IRequestSnapshot FinalRequest, String VirtualPath, IBlobProvider Provider, LatencyTrackingZone LatencyZone, IReLogger logger): CacheableBlobPromiseBase(FinalRequest, LatencyZone, logger)
 {
     public override void WriteCacheKeyBasisPairsToRecursive(IBufferWriter<byte> writer)
     {
@@ -200,7 +200,7 @@ internal record BlobProviderPromise(IRequestSnapshot FinalRequest, String Virtua
 internal record BlobWrapperProviderPromise(
     IRequestSnapshot FinalRequest,
     String VirtualPath,
-    IBlobWrapperProvider Provider, LatencyTrackingZone LatencyZone, IReLogger LoggerForPath) : LocalFilesLayer.CacheableBlobPromiseBase(FinalRequest, LatencyZone, LoggerForPath)
+    IBlobWrapperProvider Provider, LatencyTrackingZone LatencyZone, IReLogger LoggerForPath) : CacheableBlobPromiseBase(FinalRequest, LatencyZone, LoggerForPath)
 {
     public override async ValueTask<CodeResult<IBlobWrapper>> TryGetBlobAsync(IRequestSnapshot request,
         IBlobRequestRouter router, IBlobPromisePipeline pipeline,
