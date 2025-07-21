@@ -66,7 +66,7 @@ internal readonly record struct
             var innerMem = exprMemory[1..^1];
             if (innerMem.Length == 0)
             {
-                error = "Segment {} cannot be empty. Try {*}, {name}, {name:condition1:condition2}";
+                error = "Segment {} cannot be empty. Try {name}, {name:condition1:condition2}";
                 segment = null;
                 return false;
             }

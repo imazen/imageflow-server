@@ -14,5 +14,14 @@ public record TemplateValidationContext(
     IReadOnlyDictionary<string, MatcherVariableInfo>? MatcherVariables,
     ExpressionFlags? MatcherFlags,
     ExpressionFlags? TemplateFlags,
-    Regex? TemplateFlagRegex
-); 
+    Regex? TemplateFlagRegex,
+    bool RequirePath,
+    bool RequireSchemeForPaths,
+    List<string>? AllowedSchemes
+){
+
+    public static TemplateValidationContext VarsAndMatcherFlags(IReadOnlyDictionary<string, MatcherVariableInfo>? matcherVariables, ExpressionFlags? matcherFlags)
+    {
+        return new TemplateValidationContext(matcherVariables, matcherFlags, null, null, false, false, null);
+    }
+}

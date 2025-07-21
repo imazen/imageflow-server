@@ -82,6 +82,38 @@ internal static partial class ExpressionParsingHelpers
         }
         return -1;
     }
+    internal static int FindCharNotEscapedAtDepth0(ReadOnlySpan<char> str,char c, char escapeChar, char openChar, char closeChar)
+    {
+        var consecutiveEscapeChars = 0;
+        var depth = 0;
+        for (var i = 0; i < str.Length; i++)
+        {
+            if (str[i] == escapeChar)
+            {
+                consecutiveEscapeChars++;
+                continue;
+            }
+
+            if (consecutiveEscapeChars % 2 == 0)
+            {
+                if (str[i] == c && depth == 0)
+                {
+                    return i;
+                }
+                if (str[i] == openChar)
+                {
+                    depth++;
+                }
+                if (str[i] == closeChar)
+                {
+                    depth--;
+                }
+            }
+            consecutiveEscapeChars = 0;
+
+        }
+        return -1;
+    }
     
         
 #if NET8_0_OR_GREATER
@@ -125,6 +157,27 @@ internal static partial class ExpressionParsingHelpers
         if (StringCondition.IsReservedName(name))
         {
             error = $"Did you forget to put : before your condition? '{name}' cannot be used as a variable name in {{{segmentExpression.ToString()}}} (for clarity), since it has a function.";
+            return false;
+        }
+        error = null;
+        return true;
+    }
+
+    internal static bool ValidateVariableName(string name, [NotNullWhen(false)]out string? error)
+    {
+        if (name.Length == 0)
+        {
+            error = "Variable names cannot be empty";
+            return false;
+        }
+        if (!ValidSegmentName().IsMatch(name))
+        {
+            error = $"Invalid variable name '{name}'. Names must start with a letter or underscore, and contain only letters, numbers, or underscores";
+            return false;
+        }
+        if (StringCondition.IsReservedName(name))
+        {
+            error = $"Invalid variable name '{name}' - that is a reserved word.";
             return false;
         }
         error = null;

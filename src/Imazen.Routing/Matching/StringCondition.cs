@@ -6,17 +6,6 @@ using EnumFastToStringGenerated;
 namespace Imazen.Routing.Matching;
 
 
-
-// after(/): optional/?, 
-//     equals(string), everything/**
-
-//     alpha, alphanumeric, alphalower, alphaupper, guid, hex, int, i32, only([a-zA-Z0-9_\:,]), only([^/]) len(3),
-//     length(3), length(0,3),starts_with_only(3,[a-z]),
-//
-//  ends_with(.jpg|.png|.gif), includes(str), supported_image_type
-// ends_with(.jpg|.png|.gif),  includes(stra|strb), long, int_range(
-// }
-
 public readonly record struct StringCondition
 {   
     private StringCondition(StringConditionKind stringConditionKind, char? c, string? str, CharacterClass? charClass, string[]? strArray, int? int1, int? int2)
@@ -594,7 +583,6 @@ internal static class StringConditionKindAliases
             "u64" => "uint64",
             "i64" => "int64",
             "integer-range" => "range",
-            "only" => "allow",
             "starts-with-only" => "starts-with-chars",
             "len" => "length",
             "eq" => "equals",
@@ -606,8 +594,8 @@ internal static class StringConditionKindAliases
             "ends-i" => "ends-with-i",
             "includes" => "contains",
             "includes-i" => "contains-i",
-            "image-extension-supported" => "image-ext-supported",
-            "image-type-supported" => "image-ext-supported",
+            "lower" => "alpha-lower",
+            "upper" => "alpha-upper",
             _ => name
         };
     }

@@ -212,7 +212,7 @@ internal class LegacyRoutingEngine : IRoutingEngine
                     h => WrapUrlEventArgs(h.PathPrefix, h.Handler, true)).ToList()));
         }
         
-        //TODO: Add a layer that can be used to set the cache key basis
+        //TODO: Add a layer that can be used to set the cache key basis ? for licensing ? -> mutating the query should already do that
         builder.AddMediaLayer(new LicensingLayer(licenseChecker));
         
 

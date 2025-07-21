@@ -89,7 +89,7 @@ TemplateVariable            = "{", VariableName, { ":", Transformation }, "}" ;
 VariableName                = identifier_start_char, { identifier_char } ; (* Must exist in the corresponding Matcher *)
 
 Transformation              = TransformName, [ "(", Arguments, ")" ] ;
-TransformName               = transform_alias, { transform_char } ; (* e.g., "lower", "upper", "map", "default", "or_var", "other", "optional", "encode", "equals" *)
+TransformName               = transform_alias, { transform_char } ; (* e.g., "lower", "upper", "map", "default", "or-var", "other", "optional", "encode", "equals" *)
 Arguments                   = Argument, { ArgumentSeparator, Argument } ;
 Argument                    = (* Similar to Matching, but simpler types needed *) EscapedStringValue ;
 ArgumentSeparator           = "," | "|" ; (* '|' used for 'equals', ',' otherwise *)
@@ -119,7 +119,7 @@ lowercase_letter            = "a".."z" ;
     *   *Suggestion:* Could templating adopt a more restricted, uniform argument syntax? Perhaps always comma-delimited, with explicit string quoting if needed? Or could matching simplify its argument parsing if character classes were the only non-simple type?
 
 2.  **Condition vs. Transformation Naming:**
-    *   Some concepts overlap but have different names (e.g., `allow([...])` or `only(...)` in matching vs. `equals(a|b|c)` in templating).
+    *   Some concepts overlap but have different names (e.g., `chars([...])` or `only(...)` in matching vs. `equals(a|b|c)` in templating).
     *   Matching uses `len`, `length`, `range`, while templating doesn't have direct equivalents.
     *   Templating has `map`, `or`, `default`, `encode` which have no direct matching counterparts.
     *   *Suggestion:* Standardize names where functionality overlaps. Could `equals` replace `allow`/`only` in matching? Could a length check be added to templating if useful?
@@ -176,25 +176,25 @@ When these matching or templating expressions are embedded within other file for
 
 **Specific Format Examples:**
 
-*   **JSON:** Requires escaping `"` and `\\`. An expression like `/path/{file:allow([a-z\\.])}` becomes `"\\/path\\/{file:allow([a-z\\\\\\\\.])}"`. Note the quadruple `\\\\` to represent a single literal backslash in the character class.
-*   **C# (Regular String):** Requires escaping `"` and `\\`. The same example is `"\\/path\\/{file:allow([a-z\\\\\\\\.])}"`.
-*   **C# (Verbatim String):** Requires escaping `"` by doubling (`""`). The example is `@"\/path\/{file:allow([a-z\\\.])}"`. Much simpler for backslashes.
+*   **JSON:** Requires escaping `"` and `\\`. An expression like `/path/{file:chars([a-z\\.])}` becomes `"\\/path\\/{file:chars([a-z\\\\\\\\.])}"`. Note the quadruple `\\\\` to represent a single literal backslash in the character class.
+*   **C# (Regular String):** Requires escaping `"` and `\\`. The same example is `"\\/path\\/{file:chars([a-z\\\\\\\\.])}"`.
+*   **C# (Verbatim String):** Requires escaping `"` by doubling (`""`). The example is `@"\/path\/{file:chars([a-z\\\.])}"`. Much simpler for backslashes.
 *   **YAML:** Highly context-dependent. Using block scalars (`|` or `>`) often avoids most escaping issues. Plain scalars might require quoting (`'` or `"`) and escaping similar to JSON or C# strings, depending on the content. Example (Block Scalar):
     ```yaml
     matcher: |
-      /path/{file:allow([a-z\.])} 
+      /path/{file:chars([a-z\.])} 
     ```
 *   **TOML:** Standard strings require escaping `"` and `\\`. Literal strings (`'...'`) only escape `'`. Multiline literal strings (`'''...'''`) allow most characters literally. Example (Multiline Literal String):
     ```toml
     matcher = '''
-    /path/{file:allow([a-z\.])}
+    /path/{file:chars([a-z\.])}
     '''
     ```
 *   **Environment Variable (Bash/Zsh):** Needs careful quoting when setting.
     ```bash
-    export MATCHER='/path/{file:allow([a-z\.])}' 
+    export MATCHER='/path/{file:chars([a-z\.])}' 
     # Or potentially:
-    export MATCHER="/path/{file:allow([a-z\\\\.])}" # Depending on shell interpretation
+    export MATCHER="/path/{file:chars([a-z\\\\.])}" # Depending on shell interpretation
     ```
 
 **Mitigation/Suggestions:**
@@ -225,25 +225,25 @@ When these matching or templating expressions are embedded within other file for
 
 **Specific Format Examples:**
 
-*   **JSON:** Requires escaping `"` and `\\`. An expression like `/path/{file:allow([a-z\\.])}` becomes `"\\/path\\/{file:allow([a-z\\\\\\\\.])}"`. Note the quadruple `\\\\` to represent a single literal backslash in the character class.
-*   **C# (Regular String):** Requires escaping `"` and `\\`. The same example is `"\\/path\\/{file:allow([a-z\\\\\\\\.])}"`.
-*   **C# (Verbatim String):** Requires escaping `"` by doubling (`""`). The example is `@"\/path\/{file:allow([a-z\\\.])}"`. Much simpler for backslashes.
+*   **JSON:** Requires escaping `"` and `\\`. An expression like `/path/{file:chars([a-z\\.])}` becomes `"\\/path\\/{file:chars([a-z\\\\\\\\.])}"`. Note the quadruple `\\\\` to represent a single literal backslash in the character class.
+*   **C# (Regular String):** Requires escaping `"` and `\\`. The same example is `"\\/path\\/{file:chars([a-z\\\\\\\\.])}"`.
+*   **C# (Verbatim String):** Requires escaping `"` by doubling (`""`). The example is `@"\/path\/{file:chars([a-z\\\.])}"`. Much simpler for backslashes.
 *   **YAML:** Highly context-dependent. Using block scalars (`|` or `>`) often avoids most escaping issues. Plain scalars might require quoting (`'` or `"`) and escaping similar to JSON or C# strings, depending on the content. Example (Block Scalar):
     ```yaml
     matcher: |
-      /path/{file:allow([a-z\.])} 
+      /path/{file:chars([a-z\.])} 
     ```
 *   **TOML:** Standard strings require escaping `"` and `\\`. Literal strings (`'...'`) only escape `'`. Multiline literal strings (`'''...'''`) allow most characters literally. Example (Multiline Literal String):
     ```toml
     matcher = '''
-    /path/{file:allow([a-z\.])}
+    /path/{file:chars([a-z\.])}
     '''
     ```
 *   **Environment Variable (Bash/Zsh):** Needs careful quoting when setting.
     ```bash
-    export MATCHER='/path/{file:allow([a-z\.])}' 
+    export MATCHER='/path/{file:chars([a-z\.])}' 
     # Or potentially:
-    export MATCHER="/path/{file:allow([a-z\\\\.])}" # Depending on shell interpretation
+    export MATCHER="/path/{file:chars([a-z\\\\.])}" # Depending on shell interpretation
     ```
 
 **Mitigation/Suggestions:**

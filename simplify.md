@@ -19,7 +19,7 @@ Analyze the existing matching tests, and add a test for failures so we know how 
 *   **Argument Parsing:**
     *   Matching: Complex type detection (`GetArgType`), `CharacterClass` parsing, diverse argument types (`[...]`, `a|b|c`).
     *   Templating: Simpler string arguments, specific escaping (`\(\)\,`), comma delimiter default, pipe delimiter (`|`) for `equals`.
-*   **Optionality:** Different syntax and slightly different semantics (`:?` in matching vs. `:?`/`:optional`/`:default`/`:or_var` in templating).
+*   **Optionality:** Different syntax and slightly different semantics (`:?` in matching vs. `:?`/`:optional`/`:default`/`:or-var` in templating).
 *   **Query Keys:** Literals only in matching; can contain variables in templating.
 *   **Segment Boundaries:** Core concept in matching (`SegmentBoundary` influencing capture start/end); irrelevant in templating.
 
@@ -50,15 +50,15 @@ Analyze the existing matching tests, and add a test for failures so we know how 
 
 *   **Proposal:** Standardize on `:?` (and `:optional` as an alias) in both syntaxes where the concept applies.
 *   **Matching:** Maintain existing `:?` behavior.
-*   **Templating:** Consolidate `:?` and `:optional` to one form. Note that `:default` and `:or_var` still imply optional *handling* (suppressing output on null/empty) which is distinct from the marker itself.
+*   **Templating:** Consolidate `:?` and `:optional` to one form. Note that `:default` and `:or-var` still imply optional *handling* (suppressing output on null/empty) which is distinct from the marker itself.
 *   **Impact:** Minor syntax cleanup and improved consistency.
 
 ### D. Naming Alignment (Conditions vs. Transforms)
 
 *   **Proposal:** Align names where functionality clearly overlaps, potentially using aliases.
     *   Examine `allow`/`only` (matching) vs. `equals` (templating). Direct replacement is hard due to `CharacterClass` vs. string array arguments. Consider adding an `equals(a|b|c)` condition to matching for parity?
-    *   Keep distinct names for clearly different concepts (`or_var`, `map`, `default`).
-    *   Ensure `map_default` (formerly `other`) is consistently named.
+    *   Keep distinct names for clearly different concepts (`or-var`, `map`, `default`).
+    *   Ensure `map-default` (formerly `other`) is consistently named.
 *   **Impact:** Improved clarity, primarily in documentation and code readability. Requires careful analysis of any subtle behavioral differences.
 
 ### E. Enhanced Error Reporting

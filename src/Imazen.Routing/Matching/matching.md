@@ -28,7 +28,7 @@ Now, the author and reader certainly would spot and prevent such an issue in the
 7. No magical behavior. Unfortunately, this includes special treatment for optional segments. `/articles/{slug:?}/` will match `/articles//`, but you probably meant `/articles/{slug:suffix(/):?}`
 
 ** Examples **
-`/images/{slug:only([a-zA-Z0-9_-])}/{sku:int}/{image_id:int}.{format:only(jpg|png|gif)}?w={width:int:?}`
+`/images/{slug:chars([a-zA-Z0-9_-])}/{sku:int}/{image_id:int}.{format:only(jpg|png|gif)}?w={width:int:?}`
 `/san/productimages/{image_id}.{format}?format=webp&w={width:default(40)}`
 
 
@@ -125,10 +125,10 @@ Variables can be inserted in target strings using ${name} or ${name:transform:tr
 * `lower` e.g. {var:lower}
 * `upper`
 * `map(oldvalue,newvalue)`
-* `or_var(fallback_var_name)` (Previously `or`)
+* `or-var(fallback_var_name)` 
 * `default(fallback_value)`
 * `equals(value1|value2|value3)` (Previously `allow`)
-* `other(fallback_value)` (Previously `map_default`)
+* `map-default`
 
 TODO: clamp(0,2) (numeric)
 TODO: prepend(prefix)
@@ -198,7 +198,7 @@ match_query
 
 ## conditions 
 
-alpha, alphanumeric, alphalower, alphaupper, guid, hex, int, allow([a-zA-Z0-9_\\:\\,]), allow([^/]) len(3), length(3), length(0,3),starts_with_chars(3,a-z), equals(string), contains()
+alpha, alphanumeric, alphalower, alphaupper, guid, hex, int, chars([a-zA-Z0-9_\\:\\,]), chars([^/]) len(3), length(3), length(0,3),starts_with_chars(3,a-z), equals(string), contains()
  ends_with((.jpg|.png|.gif)), includes(), supported_image_type
 ends_with(.jpg|.png|.gif), contains(), 
 

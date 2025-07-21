@@ -34,7 +34,7 @@ public enum StringConditionKind: byte
     UInt64,
     [Display(Name = "range")]
     IntegerRange,
-    [Display(Name = "allow")]
+    [Display(Name = "chars")]
     CharClass,
     [Display(Name = "starts-with-chars")]
     StartsWithNCharClass,

@@ -15,6 +15,11 @@ namespace Imazen.Tests.Routing.Matching;
 
 public class MatchExpressionTests
 {
+    private readonly ITestOutputHelper _testOutputHelper;
+    public MatchExpressionTests(ITestOutputHelper testOutputHelper)
+    {
+        _testOutputHelper = testOutputHelper;
+    }
     public static TheoryData<string, bool, string, string[]> TestAllData
     {
         get
@@ -30,6 +35,8 @@ public class MatchExpressionTests
                 (false, "{:int:range(-1000,1000)}", new[] { "-1001", "1001" }),
                 (true, "/{name}/{country:suffix(/)}", new[] { "/hi/usa/" }),
                 (true, "/{name}/{country}{:eq(/):optional}", new[] { "/hi/usa", "/hi/usa/" }),
+                (true, "/{name}/{country:?:suffix(/)}{place}{:eq(/):optional}", new[] { "/hi/usa/" }), //"/hi/usa",
+                (true, "/{name}/{a}{b:prefix(/):?}{:eq(/):optional}", new[] { "/hi/usa", "/hi/usa/", "/hi/usa/co", "/hi/usa/co/" }),
                 (true, "/{name}/{country:len(3)}", new[] { "/hi/usa" }),
                 (true, "/{name}/{country:len(3)}/{state:len(2)}", new[] { "/hi/usa/CO" }),
                 (false, "/{name}/{country:length(3)}", new[] { "/hi/usa2" }),
@@ -38,7 +45,7 @@ public class MatchExpressionTests
             };
             foreach (var (success, exp, inputs) in theories)
             {
-                data.Add("Old", success, exp, inputs);
+                data.Add("", success, exp, inputs);
             }
             return data;
         }
@@ -51,19 +58,35 @@ public class MatchExpressionTests
         var parserType = t;
         var expectedSuccess = ok;
         var c = DefaultMatchingContext;
+
+        if (!MultiValueMatcher.TryParse(exp, out var matcher, out var error))
+        {
+            Assert.Fail($"Invalid expression '{exp}': {error}");
+        }
+
+        var failures = new List<string>();
+
         foreach (var v in inputs)
         {
-            if (!MultiValueMatcher.TryParse(exp, out var matcher, out var error))
-            {
-                Assert.Fail($"Invalid expression '{exp}': {error}");
-            }
             var result = matcher.Match(c, v);
             if (result.Success == expectedSuccess) continue;
             
             var message = result.Success
                 ? $"False positive! Expression '{exp}' should not have matched '{v}'. Error: {result.Error}."
                 : $"Incorrect failure! Expression '{exp}' failed to match '{v}'. Error: {result.Error}";
-            Assert.Fail(message);
+            failures.Add(message);
+            _testOutputHelper.WriteLine(message);
+        }
+        if (failures.Count > 0)
+        {
+            var message = $"{failures.Count} of {inputs.Length} inputs failed to meet expectations";
+            failures.Add(message);
+            _testOutputHelper.WriteLine(message);
+        }
+
+        if (failures.Count > 0)
+        {
+            Assert.Fail(string.Join("\n", failures));
         }
     }
     
@@ -86,6 +109,10 @@ public class MatchExpressionTests
                 (true, "/{name}/{country}{:eq(/):?}", "/hi/usa", "name=hi&country=usa", null),
                 (true, "/{name}/{country}{:eq(/):?}",  "/hi/usa/", "name=hi&country=usa", null),
                 (true, "/{name}/{country:len(3)}", "/hi/usa", "name=hi&country=usa", null),
+                // It is not intuitive that this works - place is not optional!
+                (true, "/{name}/{country:?:suffix(/)}{place}{:eq(/):optional}", "/hi/usa/" , "name=hi&country=usa&place=", null),
+                //While not strictly wrong - the segmentation uses suffix(/), and optionality eval is weird - this should probably be stopped
+                //(true, "/{name}/{country:?:suffix(/)}{place}{:eq(/):optional}", "/hi/usa" , "name=hi&country=usa&place=", null),
                 (true, "/{name}/{country:len(3)}/{state:len(2)}", "/hi/usa/CO", "name=hi&country=usa&state=CO", null),
                 (true, "{country:len(3)}{state:len(2)}", "USACO", "country=USA&state=CO", null),
                 (true, "/images/{seo_string_ignored}/{sku:guid}/{image_id:integer-range(0,1111111)}{width:integer:prefix(_):optional}.{format:equals(jpg|png|gif)}", "/images/seo-string/12345678-1234-1234-1234-123456789012/12678_300.jpg", "seo_string_ignored=seo-string&sku=12345678-1234-1234-1234-123456789012&image_id=12678&width=300&format=jpg", null),
@@ -96,7 +123,7 @@ public class MatchExpressionTests
             
             foreach (var (success, expr, input, captures, keys) in theories)
             {
-                data.Add("Old", success, expr, input, captures, keys);
+                data.Add("", success, expr, input, captures, keys);
             }
             return data;
         }
@@ -129,6 +156,7 @@ public class MatchExpressionTests
         {
             var actualPairs = result!.Captures!
                 .ToDictionary(x => x.Key, x => x.Value.ToString());
+            _testOutputHelper.WriteLine("Expected values: " + Stringify(expectedPairs) + "\n Actual: " + Stringify(actualPairs));
             actualPairs.Should().BeEquivalentTo(expectedPairs);
         }
 
@@ -138,6 +166,8 @@ public class MatchExpressionTests
             Assert.Equal(expectedExcessKeys, result.ExcessQueryKeys);
         }
     }
+    private static string Stringify(IDictionary<string, string> pairs) => "{" + string.Join(",", pairs.Select(x => $"{x.Key}='{x.Value}'")) + "}";
+
     [Theory]
     [InlineData("{name:starts(foo):ends(bar)?}", false)]
     [InlineData("{name:starts(foo):ends(bar)}", true)]
@@ -219,8 +249,8 @@ public class MatchExpressionTests
     [InlineData("{name:range(1,100):?}", true)]
     [InlineData("{name:image-ext-supported}", false)]
     [InlineData("{name:image-ext-supported:?}", false)]
-    [InlineData("{name:allow([a-zA-Z0-9_\\-])}", true)]
-    [InlineData("{name:allow([a-zA-Z0-9_\\-]):?}", true)]
+    [InlineData("{name:chars([a-zA-Z0-9_\\-])}", true)]
+    [InlineData("{name:chars([a-zA-Z0-9_\\-]):?}", true)]
     [InlineData("{name:starts-chars(3,[a-zA-Z])}", true)]
     [InlineData("{name:starts-chars(3,[a-zA-Z]):?}", true)]
     [InlineData("{name:ends([$%^])}", true)]

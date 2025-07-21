@@ -627,7 +627,7 @@ namespace Imageflow.Server.Tests
                 var signedModifiedUrl = Imazen.Common.Helpers.Signatures.SignRequest(modifiedUrl, requestSigningKey);
                 using var signedResponse = await client.GetAsync(signedModifiedUrl, TestContext.Current.CancellationToken);
                 outputHelper.WriteLine(signedResponse?.RequestMessage?.RequestUri?.AbsoluteUri ?? "null");
-                signedResponse.EnsureSuccessStatusCode();
+                signedResponse!.EnsureSuccessStatusCode();
                 
                 // Now, verify that the remote url can't be fetched without signing it the second time, 
                 // since we called .SetRequestSignatureOptions

@@ -73,7 +73,7 @@ public record MultiValueMatcher(
         [NotNullWhen(true)] out MultiValueMatcher? result, [NotNullWhen(false)] out string? error)
     {
         if (!ExpressionFlags.TryParseFromEnd(expressionWithFlags, out var expression, out var flags, out error,
-            ExpressionFlags.LowercaseDash()))
+            ExpressionFlagParsingOptions.LowercaseDash))
         {
             result = null;
             return false;

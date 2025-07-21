@@ -192,9 +192,9 @@ public record StringTemplate(IReadOnlyList<ITemplateSegment> Segments)
 
         // Validate name (Adapt from ExpressionParsingHelpers.ValidateSegmentName if needed)
         // For now, basic check:
-        if (!IsValidTemplateVariableName(variableName)) // Assuming a helper method
+        if (!CheckTemplateVariableName(variableName, out var nameError)) // Assuming a helper method
         {
-             error = $"Invalid variable name: '{variableName}'. Must start with letter or underscore, contain letters, numbers, underscores.";
+             error = nameError;
              segment = null;
              return false;
         }
@@ -222,7 +222,7 @@ public record StringTemplate(IReadOnlyList<ITemplateSegment> Segments)
             bool isHandled = transformations.Any(t => t is OrTransform || t is DefaultTransform || t is OptionalMarkerTransform);
             if (!isHandled)
             {
-                error = $"Template uses optional variable '{variableName}' without providing a fallback (:or_var, :default) or marking as ignorable (:optional, :?).";
+                error = $"Template uses optional variable '{variableName}' without providing a fallback (:or-var, :default) or marking as ignorable (:optional, :?).";
                 segment = null;
                 return false;
             }
@@ -233,18 +233,9 @@ public record StringTemplate(IReadOnlyList<ITemplateSegment> Segments)
     }
 
     // Basic validation - adapt if needed
-    private static bool IsValidTemplateVariableName(string name)
+    private static bool CheckTemplateVariableName(string name,[NotNullWhen(false)] out string? error)
     {
-         if (string.IsNullOrEmpty(name)) return false;
-         char first = name[0];
-         if (!char.IsLetter(first) && first != '_') return false;
-         for (int i = 1; i < name.Length; i++)
-         {
-             char c = name[i];
-             if (!char.IsLetterOrDigit(c) && c != '_') return false;
-         }
-         // Could add check against reserved transform names if desired
-         return true;
+        return ExpressionParsingHelpers.ValidateVariableName(name,  out error);
     }
 
 
@@ -348,7 +339,7 @@ public record StringTemplate(IReadOnlyList<ITemplateSegment> Segments)
                 case "encode": transformation = new UrlEncodeTransform(); error = null; return true;
                  case "?": case "optional": transformation = new OptionalMarkerTransform(); error = null; return true;
                 default:
-                    if (transformName == "map" || transformName == "or_var" || transformName == "default" || transformName == "equals" || transformName == "map_default") { error = $"Transformation '{transformName}' requires arguments in parentheses."; } else { error = $"Unknown transformation: '{transformName}'"; } transformation = null; return false;
+                    if (transformName == "map" || transformName == "allow" || transformName == "only"  || transformName == "or-var" || transformName == "default" || transformName == "equals" || transformName == "map-default") { error = $"Transformation '{transformName}' requires arguments in parentheses."; } else { error = $"Unknown transformation: '{transformName}'"; } transformation = null; return false;
             }
         }
         else
@@ -356,15 +347,15 @@ public record StringTemplate(IReadOnlyList<ITemplateSegment> Segments)
             switch (transformName)
             {
                  case "map": if (args.Count % 2 != 0) { error = $"'map' requires an even number of arguments. Found {args.Count}."; transformation = null; return false; } var mappings = new List<(string From, string To)>(args.Count / 2); for (int i = 0; i < args.Count; i += 2) { mappings.Add((args[i], args[i + 1])); } transformation = new MapTransform(mappings); error = null; return true;
-                 case "or_var":
-                 case "or": // Alias for or_var
-                     if (args.Count != 1) { error = $"'or_var' requires exactly one argument. Found {args.Count}."; transformation = null; return false; }
+                 case "or-var":
+                 case "or": // Alias for or-var
+                     if (args.Count != 1) { error = $"'or-var' requires exactly one argument. Found {args.Count}."; transformation = null; return false; }
                      string fallbackVarName = args[0];
-                     if (!IsValidTemplateVariableName(fallbackVarName)) { error = $"Invalid fallback variable name '{fallbackVarName}' in 'or_var'."; transformation = null; return false; }
-                     if (validationContext?.MatcherVariables != null && !validationContext.MatcherVariables.ContainsKey(fallbackVarName)) { error = $"'or_var' transform uses fallback variable '{fallbackVarName}' which is not defined by the corresponding match expression."; transformation = null; return false; }
+                     if (!CheckTemplateVariableName(fallbackVarName, out var nameError)) { error = $"Invalid or-var({fallbackVarName}): {nameError}. "; transformation = null; return false; }
+                     if (validationContext?.MatcherVariables != null && !validationContext.MatcherVariables.ContainsKey(fallbackVarName)) { error = $"'or-var' transform uses fallback variable '{fallbackVarName}' which is not defined by the corresponding match expression."; transformation = null; return false; }
                      transformation = new OrTransform(fallbackVarName);
                      error = null; return true;
-                 case "default": if (args.Count != 1) { error = $"'default' requires exactly one argument. Found {args.Count}."; transformation = null; return false; } transformation = new DefaultTransform(args[0]); error = null; return true;
+                 case "default": if (args.Count > 1) { error = $"'default' requires exactly one argument. Found {args.Count}."; transformation = null; return false; } transformation = new DefaultTransform(args.Count == 1 ? args[0] : ""); error = null; return true;
                  case "equals": // New (replaces allow)
                     if (args.Count == 0) { error = "'equals' requires at least one argument."; transformation = null; return false; }
                     // Arguments were already parsed using '|' delimiter
@@ -375,11 +366,19 @@ public record StringTemplate(IReadOnlyList<ITemplateSegment> Segments)
                  case "only": // New: Maps to OnlyTransform (placeholder)
                      if (args.Count == 0) { error = "'only' requires at least one argument."; transformation = null; return false; }
                      transformation = new OnlyTransform(args); error = null; return true;
-                 case "map_default": // New: Maps to MapDefaultTransform (placeholder)
-                     if (args.Count != 1) { error = "'map_default' requires exactly one argument."; transformation = null; return false; }
-                     transformation = new MapDefaultTransform(args[0]); error = null; return true;
+                 case "map-default": // New: Maps to MapDefaultTransform (placeholder)
+                     if (args.Count  > 1) { error = "'map-default' requires exactly one argument."; transformation = null; return false; }
+                     transformation = new MapDefaultTransform(args.Count == 1 ? args[0] : ""); error = null; return true;
 
                 default:
+                   if (transformName == "upper" || transformName == "lower" || transformName == "encode" || transformName == "optional" 
+                    || transformName == "?")
+                    {
+                        error = $"Transformation '{transformName}' does not accept arguments.";
+                        transformation = null;
+                        return false;
+                    }
+                    
                     error = $"Unknown transformation: '{transformName}'";
                     transformation = null;
                     return false;
@@ -514,6 +513,28 @@ public record StringTemplate(IReadOnlyList<ITemplateSegment> Segments)
     private class TemplateParseException : Exception
     {
         public TemplateParseException(string message) : base(message) { }
+    }
+
+    public string? GetStartLiteral()
+    {
+        if (Segments.Count == 0)
+        {
+            return null;
+        }
+        if (Segments.Count > 1 && Segments[0] is LiteralSegment literal1 && Segments[1] is VariableSegment)
+        {
+            return literal1.Value;
+        }
+        var sb = new StringBuilder();
+        foreach (var segment in Segments)
+        {
+            if (segment is LiteralSegment literal)
+            {
+                sb.Append(literal.Value);
+            }
+            else break;
+        }
+        return sb.ToString();
     }
 }
 

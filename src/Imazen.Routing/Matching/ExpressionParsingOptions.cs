@@ -40,7 +40,7 @@ public record ExpressionParsingOptions
     public static ExpressionParsingOptions ParseComplete(ReadOnlyMemory<char> expressionWithFlags, out ReadOnlyMemory<char> remainingExpression)
     {
         if (!ExpressionFlags.TryParseFromEnd(expressionWithFlags, out var expression, out var flags, out var error,
-            ExpressionFlags.LowercaseDash()))
+            ExpressionFlagParsingOptions.Permissive.WithValidationRegex(ExpressionFlags.LowercaseDash())))
         {
             throw new ArgumentException(error, nameof(expressionWithFlags));
         }

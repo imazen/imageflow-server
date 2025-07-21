@@ -13,12 +13,17 @@ namespace Imazen.Routing.Matching.Templating;
 public record MultiTemplate(StringTemplate? PathTemplate,
     IReadOnlyList<(StringTemplate KeyTemplate, StringTemplate ValueTemplate)>? QueryTemplates,
     MultiTemplateOptions? Options, // Placeholder for future options
-    ExpressionFlags? Flags // Added Flags property
+    ExpressionFlags? Flags, // Added Flags property
+    string? Scheme
     )
 {
-    public static MultiTemplate Parse(ReadOnlyMemory<char> expression)
+    public string? GetTemplateLiteralStart()
     {
-        if (!TryParse(expression, null, out var result, out var error))
+        return PathTemplate?.GetStartLiteral();
+    }
+    public static MultiTemplate Parse(ReadOnlyMemory<char> expression, TemplateValidationContext? validationContext)
+    {
+        if (!TryParse(expression, validationContext, out var result, out var error))
         {
             throw new ArgumentException(error, nameof(expression));
         }
@@ -31,7 +36,8 @@ public record MultiTemplate(StringTemplate? PathTemplate,
         [NotNullWhen(true)] out MultiTemplate? result,
         [NotNullWhen(false)] out string? error)
     {
-        if (!ExpressionFlags.TryParseFromEnd(expressionWithFlags, out var expressionWithoutFlags, out var flagsList, out error))
+        if (!ExpressionFlags.TryParseFromEnd(expressionWithFlags, out var expressionWithoutFlags, out var flagsList, out error
+            , ExpressionFlagParsingOptions.Permissive))
         {
             result = null;
             return false;
@@ -47,7 +53,8 @@ public record MultiTemplate(StringTemplate? PathTemplate,
         ReadOnlyMemory<char> pathPart;
         ReadOnlyMemory<char> queryPart;
 
-        int queryStartIndex = ExpressionParsingHelpers.FindCharNotEscaped(expressionWithoutFlags.Span, '?', '\\');
+        // TODO: this is weak
+        int queryStartIndex = ExpressionParsingHelpers.FindCharNotEscapedAtDepth0(expressionWithoutFlags.Span, '?', '\\', '{', '}');
 
         if (queryStartIndex != -1)
         {
@@ -61,6 +68,7 @@ public record MultiTemplate(StringTemplate? PathTemplate,
         }
 
         StringTemplate? pathTemplate = null;
+        string? scheme = null;
         if (!pathPart.IsEmpty)
         {
             if (!StringTemplate.TryParse(pathPart.Span, currentValidationContext, out pathTemplate, out error))
@@ -69,6 +77,27 @@ public record MultiTemplate(StringTemplate? PathTemplate,
                 result = null;
                 return false;
             }
+            // parse scheme from pathPart
+            if (!ExpressionParsingHelpers.TryParseScheme(pathPart.Span, currentValidationContext?.RequireSchemeForPaths ?? false, out scheme, out var schemeError))
+            {
+                error = schemeError;
+                result = null;
+                return false;
+            }
+            if (scheme != null)
+            {
+                if (currentValidationContext?.AllowedSchemes != null && !currentValidationContext.AllowedSchemes.Contains(scheme))
+                {
+                    error = $"Scheme '{scheme}' is not allowed. Use one of {string.Join(", ", currentValidationContext.AllowedSchemes)}";
+                    result = null;
+                    return false;
+                }
+            }
+        }else if (currentValidationContext?.RequirePath ?? false)
+        {
+            error = "Template must include the URI path part.";
+            result = null;
+            return false;
         }
 
         List<(StringTemplate Key, StringTemplate Value)>? queryTemplates = null;
@@ -80,11 +109,11 @@ public record MultiTemplate(StringTemplate? PathTemplate,
 
             while (currentPos < querySpan.Length)
             {
-                int nextAmpersand = ExpressionParsingHelpers.FindCharNotEscaped(querySpan.Slice(currentPos), '&', '\\');
+                int nextAmpersand = ExpressionParsingHelpers.FindCharNotEscapedAtDepth0(querySpan.Slice(currentPos), '&', '\\', '{', '}');
                 int endOfPair = (nextAmpersand == -1) ? querySpan.Length : currentPos + nextAmpersand;
                 var pairSpan = querySpan.Slice(currentPos, endOfPair - currentPos);
 
-                int equalsIndex = ExpressionParsingHelpers.FindCharNotEscaped(pairSpan, '=', '\\');
+                int equalsIndex = ExpressionParsingHelpers.FindCharNotEscapedAtDepth0(pairSpan, '=', '\\', '{', '}');
                 ReadOnlySpan<char> keySpan = (equalsIndex == -1) ? pairSpan : pairSpan.Slice(0, equalsIndex);
                 ReadOnlySpan<char> valueSpan = (equalsIndex == -1) ? ReadOnlySpan<char>.Empty : pairSpan.Slice(equalsIndex + 1);
 
@@ -103,7 +132,7 @@ public record MultiTemplate(StringTemplate? PathTemplate,
             }
         }
 
-        result = new MultiTemplate(pathTemplate, queryTemplates, null, templateFlags);
+        result = new MultiTemplate(pathTemplate, queryTemplates, null, templateFlags, scheme);
         error = result.GetValidationErrors();
         if (error != null)
         {
@@ -159,6 +188,15 @@ public record MultiTemplate(StringTemplate? PathTemplate,
         result = pathResult + sb.ToString();
         error = null;
         return true;
+    }
+
+    public string Evaluate(IDictionary<string, string> variables)
+    {
+        if (!TryEvaluate(variables, out var result, out var error))
+        {
+            throw new ArgumentException(error);
+        }
+        return result!;
     }
 
     public static bool TryParse(ReadOnlyMemory<char> expressionWithFlags,
