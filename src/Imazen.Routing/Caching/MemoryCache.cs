@@ -174,7 +174,7 @@ public class MemoryCache(MemoryCacheOptions options, IReLogger<MemoryCache> logg
         return true;
     }
 
-    private async Task<bool> TryAdd(string cacheKey, IBlobWrapper unforkedBlobWrapper)
+    private Task<bool> TryAdd(string cacheKey, IBlobWrapper unforkedBlobWrapper)
     {
         var estimateAllocatedBytes = unforkedBlobWrapper.EstimateAllocatedBytes;
         if (estimateAllocatedBytes == null)
@@ -189,16 +189,16 @@ public class MemoryCache(MemoryCacheOptions options, IReLogger<MemoryCache> logg
             // Not sure why previous code wanted to replace entries. We'd have to immutably swap the whole entry anyway.
             existingBlob = oldEntry.BlobWrapper;
             // We can exit.
-            return false;
+            return Task.FromResult(false);
         }
         var replacementSizeDifference = (long)estimateAllocatedBytes! - (existingBlob?.EstimateAllocatedBytes ?? 0);
         if (estimateAllocatedBytes > options.MaxItemSizeKb * 1024)
         {
-            return false;
+            return Task.FromResult(false);
         }
         if (!TryEnsureCapacity(replacementSizeDifference))
         {
-            return false; // Can't make space? That's odd.
+            return Task.FromResult(false); // Can't make space? That's odd.
         }
         if (!unforkedBlobWrapper.IsReusable)
         {
@@ -211,14 +211,14 @@ public class MemoryCache(MemoryCacheOptions options, IReLogger<MemoryCache> logg
             Interlocked.Increment(ref itemCountSync);
             Interlocked.Add(ref memoryUsedSync, estimateAllocatedBytes ?? 0);
             itemCountSync++;
-            return true;
+            return Task.FromResult(true);
         }
         else
         {
             entry.BlobWrapper.Dispose();
             // If we updated instead of leaving in place, we would call Interlocked.Add(ref memoryUsedSync, replacementSizeDifference);
         }
-        return false;
+        return Task.FromResult(false);
     }
 
     private void IncrementUsage(string cacheKeyHashString)

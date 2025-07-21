@@ -36,6 +36,8 @@ internal class MiddlewareOptionsServerBuilder(
         // TODO: verify ASP.NET adds the webhostenvironment services.AddSingleton(env);
         services.AddSingleton(options);
 
+        services.AddSingleton<IDefaultContentRootPathProvider, WebRootPathProvider>();
+
         var diagPageOptions = new DiagnosticsPageOptions(
             options.DiagnosticsPassword,
             (Imazen.Routing.Layers.DiagnosticsPageOptions.AccessDiagnosticsFrom)options.DiagnosticsAccess);
