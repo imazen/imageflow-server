@@ -1,6 +1,7 @@
 using System.Text;
 using Imazen.Abstractions.Logging;
 using Imazen.Abstractions.Resulting;
+using Imazen.Common.Issues;
 using Imazen.Routing.HttpAbstractions;
 using Imazen.Routing.Layers;
 using Imazen.Routing.Promises;
@@ -94,7 +95,7 @@ public class RoutingEngine : IRoutingEngine, IHasDiagnosticPageSection
                         else
                         {
                             logger.LogError(
-                                "Imageflow Routing endpoint {0} (from routing layer {1} is not a blob endpoint",
+                                "Imageflow Routing endpoint {endpoint} (from routing layer {layerName} is not a blob endpoint",
                                 endpoint, layer.Name);
                             return CodeResult<ICacheableBlobPromise>.Err(
                                 HttpStatus.ServerError.WithAppend("Routing endpoint is not a blob endpoint"));
@@ -111,6 +112,17 @@ public class RoutingEngine : IRoutingEngine, IHasDiagnosticPageSection
         return null; // We don't have matching routing for this. Let the rest of the app handle it.
     }
 
+    private static string FormatLayer(int groupIndex, RoutingLayerGroup group, int layerIndex)
+    {
+        var layer = group.Layers[layerIndex];
+        return $"group[{groupIndex}]({group.Name}).layer[{layerIndex}]({layer.Name}): ({layer.GetType().Name}), Preconditions={layer.FastPreconditions}";
+    
+    }
+    private static string FormatGroup(int groupIndex, RoutingLayerGroup group)
+    {
+        return $"group[{groupIndex}]({group.Name}): Layers: {group.Layers.Count}, Group Preconditions: {group.GroupPrecondition}";
+    }
+
     public override string ToString()
     {
         var sb = new StringBuilder();
@@ -118,12 +130,47 @@ public class RoutingEngine : IRoutingEngine, IHasDiagnosticPageSection
         sb.AppendLine($"Routing Engine: {layersTotal} layers in {layerGroups.Length} groups, Preconditions: {mightHandleConditions}");
         for(var i = 0; i < layerGroups.Length; i++)
         {
-            sb.AppendLine($"group[{i}]: Name: {layerGroups[i].Name}, Layers: {layerGroups[i].Layers.Count}, Group Preconditions: {layerGroups[i].GroupPrecondition}");
+            sb.AppendLine(FormatGroup(i, layerGroups[i]));
             for (var j = 0; j < layerGroups[i].Layers.Count; j++)
             {
-                sb.AppendLine($"group[{i}](layerGroups[i].Name).layer[{j}]({layerGroups[i].Layers[j].Name}): ({layerGroups[i].Layers[j].GetType().Name}), Preconditions={layerGroups[i].Layers[j].FastPreconditions}");
+                sb.AppendLine(FormatLayer(i, layerGroups[i], j));
             }
         }
+        var issueLines = new List<string>();
+        var diagnosticLines = new List<string>();
+        var issueCount = 0;
+        for (var groupIndex = 0; groupIndex < layerGroups.Length; groupIndex++)
+        {
+            var group = layerGroups[groupIndex];
+            for (var layerIndex = 0; layerIndex < group.Layers.Count; layerIndex++)
+            {
+                var layer = group.Layers[layerIndex];
+                if (layer is IHasDiagnosticPageSection hasSection)
+                {
+                    // add layer name
+                    diagnosticLines.Add($"\n{FormatLayer(groupIndex, group, layerIndex)} Diagnostics:");
+                    diagnosticLines.Add(hasSection.GetDiagnosticsPageSection(DiagnosticsPageArea.Start) ?? "");
+                }
+                if (layer is IIssueProvider issueProvider)
+                {
+                    var issueList = issueProvider.GetIssues().ToList();
+                    issueCount += issueList.Count;
+                    issueLines.Add($"\n{FormatLayer(groupIndex, group, layerIndex)} Issues:");
+                    issueLines.AddRange(issueList.Select(i => i.ToString() ?? ""));
+                }
+            }
+        }
+        if (issueLines.Count > 0)
+        {
+            sb.AppendLine(" \nRouting Issues:");
+            sb.AppendLine(string.Join("\n", issueLines));
+        }
+        if (diagnosticLines.Count > 0)
+        {
+            sb.AppendLine(" \nRouting Diagnostics:");
+            sb.AppendLine(string.Join("\n", diagnosticLines));
+        }
+        
         return sb.ToString();
     }
 
