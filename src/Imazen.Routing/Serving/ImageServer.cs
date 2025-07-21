@@ -141,7 +141,6 @@ internal class ImageServer<TRequest, TResponse, TContext> : IImageServer<TReques
         IEnumerable<IHostedImageServerService> registeredServices,
         StartupDiagnostics startupDiagnostics)
     {
-        this.shutdownRegisteredServices = shutdownRegisteredServices;
         perf = perfTracker;
         this.logger = loggerFactory.CreateReLogger("ImageServer");
         this.routingEngine = routingEngine;
