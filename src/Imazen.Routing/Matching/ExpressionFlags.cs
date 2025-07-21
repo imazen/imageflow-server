@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 
 namespace Imazen.Routing.Matching;
 
-public record ExpressionFlags(ReadOnlyCollection<string> Flags)
+public partial record ExpressionFlags(ReadOnlyCollection<string> Flags)
 {
     /// <summary>
     /// Parses the flags from the end of the expression. Syntax is [flag1,flag2,flag3]
@@ -16,7 +16,7 @@ public record ExpressionFlags(ReadOnlyCollection<string> Flags)
     /// <returns></returns>
     public static bool TryParseFromEnd(ReadOnlyMemory<char> expression, out ReadOnlyMemory<char> remainingExpression, out List<string> result, 
         [NotNullWhen(false)]
-        out string? error, Regex? validationRegex = null)
+        out string? error, Regex validationRegex)
     {
         var flags = new List<string>();
         var span = expression.Span;
@@ -45,33 +45,62 @@ public record ExpressionFlags(ReadOnlyCollection<string> Flags)
             var commaIndex = innerSpan.IndexOf(',');
             if (commaIndex == -1)
             {
-                flags.Add(inner.Trim().ToString());
+                flags.Add(inner.Span.Trim().ToString());
                 break;
             }
-            flags.Add(inner[..commaIndex].Trim().ToString());
+            flags.Add(inner.Span[..commaIndex].Trim().ToString());
             inner = inner[(commaIndex + 1)..];
             innerSpan = inner.Span;
         }
         // validate 
         foreach (var flag in flags)
         {
-            if (validationRegex == null){
-                if (!flag.All(x => x == '-' || (x >= 'a' && x <= 'z'))){
-                    result = flags;
-                    error = $"Invalid flag '{flag}', only a-z- are allowed in match expressions.";
-                    return false;
-                }
-            }
-            else if (!validationRegex.IsMatch(flag))
+            if (!validationRegex.IsMatch(flag))
             {
                 result = flags;
                 error = $"Invalid flag '{flag}', it does not match the required format {validationRegex}.";
                 return false;
             }
         }
-
+        // Handle [flag][flag]etc, recursively
+        if (!TryParseFromEnd(remainingExpression, out var remainingExpression2, out var flags2, out error, validationRegex))
+        {
+            remainingExpression = remainingExpression2;
+            flags.AddRange(flags2);
+            result = flags;
+            return false;
+        }
+        // We might have found no additional ones, flags2.count == 0 is the only way to know.
+        remainingExpression = remainingExpression2;
+        flags.AddRange(flags2);
         result = flags;
         error = null;
         return true;
     }
+
+#if NET8_0_OR_GREATER
+    [GeneratedRegex(@"^[a-zA-Z-][a-zA-Z0-9-]*$",
+        RegexOptions.CultureInvariant | RegexOptions.Singleline)]
+    public static partial Regex AlphaNumericDash();
+#else
+
+    public static readonly Regex AlphaNumericDashVar =
+        new(@"^[a-zA-Z-][a-zA-Z0-9-]*$",
+            RegexOptions.CultureInvariant | RegexOptions.Singleline, TimeSpan.FromMilliseconds(50));
+
+    public static Regex AlphaNumericDash() => AlphaNumericDashVar;
+#endif
+
+#if NET8_0_OR_GREATER
+    [GeneratedRegex(@"^[a-z-]*$",
+        RegexOptions.CultureInvariant | RegexOptions.Singleline)]
+    public static partial Regex LowercaseDash();
+#else
+
+    public static readonly Regex LowercaseDashVar =
+        new(@"^[a-z-]*$",
+            RegexOptions.CultureInvariant | RegexOptions.Singleline, TimeSpan.FromMilliseconds(50));
+
+    public static Regex LowercaseDash() => LowercaseDashVar;
+#endif
 }

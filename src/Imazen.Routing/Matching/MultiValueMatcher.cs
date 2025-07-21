@@ -4,6 +4,8 @@ using Imazen.Abstractions.HttpStrings;
 using Imazen.Routing.HttpAbstractions;
 using Microsoft.Extensions.Primitives;
 using Imazen.Routing.Matching.Templating;
+using Imazen.Routing.Requests;
+using Imazen.Routing.RoutingExpressions;
 
 namespace Imazen.Routing.Matching;
 
@@ -55,7 +57,12 @@ public record MultiValueMatcher(
     }
 
 
-
+    public static MultiValueMatcher Parse(string expressionWithFlags)
+    {
+        return TryParse(expressionWithFlags.AsMemory(), out var result, out var error)
+            ? result
+            : throw new ArgumentException(error);
+    }
     // as string
     public static bool TryParse(string expressionWithFlags,
         [NotNullWhen(true)] out MultiValueMatcher? result, [NotNullWhen(false)] out string? error)
@@ -65,7 +72,8 @@ public record MultiValueMatcher(
     public static bool TryParse(ReadOnlyMemory<char> expressionWithFlags,
         [NotNullWhen(true)] out MultiValueMatcher? result, [NotNullWhen(false)] out string? error)
     {
-        if (!ExpressionFlags.TryParseFromEnd(expressionWithFlags, out var expression, out var flags, out error))
+        if (!ExpressionFlags.TryParseFromEnd(expressionWithFlags, out var expression, out var flags, out error,
+            ExpressionFlags.LowercaseDash()))
         {
             result = null;
             return false;
@@ -93,7 +101,17 @@ public record MultiValueMatcher(
         return true;
     }
 
-
+    internal MultiMatchResult Match(in MatchingContext context, MutableRequest request, in string? headerAsQuery = null)
+    {
+        var path = request.Path.AsMemory();
+        var query = request.ReadOnlyQueryWrapper;
+        ReadOnlyMemory<char>? rawQuery  = null;
+        ReadOnlyMemory<char>? rawPathAndQuery = null;
+        ReadOnlyMemory<char>? sorted = null;
+        var headers = headerAsQuery != null ? QueryHelpers.ParseQuery(headerAsQuery) : null;
+        return Match(context, path, query, headers, ref rawQuery, ref rawPathAndQuery, ref sorted);
+    }
+    
     internal MultiMatchResult Match(in MatchingContext context, in string pathAndQuery, in string? headerAsQuery = null)
     {
         var pathEnd = pathAndQuery.IndexOf('?') > -1 ? pathAndQuery.IndexOf('?') : pathAndQuery.Length;

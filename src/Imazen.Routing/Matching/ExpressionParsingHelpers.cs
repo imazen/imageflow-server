@@ -297,4 +297,43 @@ internal static partial class ExpressionParsingHelpers
         }
         return true;
     }
+
+    public static bool TryParseScheme(ReadOnlySpan<char> text, bool requireScheme, out string? scheme,
+        [NotNullWhen(false)] out string? error)
+    {
+        // scheme = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." ) then :
+        scheme = null;
+        var i = 1;
+        while (i < text.Length)
+        {
+            var c = text[i];
+            if (!char.IsLetterOrDigit(c) && c != '+' && c != '-' && c != '.')
+            {
+                if (c == ':')
+                {
+                    scheme = text[..i].ToString();
+                    error = null;
+                    return true;
+                }
+
+                if (requireScheme)
+                {
+                    error = "Scheme required, but not found present in: " + text.ToString();
+                    return false;
+                }
+
+                error = null;
+                return true; // Not required, not found
+            }
+
+            i++;
+        }
+        if (requireScheme){
+            error = "Scheme required, but not found in: " + text.ToString();
+            return false;
+        }
+        error = null;
+        return true;
+    }
 }
+
