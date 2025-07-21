@@ -1,4 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
+    
+    <PropertyGroup>
+        <Title>Imazen.Routing - Routing and serving for Imageflow and ImageResizer.</Title>
+    </PropertyGroup>
+    <Import Project="..\NugetPackageDefaults.targets" />
 
 
 <!-- exclude .txt.cs files from compilation -->
@@ -6,9 +11,6 @@
         <Compile Remove="**\*.txt.cs" />
     </ItemGroup>
 
-    <PropertyGroup>
-        <Title>Imazen.Routing - Routing and serving for Imageflow and ImageResizer.</Title>
-    </PropertyGroup>
 
     <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
         <PackageReference Include="System.IO.Pipelines" Version="8.0.0" />
@@ -16,7 +18,6 @@
         <PackageReference Include="System.Threading.Tasks.Extensions" Version="4.6.1" />
     </ItemGroup>
 
-    <Import Project="..\NugetPackageDefaults.targets" />
 
 
     <ItemGroup>

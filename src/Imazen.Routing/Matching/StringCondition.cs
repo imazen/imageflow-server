@@ -371,7 +371,7 @@ public readonly record struct StringCondition
        StringConditionKind.Int64 => text.IsInt64(),
        StringConditionKind.UInt32 => text.IsU32(),
        StringConditionKind.UInt64 => text.IsU64(),
-       StringConditionKind.EndsWithSupportedImageExtension => context.EndsWithSupportedImageExtension(text),
+       //StringConditionKind.EndsWithSupportedImageExtension => context.EndsWithSupportedImageExtension(text),
        StringConditionKind.IntegerRange => text.IsInIntegerRangeInclusive(int1, int2),
        StringConditionKind.Guid => text.IsGuid(),
        StringConditionKind.CharLength => text.LengthWithinInclusive(int1, int2),
@@ -520,7 +520,7 @@ public readonly record struct StringCondition
               StringConditionKind.StartsWithCharClassIgnoreCase => ExpectedArgs.CharClass,
               StringConditionKind.EndsWithCharClass => ExpectedArgs.CharClass,
               StringConditionKind.EndsWithCharClassIgnoreCase => ExpectedArgs.CharClass,
-              StringConditionKind.EndsWithSupportedImageExtension => ExpectedArgs.None,
+            //StringConditionKind.EndsWithSupportedImageExtension => ExpectedArgs.None,
               StringConditionKind.Uninitialized => ExpectedArgs.None,
               StringConditionKind.True => ExpectedArgs.None,
               _ => throw new ArgumentOutOfRangeException(nameof(stringConditionKind), stringConditionKind, null)

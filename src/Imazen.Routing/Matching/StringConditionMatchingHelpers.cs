@@ -236,13 +236,13 @@ internal static class StringConditionMatchingHelpers
     {
         return chars.Length != 0 && charClass.Contains(chars[^1]);
     }
-    internal static bool EndsWithSupportedImageExtension(this MatchingContext context, ReadOnlySpan<char> chars)
-    {
-        foreach (var ext in context.SupportedImageExtensions)
-        {
-            if (chars.EndsWith(ext.AsSpan(), StringComparison.OrdinalIgnoreCase)) return true;
-        }
-        return false;
-    }
+    // internal static bool EndsWithSupportedImageExtension(this MatchingContext context, ReadOnlySpan<char> chars)
+    // {
+    //     foreach (var ext in context.SupportedImageExtensions)
+    //     {
+    //         if (chars.EndsWith(ext.AsSpan(), StringComparison.OrdinalIgnoreCase)) return true;
+    //     }
+    //     return false;
+    // }
     
 }

@@ -3,12 +3,13 @@ using System.Linq;
 using Imazen.Abstractions.Resulting;
 using Imazen.Routing.Matching;
 using Xunit;
-using Imazen.Routing.Parsing;
+using Imazen.Routing.Matching.Templating;
 using System.Collections.Generic;
 using FluentAssertions;
 using sly.parser.generator;
 using sly.lexer;
 using sly.parser;
+using Microsoft.Extensions.FileSystemGlobbing;
 
 namespace Imazen.Tests.Routing.Matching;
 
@@ -38,7 +39,6 @@ public class MatchExpressionTests
             foreach (var (success, exp, inputs) in theories)
             {
                 data.Add("Old", success, exp, inputs);
-                data.Add("AST", success, exp, inputs);
             }
             return data;
         }
@@ -53,27 +53,17 @@ public class MatchExpressionTests
         var c = DefaultMatchingContext;
         foreach (var v in inputs)
         {
-            if (parserType == "Old")
+            if (!MultiValueMatcher.TryParse(exp, out var matcher, out var error))
             {
-                var matcher = MultiValueMatcher.Parse(exp.AsMemory());
-                var result = matcher.Match(c, v);
-                if (result.Success == expectedSuccess) continue;
-                
-                var message = result.Success
-                    ? $"[{parserType}] False positive! Expression '{exp}' should not have matched '{v}'. Error: {result.Error}."
-                    : $"[{parserType}] Incorrect failure! Expression '{exp}' failed to match '{v}'. Error: {result.Error}";
-                Assert.Fail(message);
+                Assert.Fail($"Invalid expression '{exp}': {error}");
             }
-            else // AST
-            {
-                var result = EvaluateWithAst(exp, v, c);
-                if (result.Success == expectedSuccess) continue;
-                
-                var message = result.Success
-                    ? $"[{parserType}] False positive! Expression '{exp}' should not have matched '{v}'. Error: {result.Error}."
-                    : $"[{parserType}] Incorrect failure! Expression '{exp}' failed to match '{v}'. Error: {result.Error}";
-                Assert.Fail(message);
-            }
+            var result = matcher.Match(c, v);
+            if (result.Success == expectedSuccess) continue;
+            
+            var message = result.Success
+                ? $"False positive! Expression '{exp}' should not have matched '{v}'. Error: {result.Error}."
+                : $"Incorrect failure! Expression '{exp}' failed to match '{v}'. Error: {result.Error}";
+            Assert.Fail(message);
         }
     }
     
@@ -107,7 +97,6 @@ public class MatchExpressionTests
             foreach (var (success, expr, input, captures, keys) in theories)
             {
                 data.Add("Old", success, expr, input, captures, keys);
-                data.Add("AST", success, expr, input, captures, keys);
             }
             return data;
         }
@@ -118,69 +107,35 @@ public class MatchExpressionTests
     {
         var parserType = t;
         var expectedSuccess = ok;
-        if (parserType == "Old")
+        var matcher = MultiValueMatcher.Parse(expr);
+        var result = matcher.Match(DefaultMatchingContext, input);
+
+        if (result.Success != expectedSuccess)
         {
-            var matcher = MultiValueMatcher.Parse(expr.AsMemory());
-            var result = matcher.Match(DefaultMatchingContext, input);
-
-            if (result.Success != expectedSuccess)
-            {
-                var message = result.Success
-                    ? $"[{parserType}] False positive! Expression '{expr}' should NOT have matched '{input}'."
-                    : $"[{parserType}] Incorrect failure! Expression '{expr}' failed to match '{input}'. Error: {result.Error}";
-                Assert.Fail(message);
-            }
-            if (!result.Success) return;
-
-            Dictionary<string, string>? expectedPairs =
-                expectedCapturesString is null
-                    ? null
-                    : Imazen.Routing.Helpers.PathHelpers.ParseQuery(expectedCapturesString)!
-                        .ToDictionary(x => x.Key, x => x.Value.ToString());
-
-            if (expectedPairs != null)
-            {
-                var actualPairs = result!.Captures!
-                    .ToDictionary(x => x.Key, x => x.Value.ToString());
-                actualPairs.Should().BeEquivalentTo(expectedPairs);
-            }
-
-            if (excessKeys != null)
-            {
-                var expectedExcessKeys = excessKeys.Split(',');
-                Assert.Equal(expectedExcessKeys, result.ExcessQueryKeys);
-            }
+            var message = result.Success
+                ? $"False positive! Expression '{expr}' should NOT have matched '{input}'."
+                : $"Incorrect failure! Expression '{expr}' failed to match '{input}'. Error: {result.Error}";
+            Assert.Fail(message);
         }
-        else // AST
+        if (!result.Success) return;
+
+        Dictionary<string, string>? expectedPairs =
+            expectedCapturesString is null
+                ? null
+                : Imazen.Routing.Helpers.PathHelpers.ParseQuery(expectedCapturesString)!
+                    .ToDictionary(x => x.Key, x => x.Value.ToString());
+
+        if (expectedPairs != null)
         {
-            var result = EvaluateWithAst(expr, input, DefaultMatchingContext);
+            var actualPairs = result!.Captures!
+                .ToDictionary(x => x.Key, x => x.Value.ToString());
+            actualPairs.Should().BeEquivalentTo(expectedPairs);
+        }
 
-            if (result.Success != expectedSuccess)
-            {
-                var message = result.Success
-                    ? $"[{parserType}] False positive! Expression '{expr}' should NOT have matched '{input}'."
-                    : $"[{parserType}] Incorrect failure! Expression '{expr}' failed to match '{input}'. Error: {result.Error}";
-                Assert.Fail(message);
-            }
-
-            if (!result.Success) return;
-
-            Dictionary<string, string>? expectedPairs =
-                expectedCapturesString is null
-                    ? null
-                    : Imazen.Routing.Helpers.PathHelpers.ParseQuery(expectedCapturesString)!
-                        .ToDictionary(x => x.Key, x => x.Value.ToString());
-
-            if (expectedPairs != null)
-            {
-                (result.Captures ?? new Dictionary<string, string>()).Should().BeEquivalentTo(expectedPairs,
-                    because: $"[{parserType}] captures for '{expr}' on '{input}' should match.");
-            }
-            else
-            {
-                Assert.True(result.Captures == null || result.Captures.Count == 0,
-                    $"[{parserType}] captures should be empty when no captures expected.");
-            }
+        if (excessKeys != null)
+        {
+            var expectedExcessKeys = excessKeys.Split(',');
+            Assert.Equal(expectedExcessKeys, result.ExcessQueryKeys);
         }
     }
     [Theory]
@@ -262,8 +217,8 @@ public class MatchExpressionTests
     [InlineData("{name:contains-i(foo|bar|baz):?}", true)]
     [InlineData("{name:range(1,100)}", true)]
     [InlineData("{name:range(1,100):?}", true)]
-    [InlineData("{name:image-ext-supported}", true)]
-    [InlineData("{name:image-ext-supported:?}", true)]
+    [InlineData("{name:image-ext-supported}", false)]
+    [InlineData("{name:image-ext-supported:?}", false)]
     [InlineData("{name:allow([a-zA-Z0-9_\\-])}", true)]
     [InlineData("{name:allow([a-zA-Z0-9_\\-]):?}", true)]
     [InlineData("{name:starts-chars(3,[a-zA-Z])}", true)]
@@ -356,66 +311,4 @@ public class MatchExpressionTests
     
     
     private static readonly MatchingContext DefaultMatchingContext = MatchingContext.Default;
-
-    private static readonly Lazy<Imazen.Routing.Parsing.ImazenRoutingParser> ParserHost = new(() => new ImazenRoutingParser());
-    private static readonly Lazy<Parser<ImazenRoutingToken, IAstNode>> AstParser = new(() =>
-    {
-        var builder = new ParserBuilder<ImazenRoutingToken, IAstNode>();
-        var buildResult = builder.BuildParser(ParserHost.Value, ParserType.EBNF_LL_RECURSIVE_DESCENT, "root");
-        if (buildResult.IsError)
-        {
-            var allBuildErrors = string.Join("; ", buildResult.Errors.Select(e => e.Message));
-            throw new InvalidOperationException($"AST Parser build failed: {allBuildErrors}");
-        }
-        return buildResult.Result;
-    });
-    
-    private (bool Success, Dictionary<string, string>? Captures, string? Error) EvaluateWithAst(
-        string expressionString,
-        string inputString,
-        MatchingContext matchingContext)
-    {
-        var flagParseSuccess = ExpressionFlags.TryParseFromEnd(expressionString.AsMemory(),
-            out var expressionWithoutFlags, out var astFlagStrings, out var flagError);
-        if (!flagParseSuccess)
-        {
-            return (false, null, $"Flag Parser error: {flagError}");
-        }
-        
-        var astParsingOptions = new Imazen.Routing.Matching.ParsingOptions();
-        
-        var astParser = AstParser.Value;
-        
-        // 3. Parse the expression string (without flags) to get the AST
-        // var astParseResult = UnifiedExpressionParser.TryParse(expressionWithoutFlags.ToString(), ParseMode.Matching);
-        var astParseResult = astParser.Parse(expressionWithoutFlags.ToString());
-
-        if (astParseResult.IsError || (astParseResult.Errors != null && astParseResult.Errors.Any()) || astParseResult.Result == null)
-        {
-            // Combine all parse errors for a more complete diagnostic message
-            string allParseErrors = string.Join("; ", astParseResult.Errors?.Select(e => e.ErrorMessage) ?? new List<string>());
-            if (string.IsNullOrEmpty(allParseErrors) && astParseResult.IsError) allParseErrors = "Unknown parsing error."; // Fallback if Errors list is empty but IsError is true
-            return (false, null, $"AST Parser error: {allParseErrors}");
-        }
-
-        var astRootNode = astParseResult.Result as Expression;
-        if (astRootNode == null)
-        {
-            return (false, null, "AST parsing succeeded but result is not an Expression node.");
-        }
-
-        var astEvaluator = new MatcherAstEvaluator(astRootNode, matchingContext, astParsingOptions);
-        
-        var astMatchResult = astEvaluator.Match(inputString.AsMemory());
-
-        Dictionary<string, string>? astCaptures = null;
-        if (astMatchResult.Captures != null)
-        {
-            astCaptures = astMatchResult.Captures.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToString());
-        }
-
-        return (astMatchResult.Success, astCaptures, astMatchResult.Error);
-    }
-    
-
 }

@@ -85,7 +85,8 @@ public enum StringConditionKind: byte
     [Display(Name = "contains")]
     IncludesAnyOrdinal,
     [Display(Name = "contains-i")]
-    // IncludesAnyOrdinalIgnoreCase,
+    IncludesAnyOrdinalIgnoreCase
+    // We are discontinuing img-ext-supported, too magic. 
     // [Display(Name = "image-ext-supported")]
     // EndsWithSupportedImageExtension
 }
