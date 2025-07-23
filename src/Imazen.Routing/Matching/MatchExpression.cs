@@ -27,17 +27,89 @@ public partial record MatchExpression
     {
         return string.Join("", Segments);
     }
-    
-    private static bool TryCreate(IReadOnlyCollection<MatchSegment> segments, [NotNullWhen(true)] out MatchExpression? result, [NotNullWhen(false)]out string? error)
+
+    private static bool EndsWithChar(string? s, char c)
     {
-        if (segments.Count == 0)
+        if (s == null || s.Length == 0) return false;
+        return s[^1] == c;
+    }
+    private static bool StartsWithChar(string? s, char c)
+    {
+        if (s == null || s.Length == 0) return false;
+        return s[0] == c;
+    }
+    
+    private static bool TryCreate(ExpressionParsingOptions options, IReadOnlyCollection<MatchSegment> segments, [NotNullWhen(true)] out MatchExpression? result, [NotNullWhen(false)]out string? error)
+    {
+
+        var segmentArray = segments.ToArray();
+
+
+        // A shortcut to {:?:eq(/)} is [/]
+        if (options.MatchOptionalTrailingSlash)
+        {
+            var addSlashSegment = true;
+            if (segmentArray.Length > 0)
+            {
+                // Check if the the last segment ends in a forward slash, OR if it is an optional segment that ends in a forward slash
+                var lastSegment = segmentArray[^1];
+                if (EndsWithChar(lastSegment.StartsOn.MatchString, '/') || EndsWithChar(lastSegment.EndsOn.MatchString, '/'))
+                {
+                    addSlashSegment = false;
+                    error = $"Flag [/] would add {{:?:eq(/)}} after {lastSegment}, but that would be confusing.";
+                    result = null;
+                    return false; 
+                }
+            }
+            if (addSlashSegment)
+            {
+                if (!MatchSegment.TryParseSegmentExpression(options, "{:?:eq(/)}".AsMemory(), new Stack<MatchSegment>(), out _, out var optionalSlashSegment, out error)){
+                    throw new InvalidOperationException($"Failed to parse optional slash segment: {error}");
+                }
+                segmentArray = [.. segmentArray, optionalSlashSegment.Value];
+            }
+        }
+        
+
+        if (segmentArray.Length == 0)
         {
             result = null;
             error = "Zero segments found in expression";
             return false;
         }
 
-        result = new MatchExpression(segments.ToArray());
+        
+        // Check for bookended optional segments (literals ending with '/' followed by optional segment followed by literals starting with '/')
+        for (int i = 1; i < segmentArray.Length - 1; i++)
+        {
+            var currentSegment = segmentArray[i];
+            var previousSegment = segmentArray[i - 1];
+            var nextSegment = segmentArray[i + 1];
+            
+            // Check if current segment is optional
+            if (currentSegment.IsOptional)
+            {
+                if (!options.AllowOptionalSegmentBetweenSlashes)
+                {
+
+                    // Check if previous segment is a literal ending with '/'
+                    var prevLiteral = previousSegment.StartsOn.AsCaseSensitiveLiteral;
+                    if (prevLiteral != null && EndsWithChar(prevLiteral, '/'))
+                    {
+                        // Check if next segment is a literal starting with '/'
+                        var nextLiteral = nextSegment.StartsOn.AsCaseSensitiveLiteral;
+                        if (nextLiteral != null && StartsWithChar(nextLiteral, '/'))
+                        {
+                            result = null;
+                            error = $"Expressions like '/{{var:?}}/' are disallowed; they would match '//'. Found '/{currentSegment}/'. Use {{var:?:suffix(/)}} to make the segment optional - it won't capture there are no more slashes. ";
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+
+        result = new MatchExpression(segmentArray);
         error = null;
         return true;
     }
@@ -201,7 +273,7 @@ public partial record MatchExpression
             }
             segments.Push(parsedSegment.Value);
         }
-        return TryCreate(segments, out result, out error);
+        return TryCreate(options, segments, out result, out error);
     }
     public static bool TryParseWithSmartQuery(ParsingOptions parsingDefaults,  ReadOnlyMemory<char> expression,
         out MatchExpression? pathMatcherResult, 

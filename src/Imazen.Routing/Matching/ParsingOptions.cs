@@ -16,21 +16,7 @@ public record ParsingOptions
     /// </summary>
     public bool IgnorePath { get; init; } = false;
     
-    /// <summary>
-    /// If true, matching will only succeed if the Accept HTTP header is present and contains 'image/webp'
-    /// </summary>
-    public bool RequireAcceptWebP { get; init; }
-    
-    /// <summary>
-    /// If true, matching will only succeed if the Accept HTTP header is present and contains 'image/avif'
-    /// </summary>
-    public bool RequireAcceptAvif { get; init; }
-    
-    /// <summary>
-    /// If true, matching will only succeed if the Accept HTTP header is present and contains 'image/jxl'
-    /// </summary>
-    public bool RequireAcceptJxl { get; init; }
-    
+
     /// <summary>
     /// * `import-accept-header` Searches the accept header for image/webp, image/avif, and image/jxl and translates them to &accept.webp=1, &accept.avif=1, &accept.jxl=1
     /// </summary>
@@ -60,7 +46,7 @@ public record ParsingOptions
     public static ParsingOptions SubtractFromFlags(List<string> flags)
     {
         var context = new ParsingOptions();
-        if (flags.Remove("ignore-case"))
+        if (flags.Remove("ignore-case") || flags.Remove("i"))
         {
             context = context with { QueryParsingOptions = QueryParsingOptions.DefaultCaseInsensitive, PathParsingOptions = PathParsingOptions.DefaultCaseInsensitive };
         }
@@ -72,9 +58,9 @@ public record ParsingOptions
         {
             context = context with { RawQueryAndPath = true };
         }
-        if (flags.Remove("sort-raw-query-first"))
+        if (flags.Remove("sort-raw"))
         {
-            context = context with { SortRawQueryValuesFirst = true };
+            context = context with { SortRawQueryValuesFirst = true, RawQueryAndPath = true };
         }
         
         if (flags.Remove("ignore-path"))
@@ -82,22 +68,7 @@ public record ParsingOptions
             context = context with { IgnorePath = true };
         }
 
-        if (flags.Remove("require-accept-webp"))
-        {
-            context = context with { RequireAcceptWebP = true };
-        }
-
-        if (flags.Remove("require-accept-avif"))
-        {
-            context = context with { RequireAcceptAvif = true };
-        }
-
-        if (flags.Remove("require-accept-jxl"))
-        {
-            context = context with { RequireAcceptJxl = true };
-        }
-
-        if (flags.Remove("import-accept-header"))
+        if (flags.Contains("accept.format"))
         {
             context = context with { ImportAcceptHeader = true };
         }

@@ -381,7 +381,7 @@ internal readonly record struct SegmentBoundary
 
 
     }
-    private string? MatchString => On switch
+    public string? MatchString => On switch
     {
         When.AtChar or When.EqualsChar => Char.ToString(),
         When.AtString or When.AtStringIgnoreCase or

@@ -222,7 +222,7 @@ public record StringTemplate(IReadOnlyList<ITemplateSegment> Segments)
             bool isHandled = transformations.Any(t => t is OrTransform || t is DefaultTransform || t is OptionalMarkerTransform);
             if (!isHandled)
             {
-                error = $"Template uses optional variable '{variableName}' without providing a fallback (:or-var, :default) or marking as ignorable (:optional, :?).";
+                error = $"Template uses optional variable '{variableName}' without providing a fallback such as (:or-var(name), :default(value)) or marking as ignorable (:optional, :?).";
                 segment = null;
                 return false;
             }

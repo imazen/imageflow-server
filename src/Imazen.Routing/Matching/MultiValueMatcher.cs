@@ -73,7 +73,7 @@ public record MultiValueMatcher(
         [NotNullWhen(true)] out MultiValueMatcher? result, [NotNullWhen(false)] out string? error)
     {
         if (!ExpressionFlags.TryParseFromEnd(expressionWithFlags, out var expression, out var flags, out error,
-            ExpressionFlagParsingOptions.LowercaseDash))
+            ExpressionFlagParsingOptions.Permissive))
         {
             result = null;
             return false;
@@ -125,17 +125,43 @@ public record MultiValueMatcher(
         return Match(context, path.AsMemory(), queryWrapper, headers, ref rawQuery, ref rawPathAndQuery, ref sorted);
     }
 
+    internal static Tuple<string,string>[] AcceptHeaderQueryPairs = new Tuple<string,string>[]
+    {
+        Tuple.Create("image/webp", "accept.webp"),
+        Tuple.Create("image/avif", "accept.avif"),
+        Tuple.Create("image/jxl", "accept.jxl"),
+    };
+
     internal MultiMatchResult Match(in MatchingContext context, in ReadOnlyMemory<char> path,
         IReadOnlyQueryWrapper? query, IDictionary<string, StringValues>? headers,
         ref ReadOnlyMemory<char>? rawQuery, ref ReadOnlyMemory<char>? rawPathAndQuery, ref ReadOnlyMemory<char>? pathAndSortedQuery)
     {
-        if (ParsingOptions.RequireAcceptWebP && 
-            (headers == null
-             || !headers.TryGetValue(HttpHeaderNames.Accept, out var accept)
-             || !accept.Any(s => s != null && s.Contains("image/webp"))))
+        // TODO: Importing the accept header might happen at the CDN
+        // And needs to modify the cache. And if we use the CDN, we don't want to 
+        // populate the cache based on a single user's header... or another cache layer.
+        // So, we may want to work with this a little more.
+        Dictionary<string, StringValues>? mutableQuery = null;
+        if (ParsingOptions.ImportAcceptHeader &&
+            headers != null && query != null
+             && headers.TryGetValue(HttpHeaderNames.Accept, out var accept))
         {
-            return new MultiMatchResult()
-                { Success = false, Error = "'image/webp' was not found in the HTTP Accept header string" };
+            foreach (var pair in AcceptHeaderQueryPairs)
+            {
+                if (accept.Any(s => s != null && s.Contains(pair.Item1)))
+                {
+                    if (!query.TryGetValue(pair.Item2, out string? acceptWebp)
+                            || acceptWebp != "1")
+                    {
+                        mutableQuery ??= query.ToStringValuesDictionary();
+                        mutableQuery.Add(pair.Item2, "1");
+                    }
+                    // We don't currently override existing values
+                }
+            }
+        }
+        if (mutableQuery != null)
+        {
+            query = new DictionaryQueryWrapper(mutableQuery);
         }
 
         var pathInput = ParsingOptions.IgnorePath ? "".AsMemory() : path;

@@ -139,12 +139,12 @@ public partial record ExpressionFlags(ReadOnlyCollection<string> Flags)
 
     // Allow k/v pairs as well, [a-zA-Z-][a-zA-Z0-9-]*([=][a-zA-Z0-9-]+)?
 #if NET8_0_OR_GREATER
-    [GeneratedRegex(@"^[a-zA-Z-_][a-zA-Z0-9-]*([=][a-zA-Z0-9-_]+)?$")]
+    [GeneratedRegex(@"^([a-zA-Z-_][a-zA-Z0-9-\.]*([=][a-zA-Z0-9-_\.]+)?|/)$")]
     public static partial Regex LatestPermissiveFlagSyntax();
 #else
 
     public static readonly Regex LatestPermissiveFlagSyntaxVar =
-        new(@"^[a-zA-Z-_][a-zA-Z0-9-]*([=][a-zA-Z0-9-_]+)?$");
+        new(@"^([a-zA-Z-_][a-zA-Z0-9-\.]*([=][a-zA-Z0-9-_\.]+)?|/)$");
 
     public static Regex LatestPermissiveFlagSyntax() => LatestPermissiveFlagSyntaxVar;
 #endif

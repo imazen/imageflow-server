@@ -10,6 +10,7 @@ public record PathParsingOptions
             OrdinalIgnoreCase = OrdinalIgnoreCase,
             AllowStarLiteral = AllowStarLiteral,
             AllowQuestionLiteral = false,
+            MatchOptionalTrailingSlash = MatchOptionalTrailingSlash,
             //CaptureSlashesByDefault = CaptureSlashesByDefault
         };
     }
@@ -19,6 +20,7 @@ public record PathParsingOptions
     public bool OrdinalIgnoreCase { get; init; } = false;
     
     public bool AllowStarLiteral { get; init; } = false;
+    public bool MatchOptionalTrailingSlash { get; init; } = false;
     /// <summary>
     /// If true, all segments will capture the / character by default. If false, segments must specify {:**} to capture slashes.
     /// </summary>
@@ -33,6 +35,10 @@ public record PathParsingOptions
         if (flags.Remove("allow-star-literal"))
         {
             defaults = defaults with { AllowStarLiteral = true };
+        }
+        if (flags.Remove("/"))
+        {
+            defaults = defaults with { MatchOptionalTrailingSlash = true };
         }
         return defaults;
     }

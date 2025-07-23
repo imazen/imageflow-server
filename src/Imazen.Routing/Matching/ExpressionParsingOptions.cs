@@ -12,6 +12,10 @@ public record ExpressionParsingOptions
     public bool AllowStarLiteral { get; init; } = false;
     
     public bool AllowQuestionLiteral { get; init; } = false;
+
+    public bool AllowOptionalSegmentBetweenSlashes { get; init; } = false;
+
+    public bool MatchOptionalTrailingSlash { get; init; } = false;
     // /// <summary>
     // /// If true, all segments will capture the / character by default. If false, segments must specify {:**} to capture slashes.
     // /// </summary>
@@ -31,10 +35,14 @@ public record ExpressionParsingOptions
         {
             defaults = defaults with { AllowQuestionLiteral = true };
         }
-        // if (flags.Remove("capture-slashes"))
-        // {
-        //     defaults = defaults with { CaptureSlashesByDefault = true };
-        // }
+        if (flags.Remove("allow-optional-segment-between-slashes"))
+        {
+            defaults = defaults with { AllowOptionalSegmentBetweenSlashes = true };
+        }
+        if (flags.Remove("/"))
+        {
+            defaults = defaults with { MatchOptionalTrailingSlash = true };
+        }
         return defaults;
     }
     public static ExpressionParsingOptions ParseComplete(ReadOnlyMemory<char> expressionWithFlags, out ReadOnlyMemory<char> remainingExpression)

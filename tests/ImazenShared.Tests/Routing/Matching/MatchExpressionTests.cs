@@ -1,15 +1,6 @@
-using System;
-using System.Linq;
-using Imazen.Abstractions.Resulting;
+
 using Imazen.Routing.Matching;
-using Xunit;
-using Imazen.Routing.Matching.Templating;
-using System.Collections.Generic;
 using FluentAssertions;
-using sly.parser.generator;
-using sly.lexer;
-using sly.parser;
-using Microsoft.Extensions.FileSystemGlobbing;
 
 namespace Imazen.Tests.Routing.Matching;
 
@@ -20,44 +11,29 @@ public class MatchExpressionTests
     {
         _testOutputHelper = testOutputHelper;
     }
-    public static TheoryData<string, bool, string, string[]> TestAllData
-    {
-        get
-        {
-            var data = new TheoryData<string, bool, string, string[]>();
-            var theories = new List<(bool, string, string[])>
-            {
-                (true, "/{name}/{country}{:(/):?}", new[] { "/hi/usa", "/hi/usa/" }),
-                (true, "/{name}/{country:ends(/)}", new[] { "/hi/usa/" }),
-                (true, "{:int}", new[] { "-1300" }),
-                (false, "{:uint}", new[] { "-1300" }),
-                (true, "{:int:range(-1000,1000)}", new[] { "-1000", "1000" }),
-                (false, "{:int:range(-1000,1000)}", new[] { "-1001", "1001" }),
-                (true, "/{name}/{country:suffix(/)}", new[] { "/hi/usa/" }),
-                (true, "/{name}/{country}{:eq(/):optional}", new[] { "/hi/usa", "/hi/usa/" }),
-                (true, "/{name}/{country:?:suffix(/)}{place}{:eq(/):optional}", new[] { "/hi/usa/" }), //"/hi/usa",
-                (true, "/{name}/{a}{b:prefix(/):?}{:eq(/):optional}", new[] { "/hi/usa", "/hi/usa/", "/hi/usa/co", "/hi/usa/co/" }),
-                (true, "/{name}/{country:len(3)}", new[] { "/hi/usa" }),
-                (true, "/{name}/{country:len(3)}/{state:len(2)}", new[] { "/hi/usa/CO" }),
-                (false, "/{name}/{country:length(3)}", new[] { "/hi/usa2" }),
-                (false, "/{name}/{country:length(3)}", new[] { "/hi/usa/" }),
-                (true, "/images/{seo_string_ignored}/{sku:guid}/{image_id:integer-range(0,1111111)}{width:integer:prefix(_):optional}.{format:equals(jpg|png|gif)}", new[] { "/images/seo-string/12345678-1234-1234-1234-123456789012/12678_300.jpg", "/images/seo-string/12345678-1234-1234-1234-123456789012/12678.png" })
-            };
-            foreach (var (success, exp, inputs) in theories)
-            {
-                data.Add("", success, exp, inputs);
-            }
-            return data;
-        }
-    }
+
+    private ITestOutputHelper output => _testOutputHelper;
     
     [Theory]
-    [MemberData(nameof(TestAllData))]
-    public void TestAll(string t, bool ok, string exp, params string[] inputs)
+    [InlineData(true, "/{name}/{country}{:(/):?}", new[] { "/hi/usa", "/hi/usa/" })]
+    [InlineData(true, "/{name}/{country:ends(/)}", new[] { "/hi/usa/" })]
+    [InlineData(true, "{:int}", new[] { "-1300" })]
+    [InlineData(false, "{:uint}", new[] { "-1300" })]
+    [InlineData(true, "{:int:range(-1000,1000)}", new[] { "-1000", "1000" })]
+    [InlineData(false, "{:int:range(-1000,1000)}", new[] { "-1001", "1001" })]
+    [InlineData(true, "/{name}/{country:suffix(/)}", new[] { "/hi/usa/" })]
+    [InlineData(true, "/{name}/{country}{:eq(/):optional}", new[] { "/hi/usa", "/hi/usa/" })]
+    [InlineData(true, "/{name}/{country:?:suffix(/)}{place}{:eq(/):optional}", new[] { "/hi/usa/" })]
+    [InlineData(true, "/{name}/{a}{b:prefix(/):?}{:eq(/):optional}", new[] { "/hi/usa", "/hi/usa/", "/hi/usa/co", "/hi/usa/co/" })]
+    [InlineData(true, "/{name}/{country:len(3)}", new[] { "/hi/usa" })]
+    [InlineData(true, "/{name}/{country:len(3)}/{state:len(2)}", new[] { "/hi/usa/CO" })]
+    [InlineData(false, "/{name}/{country:length(3)}", new[] { "/hi/usa2" })]
+    [InlineData(false, "/{name}/{country:length(3)}", new[] { "/hi/usa/" })]
+    [InlineData(true, "/images/{seo_string_ignored}/{sku:guid}/{image_id:integer-range(0,1111111)}{width:integer:prefix(_):optional}.{format:equals(jpg|png|gif)}", new[] { "/images/seo-string/12345678-1234-1234-1234-123456789012/12678_300.jpg", "/images/seo-string/12345678-1234-1234-1234-123456789012/12678.png" })]
+    public void TestAll(bool ok, string exp, params string[] inputs)
     {
-        var parserType = t;
         var expectedSuccess = ok;
-        var c = DefaultMatchingContext;
+        var c = Context;
 
         if (!MultiValueMatcher.TryParse(exp, out var matcher, out var error))
         {
@@ -106,7 +82,7 @@ public class MatchExpressionTests
                 (true, "{a:u64}?k={v}", "123?k=h&a=b", "a=123&v=h", "a"),
                 (true, "{a:u64}", "0", "a=0", null),
                 (false, "{:u64}", "-123", null, null),
-                (true, "/{name}/{country}{:eq(/):?}", "/hi/usa", "name=hi&country=usa", null),
+                (true, "/{name}/{country}[/]", "/hi/usa", "name=hi&country=usa", null),
                 (true, "/{name}/{country}{:eq(/):?}",  "/hi/usa/", "name=hi&country=usa", null),
                 (true, "/{name}/{country:len(3)}", "/hi/usa", "name=hi&country=usa", null),
                 // It is not intuitive that this works - place is not optional!
@@ -135,7 +111,7 @@ public class MatchExpressionTests
         var parserType = t;
         var expectedSuccess = ok;
         var matcher = MultiValueMatcher.Parse(expr);
-        var result = matcher.Match(DefaultMatchingContext, input);
+        var result = matcher.Match(Context, input);
 
         if (result.Success != expectedSuccess)
         {
@@ -168,177 +144,41 @@ public class MatchExpressionTests
     }
     private static string Stringify(IDictionary<string, string> pairs) => "{" + string.Join(",", pairs.Select(x => $"{x.Key}='{x.Value}'")) + "}";
 
-    [Theory]
-    [InlineData("{name:starts(foo):ends(bar)?}", false)]
-    [InlineData("{name:starts(foo):ends(bar)}", true)]
-    [InlineData("{name:starts(foo):?}", true)]
-    [InlineData("{name:prefix(foo):suffix(bar)}", true)]
-    [InlineData("prefix(foo){name}suffix(bar)", true)]
-    [InlineData("{name:len(5):alpha()}", true)]
-    [InlineData("{name:alpha():length(5,10)}", true)]
-    [InlineData("{name:len(5)}", true)]
-    [InlineData("{name:equals(foo):equals(bar)}", false)]
-    [InlineData("{name:equals(foo|bar)}", true)]
-    [InlineData("{name:starts(foo)}suffix(bar)", true)] //suffix(bar) will be seen as a literal
-    [InlineData("{name:starts(foo)}/suffix(bar)", true)]
-    [InlineData("{name:starts(foo)}:ends(baz)suffix(bar)", true)]
-    [InlineData("{?}", true)]
-    [InlineData("{*}", true)]
-    [InlineData("{:?}", true)]
-    [InlineData("{name:?}", true)]
-    [InlineData("{name:int32}", true)]
-    [InlineData("{name:int32()}", true)]
-    [InlineData("{name:starts(foo}:ends(bar)}", false)]
-    [InlineData("{name:starts(foo):ends(bar)}{:alpha()}", true)]
-    [InlineData("{name:starts(foo):ends(bar)}/{:alpha()}", true)]
-    [InlineData("{name:starts(foo)}{:ends(bar):alpha()}", false)]
-    [InlineData("{name:prefix(foo):?}", true)]
-    [InlineData("{name:suffix(bar)}", true)]
-    [InlineData("{name:suffix(bar):?}", true)]
-    [InlineData("{name:ends(bar):?}", true)]
-    [InlineData("{name:contains(foo)}", true)]
-    [InlineData("{name:contains(foo):?}", true)]
-    [InlineData("{name:contains-i(foo)}", true)]
-    [InlineData("{name:contains-i(foo):?}", true)]
-    [InlineData("{name:equals(foo):?}", true)]
-    [InlineData("{name:equals-i(foo)}", true)]
-    [InlineData("{name:equals-i(foo):?}", true)]
-    [InlineData("{name:starts-i(foo)}", true)]
-    [InlineData("{name:starts-i(foo):?}", true)]
-    [InlineData("{name:ends-i(bar)}", true)]
-    [InlineData("{name:ends-i(bar):?}", true)]
-    [InlineData("{name:len(5,10)}", true)]
-    [InlineData("{name:len(5,10):?}", true)]
-    [InlineData("{name:length(,5)}", true)]
-    [InlineData("{name:length(5,)}", true)]
-    [InlineData("{name:length(5)}", true)]
-    [InlineData("{name:length(5):?}", true)]
-    [InlineData("{name:length(5,10)}", true)]
-    [InlineData("{name:length(5,10):?}", true)]
-    [InlineData("{name:alpha}", true)]
-    [InlineData("{name:alpha:?}", true)]
-    [InlineData("{name:alpha-lower}", true)]
-    [InlineData("{name:alpha-lower:?}", true)]
-    [InlineData("{name:alpha-upper}", true)]
-    [InlineData("{name:alpha-upper:?}", true)]
-    [InlineData("{name:alphanumeric}", true)]
-    [InlineData("{name:alphanumeric:?}", true)]
-    [InlineData("{name:hex}", true)]
-    [InlineData("{name:hex:?}", true)]
-    [InlineData("{name:int64}", true)]
-    [InlineData("{name:int64:?}", true)]
-    [InlineData("{name:guid}", true)]
-    [InlineData("{name:guid:?}", true)]
-    [InlineData("{name:equals(foo|bar|baz)}", true)]
-    [InlineData("{name:equals(foo|bar|baz):?}", true)]
-    [InlineData("{name:equals-i(foo|bar|baz)}", true)]
-    [InlineData("{name:equals-i(foo|bar|baz):?}", true)]
-    [InlineData("{name:starts(foo|bar|baz)}", true)]
-    [InlineData("{name:starts(foo|bar|baz):?}", true)]
-    [InlineData("{name:starts-i(foo|bar|baz)}", true)]
-    [InlineData("{name:starts-i(foo|bar|baz):?}", true)]
-    [InlineData("{name:ends(foo|bar|baz)}", true)]
-    [InlineData("{name:ends(foo|bar|baz):?}", true)]
-    [InlineData("{name:ends-i(foo|bar|baz)}", true)]
-    [InlineData("{name:ends-i(foo|bar|baz):?}", true)]
-    [InlineData("{name:contains(foo|bar|baz)}", true)]
-    [InlineData("{name:contains(foo|bar|baz):?}", true)]
-    [InlineData("{name:contains-i(foo|bar|baz)}", true)]
-    [InlineData("{name:contains-i(foo|bar|baz):?}", true)]
-    [InlineData("{name:range(1,100)}", true)]
-    [InlineData("{name:range(1,100):?}", true)]
-    [InlineData("{name:image-ext-supported}", false)]
-    [InlineData("{name:image-ext-supported:?}", false)]
-    [InlineData("{name:chars([a-zA-Z0-9_\\-])}", true)]
-    [InlineData("{name:chars([a-zA-Z0-9_\\-]):?}", true)]
-    [InlineData("{name:starts-chars(3,[a-zA-Z])}", true)]
-    [InlineData("{name:starts-chars(3,[a-zA-Z]):?}", true)]
-    [InlineData("{name:ends([$%^])}", true)]
-    [InlineData("{name:ends([$%^]):?}", true)]
-    [InlineData("{name:ends-i([$%^])}", true)]
-    [InlineData("{name:ends-i([$%^]):?}", true)]
-    [InlineData("{name:starts([0-9])}", true)]
-    [InlineData("{name:starts([0-9]):?}", true)]
-    [InlineData("{name:starts-i([0-9])}", true)]
-    [InlineData("{name:starts-i([0-9]):?}", true)]
-    [InlineData("{name:starts([aeiouAEIOU])}", true)]
-    [InlineData("{name:starts([aeiouAEIOU]):?}", true)]
-    [InlineData("{name:starts-i([aeiouAEIOU])}", true)]
-    [InlineData("{name:starts-i([aeiouAEIOU]):?}", true)]
-    [InlineData("{name:ends([!@#$%^&*])}", true)]
-    [InlineData("{name:ends([!@#$%^&*]):?}", true)]
-    [InlineData("{name:ends-i([!@#$%^&*])}", true)]
-    [InlineData("{name:ends-i([!@#$%^&*]):?}", true)]
-    [InlineData("{name:ends([aeiouAEIOU])}", true)]
-    [InlineData("{name:ends([aeiouAEIOU]):?}", true)]
-    [InlineData("{name:ends-i([aeiouAEIOU])}", true)]
-    [InlineData("{name:ends-i([aeiouAEIOU]):?}", true)]
-    [InlineData("{name:ends-i([aeiouAEIOU]|[a-z]):?}", false)]
-    // Ensure that they won't parse if we use any aliases or conditions as names
-    [InlineData("{int}", false)]
-    [InlineData("{uint}", false)]
-    [InlineData("{alpha}", false)]
-    [InlineData("{alphanumeric}", false)]
-    [InlineData("{hex}", false)]
-    [InlineData("{guid}", false)]
-    [InlineData("{:guid}", true)]
-    [InlineData("{:int}", true)]
-    [InlineData("{:u32}", true)]
-    [InlineData("{:u64}", true)]
-    [InlineData("{:int32}", true)]
-    [InlineData("{:int64}", true)]
-    [InlineData("{:alpha}", true)]
-    [InlineData("{:alpha-lower}", true)]
-    [InlineData("{:alpha-upper}", true)]
-    [InlineData("{:alphanumeric}", true)]
-    [InlineData("{:i32}", true)]
-    [InlineData("{:i64}", true)]
-    [InlineData("{:(literal)}", true)]
-    [InlineData("{:starts-with-i(hi)}", true)]
-    [InlineData("{:starts-with(hi)}", true)]
-    [InlineData("{:ends-with-i(hi)}", true)]
-    [InlineData("{:ends-with(hi)}", true)]
-    public void TestSimpleMatchExpressionParsing(string exp, bool ok)
-    {
-        var context = ExpressionParsingOptions.ParseComplete(exp.AsMemory(), out var remainingExpr);
-        var result = MatchExpression.TryParse(context, remainingExpr, out var matchExpression, out var error);
+    
+    
+    private static readonly MatchingContext Context = MatchingContext.Default;
 
-        if (ok)
-        {
-            Assert.True(result, $"Expression '{exp}' should parse successfully, but got error: {error}");
-            Assert.NotNull(matchExpression);
-        }
-        else
-        {
-            Assert.False(result, $"Expression '{exp}' should not parse successfully, but it did.");
-            Assert.Null(matchExpression);
-            Assert.NotNull(error);
-        }
-    }
-    
-    //Test MultiValueMatcher parsing
 
+
+    [MatchExpression("/{a}/{b:?}")]
     [Theory]
-    [InlineData("{path}?key={value}", true)]
-    [InlineData("{path}?key={value}&key2={value2}[require-accept-webp]", true)]
-    [InlineData("{path}?key={value}&key2={value2}[import-accept-header]", true)]
-    [InlineData("{path}?key={value}&key2={value2}[require-accept-avif]", true)]
-    [InlineData("{path}?key={value}&key2={value2}[require-accept-jxl]", true)]
-    [InlineData("{path}?key={value}&key2={value2}[raw]", true)]
-    public void TestMultiValueMatcherParsing(string exp, bool ok)
+    [InlineData("/x", false, null)]
+    [InlineData("/x/", true, "a=x&b=")] //TODO: Is this weird?
+    [InlineData("/x/y", true, "a=x&b=y")]
+    [InlineData("/x/y/z", true, "a=x&b=y/z")]
+    public void BasicOptional(string path, bool m, string? captures)
     {
-        if (ok != MultiValueMatcher.TryParse(exp.AsMemory(), out var result, out var error))
-        {
-            if (ok)
-            {
-                Assert.Null(error);
-                Assert.NotNull(result);
-                Assert.True(result.UnusedFlags == null || result.UnusedFlags.Flags.Count == 0);
-            }
-            if (!ok) Assert.Fail($"Expression {exp} parsed, but should have failed");
-        }
+        AssertMatch.Captures(this, output, Context, path, m, captures);
     }
-    
-    
-    private static readonly MatchingContext DefaultMatchingContext = MatchingContext.Default;
+
+
+    [MatchExpression("/{a}{b:?:prefix(/)}")]
+    [Theory]
+    [InlineData("/x", true, "a=x")] // Works with prefix
+    [InlineData("/x/", true, "a=x&b=")]
+    [InlineData("/x/y", true, "a=x&b=y")]
+    [InlineData("/x/y/z", true, "a=x&b=y/z")]
+    public void OptionalWithPrefix(string path, bool m, string? captures)
+    {
+        AssertMatch.Captures(this, output, Context, path, m, captures);
+    }
+
+    [MatchExpression("/{a}/")]
+    [Theory]
+    [InlineData("//", true, "a=")] //TODO, this is WEIRD
+    [InlineData("/x/", true, "a=x")]
+    public void RequiredButEmpty(string path, bool m, string? captures)
+    {
+        AssertMatch.Captures(this, output, Context, path, m, captures);
+    }
 }

@@ -31,7 +31,7 @@ public class RoutingExpressionEngineTests
     [InlineData("/file/{id} => /f/{id:upper} [v1]", "/file/abc", "/f/ABC")]
 
     // Matcher with optional var and required var, but we forgot "suffix(/)", trying "ends(/)" first
-    [InlineData("/file/{id:int:?}/{path:alpha} => /{path}?id={id:?:default(none)} [v1]", "/file/testpath", null)]
+    [InlineData("/file/{id:int:?:suffix(/)}}{path:alpha} => /{path}?id={id:?:default(none)} [v1]", "/file/testpath", null)]
     // Matcher with optional var and required var
     // Unexpected behavior since optional doesn't change the suffix chopping the path into blocks.
     // [InlineData("/file/{id:int:?:suffix(/)}{path:alpha} => /{path}?id={id:?:default(none)} [v1]", "/file/testpath", "/testpath?id=none")]
@@ -68,6 +68,43 @@ public class RoutingExpressionEngineTests
                 Assert.Fail("Router returned Not Found, but a result was expected");
             }
             Assert.Equal(expectedOutput, result.PathAndQuery);
+        }
+    }
+
+    [Theory]
+    // Test cases for bookended optional segments - should fail parsing
+    [InlineData("/path/{optional:?}/more", "disallowed")]
+    [InlineData("/files/{id:?}/download", "disallowed")]
+    [InlineData("/api/v1/{version:?}/users", "disallowed")]
+    [InlineData("/data/{item:?}/process", "disallowed")]
+    // Valid cases that should not fail
+    [InlineData("/path/{optional:?}", null)] // No following literal
+    [InlineData("{optional:?}/more", null)] // Previous literal doesn't end with /
+    [InlineData("/path/{optional:?}more", null)] // Following literal doesn't start with /
+    [InlineData("/path/{required}/more", null)] // Not optional
+    public void TestBookendedOptionalSegmentValidation(string matchExpression, string? expectedError)
+    {
+        var parsingOptions = RoutingParsingOptions.AnySchemeAnyFlagRequirePath;
+        var fullExpression = $"{matchExpression} => /result [v1]";
+        
+        var success = RoutingExpressionParser.TryParse(parsingOptions, fullExpression, out var parsed, out var error);
+        
+        if (expectedError != null)
+        {
+            // Should fail parsing
+            Assert.False(success, $"Expected parsing to fail for '{matchExpression}', but it succeeded");
+            Assert.NotNull(error);
+            Assert.Contains(expectedError, error);
+            Output.WriteLine($"Match Expression: {matchExpression}");
+            Output.WriteLine($"Expected Error: {expectedError}");
+            Output.WriteLine($"Actual Error: {error}");
+        }
+        else
+        {
+            // Should succeed parsing
+            Assert.True(success, $"Expected parsing to succeed for '{matchExpression}', but failed with: {error}");
+            Assert.NotNull(parsed);
+            Assert.Null(error);
         }
     }
 }

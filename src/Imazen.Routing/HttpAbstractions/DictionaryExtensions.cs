@@ -13,6 +13,20 @@ public static class DictionaryExtensions
         }
         return d;
     }
+
+      public static Dictionary<string,StringValues> ToStringValuesDictionary(this IReadOnlyQueryWrapper query)
+    {
+#if NET6_0_OR_GREATER
+        var d = new Dictionary<string,StringValues>(query);
+#else
+        var d = new Dictionary<string,StringValues>(query.Count);
+        foreach (var kvp in query)
+        {
+            d[kvp.Key] = kvp.Value;
+        }
+#endif
+        return d;
+    }
     public static Dictionary<string,string> ToStringDictionary(this IDictionary<string,StringValues> query)
     {
         var d = new Dictionary<string,string>(query.Count);
