@@ -11,7 +11,7 @@ namespace Imazen.Routing.Matching.Templating;
 /// Represents a parsed template string, composed of literal and variable segments.
 /// Can be used for paths, query keys, or query values.
 /// </summary>
-public record StringTemplate(IReadOnlyList<ITemplateSegment> Segments)
+public record StringTemplate(IReadOnlyList<ITemplateSegment> Segments, string? LiteralStart)
 {
     /// <summary>
     /// Parses a template string into segments.
@@ -120,12 +120,12 @@ public record StringTemplate(IReadOnlyList<ITemplateSegment> Segments)
              return false;
         }
 
-
-        result = new StringTemplate(segments);
+        var startLiteral = GetStartLiteral(segments);
+        result = new StringTemplate(segments, startLiteral);
         error = null;
         return true;
     }
-
+    public string? GetStartLiteral() => LiteralStart;
     // Original TryParse overload now calls the new one with null context
     public static bool TryParse(ReadOnlySpan<char> template,
         [NotNullWhen(true)] out StringTemplate? result,
@@ -514,8 +514,7 @@ public record StringTemplate(IReadOnlyList<ITemplateSegment> Segments)
     {
         public TemplateParseException(string message) : base(message) { }
     }
-
-    public string? GetStartLiteral()
+    private static string? GetStartLiteral(IReadOnlyList<ITemplateSegment> Segments)
     {
         if (Segments.Count == 0)
         {
@@ -536,6 +535,7 @@ public record StringTemplate(IReadOnlyList<ITemplateSegment> Segments)
         }
         return sb.ToString();
     }
+
 }
 
 // Placeholder for 'allow' transformation

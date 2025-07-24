@@ -8,18 +8,27 @@ using System.Text;
 namespace Imazen.Routing.RoutingExpressions;
 
 public record struct ParsedRoutingExpression(MultiValueMatcher Matcher, MultiTemplate Template, 
-ProviderInfo? ProviderInfo, string OriginalExpression, string? PathTemplateLiteralStart, Uri? TemplateLiteralStartUri){
+    RouteProviderInfo ProviderInfo, string OriginalExpression, string? PathTemplateLiteralStart, Uri? TemplateLiteralStartUri){
     public override readonly string ToString(){
         return OriginalExpression;
     }
+    public readonly IReadOnlyCollection<string>? TemplateFlags => Template.Flags?.Flags;
 }
 
-public record struct ProviderInfo(string? ProviderName,string? FixedScheme);
+public record struct RouteProviderInfo(string? LiteralPrefix, string? ProviderName, string? FixedScheme, 
+IReadOnlyCollection<KeyValuePair<string, string>> FlagPairs, IReadOnlyCollection<string> Flags);
 
-public record RoutingParsingOptions(List<string>? AllowedSchemes, bool RequireScheme, bool RequirePath,
-List<string>? AllowedFlags, List<Regex>? AllowedFlagRegexes){
-    public static RoutingParsingOptions AnySchemeAnyFlagOptionalPath => new(null, false, false, null, null);
-    public static RoutingParsingOptions AnySchemeAnyFlagRequirePath => new(null, false, true, null, null);
+public record RoutingParsingOptions(
+    List<string>? AllowedSchemes, 
+    List<string>? AllowedTemplatePrefixes,
+    bool RequireTemplatePrefix,
+    bool RequireScheme, 
+    bool RequirePath,
+    List<string>? AllowedFlags, 
+    List<Regex>? AllowedFlagRegexes){
+
+    public static RoutingParsingOptions AnySchemeAnyFlagOptionalPath => new(null, null, false, false, false, null, null);
+    public static RoutingParsingOptions AnySchemeAnyFlagRequirePath => new(null, null, false, true, false, null, null);
 }
 
 public static partial class RoutingExpressionParser
@@ -32,8 +41,6 @@ public static partial class RoutingExpressionParser
     private record UnparsedPair(string MatchExpression, string TemplateExpression, string OriginalExpression);
     
 
-
-
     public static bool TryParse(RoutingParsingOptions options, string fullExpression, [NotNullWhen(true)] out ParsedRoutingExpression? pair, [NotNullWhen(false)] out string? error)
     {
         pair = null;
@@ -45,95 +52,147 @@ public static partial class RoutingExpressionParser
             return false;
         }
 
-        var matchExpression = fullExpression.Substring(0, separatorIndex);
+        var matchExpression = fullExpression[..separatorIndex];
+        var templateExpression = fullExpression[(separatorIndex + Separator.Length)..];
+        return TryParse(options, matchExpression, templateExpression, fullExpression, out pair, out error);
+    }
+
+    public static bool TryParse(RoutingParsingOptions options, string matchExpression, string templateExpression, string? combinedExpression, [NotNullWhen(true)] out ParsedRoutingExpression? pair, [NotNullWhen(false)] out string? error)
+    {
+        pair = null;
         if (string.IsNullOrWhiteSpace(matchExpression))
         {
             error = "Match expression cannot be empty.";
             return false;
         }
-
-        var templateExpression = fullExpression.Substring(separatorIndex + Separator.Length);
         if (string.IsNullOrWhiteSpace(templateExpression))
         {
             error = "Template expression cannot be empty.";
             return false;
         }
+        combinedExpression ??= matchExpression + Separator + templateExpression;
 
-        var unparsedPair = new UnparsedPair(matchExpression, templateExpression, fullExpression);
+        var unparsedPair = new UnparsedPair(matchExpression, templateExpression, combinedExpression);
         return TryParseRoutingExpressionPair(options, unparsedPair, out pair, out error);
     }
 
 #if !NETSTANDARD2_0
     // for pairs of provider=uniqueName, capture the uniqueName
-    [GeneratedRegex(@"(provider=(?<provider>[a-zA-Z0-9_]+))|(?<version>v[0-9]+)")]
+    [GeneratedRegex(@"v[0-9]+")]
+    private static partial Regex VersionNumberRegex();
+#else
+    private static Regex _versionNumberRegex =new Regex(@"v[0-9]+", RegexOptions.Compiled);
+    private static Regex VersionNumberRegex()
+    {
+        return _versionNumberRegex;
+    }
+#endif
+#if !NETSTANDARD2_0
+    // for pairs of provider=uniqueName, capture the uniqueName
+    [GeneratedRegex(@"[a-zA-Z0-9_]+")]
+    private static partial Regex ProviderNameRegex();
+#else
+    private static Regex _providerNameRegex =new Regex(@"[a-zA-Z0-9_]+", RegexOptions.Compiled);
+    private static Regex ProviderNameRegex()
+    {
+        return _providerNameRegex;
+    }
+#endif
+
+#if !NETSTANDARD2_0
+    // for pairs of provider=uniqueName, capture the uniqueName
+    [GeneratedRegex(@"([a-zA-Z0-9_]+|([a-zA-Z0-9_]+=[a-zA-Z0-9_]+))")]
     private static partial Regex TemplateFlagRegex();
 #else
-    private static Regex _templateFlagRegex =new Regex(@"(provider=(?<provider>[a-zA-Z0-9_]+))|(v(?<version>[0-9]+))", RegexOptions.Compiled);
+    private static Regex _templateFlagRegex =new Regex(@"([a-zA-Z0-9_]+|([a-zA-Z0-9_]+=[a-zA-Z0-9_]+))", RegexOptions.Compiled);
     private static Regex TemplateFlagRegex()
     {
         return _templateFlagRegex;
     }
 #endif
 
+
     private static bool TryParseRoutingExpressionPair(RoutingParsingOptions options, UnparsedPair pair, [NotNullWhen(true)] out ParsedRoutingExpression? parsedRoutingExpression, [NotNullWhen(false)] out string? error)
     {
-        // TODO: We might want to let the matcher use flags from the expression end...
-        if (!MultiValueMatcher.TryParse(pair.MatchExpression, out var matcher, out string? matcherError))
+ 
+        // Parse template flags first, so matcher can use them - say [ignore-case] is put last.
+        if (!MultiTemplate.TryParseRemoveFlags(pair.MatchExpression.AsMemory(), out var remainingMatchExpression, out var templateFlags, out string? templateFlagsError))
+        {
+            parsedRoutingExpression = null;
+            error = templateFlagsError + " match expression flags in route " + pair.OriginalExpression;
+            return false;
+        } 
+
+        if (!MultiValueMatcher.TryParse(pair.MatchExpression.AsMemory(),null, templateFlags, out var matcher, out string? matcherError))
         {
             parsedRoutingExpression = null;
             error = matcherError + " match expression in route " + pair.OriginalExpression;
             return false;
         }
         var matcherVariableInfo = matcher.GetMatcherVariableInfo();
-
         var templateFlagRegex = TemplateFlagRegex();
 
         var templateContext = new TemplateValidationContext(matcherVariableInfo, matcher.UnusedFlags, 
-        null, templateFlagRegex, options.RequirePath, options.RequireScheme, options.AllowedSchemes);
+        templateFlags, templateFlagRegex, options.RequirePath, options.RequireScheme, options.AllowedSchemes);
 
-        if (!MultiTemplate.TryParse(pair.TemplateExpression.AsMemory(), templateContext, out var template, out string? templateError))
+
+        if (!MultiTemplate.TryParse(pair.TemplateExpression.AsMemory(), templateFlags, templateContext, out var template, out string? templateError))
         {
             parsedRoutingExpression = null;
             error = templateError + " template expression in route " + pair.OriginalExpression;
             return false;
         }
 
-        if (!ParseTemplateFlags(options, template.Flags, template.Scheme, out var providerInfo, out error))
+        if (!ParseTemplateFlags(options, template, out var providerInfo, out error))
         {
             parsedRoutingExpression = null;
             return false;
         }
 
+
         // try parse the first template literal to URI
         var literalStart = template.GetTemplateLiteralStart();
         Uri.TryCreate(literalStart, UriKind.RelativeOrAbsolute, out var uri);
 
-        parsedRoutingExpression = new ParsedRoutingExpression(matcher, template, providerInfo, pair.OriginalExpression, literalStart, uri);
+        parsedRoutingExpression = new ParsedRoutingExpression(matcher, template, providerInfo.Value, pair.OriginalExpression, literalStart, uri);
         error = null;
         return true;
     }
 
-    private static bool ParseTemplateFlags(RoutingParsingOptions options, ExpressionFlags? flags, string? scheme, out ProviderInfo? providerInfo, [NotNullWhen(false)] out string? error)
+    private static bool ParseTemplateFlags(RoutingParsingOptions options, MultiTemplate template,
+    [NotNullWhen(true)] out RouteProviderInfo? providerInfo, [NotNullWhen(false)] out string? error)
     {
         providerInfo = null;
-        if (flags == null || flags.Flags.Count == 0)
+        if (template.Flags == null || template.Flags.Flags.Count == 0)
         {
             error = $"You must specify [v{MaxSyntaxVersion}] at the end of your routing expression to indicate what syntax version you are using.";
             return false;
         }
-        int? version = null;
-        // use regex again
-        foreach (var flag in flags.Flags)
+        string? literalStart = template.GetTemplateLiteralStart();
+        if (options.RequireTemplatePrefix && string.IsNullOrWhiteSpace(literalStart))
         {
-            var regex = TemplateFlagRegex();
+            error = "Template cannot start with variable or optional segment due to validation rules.";
+            return false;
+        }
+        if (options.AllowedTemplatePrefixes != null && !string.IsNullOrWhiteSpace(literalStart)){
+            // ensure it begins with one of them
+            if (!options.AllowedTemplatePrefixes.Any(x => literalStart.StartsWith(x))){
+                error = "Template must begin with one of the following prefixes: " + string.Join(", ", options.AllowedTemplatePrefixes);
+                return false;
+            }
+        }
+        
+        int? version = null;
+        string? providerName = null;
+        var allowlisting = options.AllowedFlags != null || options.AllowedFlagRegexes != null;
+        // use regex again
+        foreach (var flag in template.Flags.Flags)
+        {
+            var regex = VersionNumberRegex();
             var match = regex.Match(flag);
             if (match.Success)
             {
-                if (match.Groups["provider"].Success)
-                {
-                    providerInfo = new ProviderInfo(match.Groups["provider"].Value, scheme);
-                }
-                else if (match.Groups["version"].Success)
+                if (match.Groups["version"].Success)
                 {
                     version = int.Parse(match.Groups["version"].Value.TrimStart('v'));
                 }
@@ -145,6 +204,10 @@ public static partial class RoutingExpressionParser
             else if (options.AllowedFlagRegexes?.Any(x => x.IsMatch(flag)) == true)
             {
                 // allowed flag
+            }
+            else if (!allowlisting)
+            {
+                // allow any
             }
             else
             {
@@ -163,6 +226,13 @@ public static partial class RoutingExpressionParser
                 return false;
             }
         }
+        foreach (var pair in template.Flags.Pairs)
+        {
+            if (pair.Key == "provider")
+            {
+                providerName = pair.Value;
+            }
+        }
         if (version.HasValue && (version.Value < MinSyntaxVersion || version.Value > MaxSyntaxVersion))
         {
             error = $"Please see the upgrade guide to migrate your routing expressions from syntax version {version.Value} to version {MaxSyntaxVersion}";
@@ -173,6 +243,7 @@ public static partial class RoutingExpressionParser
             error = $"You must specify [v{MaxSyntaxVersion}] at the end of your routing expression to indicate what syntax version you are using.";
             return false;
         }
+        providerInfo = new RouteProviderInfo(literalStart, providerName, template.Scheme, template.Flags.Pairs, template.Flags.Flags);
         error = null;
         return true;
     }

@@ -59,17 +59,17 @@ public record MultiValueMatcher(
 
     public static MultiValueMatcher Parse(string expressionWithFlags)
     {
-        return TryParse(expressionWithFlags.AsMemory(), out var result, out var error)
+        return TryParse(expressionWithFlags.AsMemory(),null, null, out var result, out var error)
             ? result
             : throw new ArgumentException(error);
     }
     // as string
-    public static bool TryParse(string expressionWithFlags,
+    public static bool TryParse(string expressionWithFlags, ExpressionFlags? flagsAlreadyParsed, ExpressionFlags? templateFlags,
         [NotNullWhen(true)] out MultiValueMatcher? result, [NotNullWhen(false)] out string? error)
     {
-        return TryParse(expressionWithFlags.AsMemory(), out result, out error);
+        return TryParse(expressionWithFlags.AsMemory(), flagsAlreadyParsed, templateFlags, out result, out error);
     }
-    public static bool TryParse(ReadOnlyMemory<char> expressionWithFlags,
+    public static bool TryParse(ReadOnlyMemory<char> expressionWithFlags, ExpressionFlags? flagsAlreadyParsed, ExpressionFlags? templateFlags,
         [NotNullWhen(true)] out MultiValueMatcher? result, [NotNullWhen(false)] out string? error)
     {
         if (!ExpressionFlags.TryParseFromEnd(expressionWithFlags, out var expression, out var flags, out error,
@@ -79,8 +79,8 @@ public record MultiValueMatcher(
             return false;
         }
 
-        var allFlags = flags ?? new List<string>();
-        var context = ParsingOptions.SubtractFromFlags(allFlags);
+        var combinedFlags = ExpressionFlags.Combine(ExpressionFlags.Combine(flags, flagsAlreadyParsed), templateFlags);
+        var context = ParsingOptions.SubtractFromFlags(combinedFlags, out var unusedFlags);
 
         if (!MatchExpression.TryParseWithSmartQuery(context, expression, out var pathMatcher, out var queryMatchers,
                 out error))
@@ -90,7 +90,7 @@ public record MultiValueMatcher(
         }
 
         result = new MultiValueMatcher(pathMatcher, queryMatchers, context,
-            new ExpressionFlags(new ReadOnlyCollection<string>(allFlags)));
+            unusedFlags);
         error = result.GetValidationErrors();
         if (error != null)
         {

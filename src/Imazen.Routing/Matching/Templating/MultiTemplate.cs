@@ -23,26 +23,41 @@ public record MultiTemplate(StringTemplate? PathTemplate,
     }
     public static MultiTemplate Parse(ReadOnlyMemory<char> expression, TemplateValidationContext? validationContext)
     {
-        if (!TryParse(expression, validationContext, out var result, out var error))
+        if (!TryParse(expression, null, validationContext, out var result, out var error))
         {
             throw new ArgumentException(error, nameof(expression));
         }
         return result!;
     }
 
+    public static bool TryParseRemoveFlags(
+        ReadOnlyMemory<char> expressionWithFlags,
+        out ReadOnlyMemory<char> remainingExpression,
+        out ExpressionFlags? result,
+        [NotNullWhen(false)] out string? error)
+    {
+        if (!ExpressionFlags.TryParseFromEnd(expressionWithFlags, out remainingExpression, out result, out error,
+         ExpressionFlagParsingOptions.Permissive))
+        {
+            result = null;
+            return false;
+        }
+        return true;
+    }
     public static bool TryParse(
         ReadOnlyMemory<char> expressionWithFlags,
+        ExpressionFlags? flagsAlreadyParsed,
         TemplateValidationContext? validationContext,
         [NotNullWhen(true)] out MultiTemplate? result,
         [NotNullWhen(false)] out string? error)
     {
-        if (!ExpressionFlags.TryParseFromEnd(expressionWithFlags, out var expressionWithoutFlags, out var flagsList, out error
+        if (!ExpressionFlags.TryParseFromEnd(expressionWithFlags, out var expressionWithoutFlags, out var newFlags, out error
             , ExpressionFlagParsingOptions.Permissive))
         {
             result = null;
             return false;
         }
-        var templateFlags = flagsList.Count > 0 ? new ExpressionFlags(new System.Collections.ObjectModel.ReadOnlyCollection<string>(flagsList)) : null;
+        var templateFlags = ExpressionFlags.Combine(flagsAlreadyParsed, newFlags);
 
         TemplateValidationContext? currentValidationContext = null;
         if (validationContext != null)
@@ -58,8 +73,8 @@ public record MultiTemplate(StringTemplate? PathTemplate,
 
         if (queryStartIndex != -1)
         {
-            pathPart = expressionWithoutFlags.Slice(0, queryStartIndex);
-            queryPart = expressionWithoutFlags.Slice(queryStartIndex + 1);
+            pathPart = expressionWithoutFlags[..queryStartIndex];
+            queryPart = expressionWithoutFlags[(queryStartIndex + 1)..];
         }
         else
         {
@@ -111,11 +126,11 @@ public record MultiTemplate(StringTemplate? PathTemplate,
             {
                 int nextAmpersand = ExpressionParsingHelpers.FindCharNotEscapedAtDepth0(querySpan.Slice(currentPos), '&', '\\', '{', '}');
                 int endOfPair = (nextAmpersand == -1) ? querySpan.Length : currentPos + nextAmpersand;
-                var pairSpan = querySpan.Slice(currentPos, endOfPair - currentPos);
+                var pairSpan = querySpan[currentPos..endOfPair];
 
                 int equalsIndex = ExpressionParsingHelpers.FindCharNotEscapedAtDepth0(pairSpan, '=', '\\', '{', '}');
-                ReadOnlySpan<char> keySpan = (equalsIndex == -1) ? pairSpan : pairSpan.Slice(0, equalsIndex);
-                ReadOnlySpan<char> valueSpan = (equalsIndex == -1) ? ReadOnlySpan<char>.Empty : pairSpan.Slice(equalsIndex + 1);
+                ReadOnlySpan<char> keySpan = (equalsIndex == -1) ? pairSpan : pairSpan[..equalsIndex];
+                ReadOnlySpan<char> valueSpan = (equalsIndex == -1) ? [] : pairSpan[(equalsIndex + 1)..];
 
                 if (!StringTemplate.TryParse(keySpan, currentValidationContext, out var keyTemplate, out error))
                 {
@@ -151,17 +166,33 @@ public record MultiTemplate(StringTemplate? PathTemplate,
         }
         return null;
     }
-
-    public bool TryEvaluate(IDictionary<string, string> variables, [NotNullWhen(true)] out string? result, [NotNullWhen(false)] out string? error)
+    public bool TryEvaluatePath(IDictionary<string, string> variables, [NotNullWhen(true)] out string? pathResult, [NotNullWhen(false)] out string? error)
     {
-        var pathResult = PathTemplate?.Evaluate(variables, out _) ?? "";
-        if (pathResult.Contains(".."))
+        pathResult = PathTemplate?.Evaluate(variables, out _) ?? "";
+        var pathStartLiteral = PathTemplate?.GetStartLiteral();
+        if (pathStartLiteral != null && !pathResult.StartsWith(pathStartLiteral))
         {
-            result = null;
-            error = "Evaluated path template contains banned string '..'";
+            pathResult = null;
+            error = "Evaluated path template does not start with expected literal";
             return false;
         }
-
+        if (!TemplateSafety.IsPathSafe(pathResult.AsSpan(), PathTemplate?.GetStartLiteral(), out error))
+        {
+            pathResult = null;
+            return false;
+        }
+        error = null;
+        return true;
+    }
+    
+    public bool TryEvaluateToCombinedString(IDictionary<string, string> variables, 
+        [NotNullWhen(true)] out string? result, [NotNullWhen(false)] out string? error)
+    {
+        if (!TryEvaluatePath(variables, out var pathResult, out error))
+        {
+            result = null;
+            return false;
+        }
         var sb = new StringBuilder();
         bool firstQueryParam = true;
 
@@ -190,9 +221,48 @@ public record MultiTemplate(StringTemplate? PathTemplate,
         return true;
     }
 
+    public bool TryEvaluateToPathAndQuery(IDictionary<string, string> variables, out string? pathResult, 
+    out string? queryResult, out List<KeyValuePair<string?, string?>>? queryPairs, [NotNullWhen(false)] out string? error)
+    {
+        // TODO: maybe flag security errors for issue logging?
+        queryPairs = null;
+        queryResult = null;
+        if (!TryEvaluatePath(variables, out pathResult, out error))
+        {
+            return false;
+        }
+
+        if (QueryTemplates != null)
+        {
+            queryPairs = new List<KeyValuePair<string?, string?>>(QueryTemplates?.Count ?? 0);
+            var sb = new StringBuilder();
+            bool firstQueryParam = true;
+            foreach (var (keyTemplate, valueTemplate) in QueryTemplates)
+            {
+                var keyResult = keyTemplate.Evaluate(variables, out bool keyOptionalEmpty);
+                var valueResult = valueTemplate.Evaluate(variables, out bool valueOptionalEmpty);
+
+                if (keyOptionalEmpty || valueOptionalEmpty)
+                {
+                    continue;
+                }
+
+                queryPairs.Add(new KeyValuePair<string?, string?>(keyResult, valueResult));
+                sb.Append(firstQueryParam ? '?' : '&');
+                firstQueryParam = false;
+
+                sb.Append(keyResult);
+                sb.Append('=');
+                sb.Append(valueResult);
+            }
+            queryResult = sb.ToString();
+        }
+        error = null;
+        return true;
+    }
     public string Evaluate(IDictionary<string, string> variables)
     {
-        if (!TryEvaluate(variables, out var result, out var error))
+        if (!TryEvaluateToCombinedString(variables, out var result, out var error))
         {
             throw new ArgumentException(error);
         }
@@ -203,7 +273,7 @@ public record MultiTemplate(StringTemplate? PathTemplate,
         [NotNullWhen(true)] out MultiTemplate? result,
         [NotNullWhen(false)] out string? error)
     {
-        return TryParse(expressionWithFlags, null, out result, out error);
+        return TryParse(expressionWithFlags,null,null, out result, out error);
     }
 }
 

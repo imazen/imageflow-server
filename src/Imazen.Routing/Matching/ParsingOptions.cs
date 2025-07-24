@@ -1,3 +1,5 @@
+using System.Collections.ObjectModel;
+
 namespace Imazen.Routing.Matching;
 
 public record ParsingOptions
@@ -42,8 +44,18 @@ public record ParsingOptions
         PathParsingOptions = PathParsingOptions.DefaultCaseSensitive
     };
 
-
-    public static ParsingOptions SubtractFromFlags(List<string> flags)
+    public static ParsingOptions SubtractFromFlags(ExpressionFlags? flagsIn, out ExpressionFlags? flagsOut){
+        if (flagsIn == null) 
+        {
+            flagsOut = null;
+            return new ParsingOptions();
+        }
+        var mutableFlags = flagsIn.Flags.ToList();
+        var options = SubtractFromFlags(mutableFlags);
+        flagsOut = new ExpressionFlags(new ReadOnlyCollection<string>(mutableFlags), flagsIn.Pairs);
+        return options;
+    }
+    private static ParsingOptions SubtractFromFlags(List<string> flags)
     {
         var context = new ParsingOptions();
         if (flags.Remove("ignore-case") || flags.Remove("i"))
