@@ -19,6 +19,7 @@
     "azureFunctions.projectSubpath": "src\\Imageflow.Server.AzureFunctions",
     "csharp.lsp.enable": true,
     
-    "dotnet.testExplorer.testProjectPath": "tests\\**\\**\\*Tests.csproj"
+    "dotnet.testExplorer.testProjectPath": "tests\\**\\**\\*Tests.csproj",
+    "eslint.enable": false
       
 }

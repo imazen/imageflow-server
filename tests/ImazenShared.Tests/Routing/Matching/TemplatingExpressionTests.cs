@@ -296,8 +296,7 @@ public class TemplatingExpressionTests
             // MatcherFlags would come from parsing the corresponding MatchExpression if needed.
             validationContext = new TemplateValidationContext(
                 MatcherVariables: matcherVarsDict,
-                MatcherFlags: null, // Not testing matcher flags yet
-                TemplateFlags: null, // TemplateFlags get populated during TryParse
+                Flags: DualExpressionFlags.Empty,
                 TemplateFlagRegex: null,
                 RequirePath: false,
                 RequireSchemeForPaths: false,
@@ -307,7 +306,7 @@ public class TemplatingExpressionTests
         }
 
         // Call the overload that accepts the validation context
-        bool success = MultiTemplate.TryParse(template.AsMemory(), null, validationContext, out var multiTemplate, out var error); // Pass context
+        bool success = MultiTemplate.TryParse(template.AsMemory(), true, validationContext, out var multiTemplate, out var error); // Pass context
 
         if (shouldSucceed)
         {

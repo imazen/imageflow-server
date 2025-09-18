@@ -54,7 +54,7 @@ public class RoutingExpressionLayer : IRoutingLayer, IIssueProvider, IDisposable
         {
             group.OnProvidersChanged += () => ReloadRoutes(options.CurrentValue,_providers, _providerGroups);
         }
-        ReloadRoutes(options.CurrentValue,_providers, _providerGroups);
+        _providerSet =ReloadRoutes(options.CurrentValue,_providers, _providerGroups);
     }
 
     // Any schema allowed, but a scheme: is required.
@@ -68,7 +68,7 @@ public class RoutingExpressionLayer : IRoutingLayer, IIssueProvider, IDisposable
         AllowedFlagRegexes: null);
 
 
-    private void ReloadRoutes(UriRoutingOptions options, List<IRoutedBlobProvider> providers, List<IRoutedBlobProviderGroup> providerGroups)
+    private RoutingExpressionProviderSet ReloadRoutes(UriRoutingOptions options, List<IRoutedBlobProvider> providers, List<IRoutedBlobProviderGroup> providerGroups)
     {
 
         configIssues.ClearIssues();
@@ -90,6 +90,7 @@ public class RoutingExpressionLayer : IRoutingLayer, IIssueProvider, IDisposable
             throw new Exception("Failed to create routing expression provider set: " + criticalError);
         }
         _providerSet = set;
+        return set;
 
     }
 

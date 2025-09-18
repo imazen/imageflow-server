@@ -12,16 +12,19 @@ namespace Imazen.Routing.Matching.Templating;
 /// <param name="TemplateFlags">Flags parsed from the template expression.</param>
 public record TemplateValidationContext(
     IReadOnlyDictionary<string, MatcherVariableInfo>? MatcherVariables,
-    ExpressionFlags? MatcherFlags,
-    ExpressionFlags? TemplateFlags,
+    DualExpressionFlags Flags,
     Regex? TemplateFlagRegex,
     bool RequirePath,
     bool RequireSchemeForPaths,
     List<string>? AllowedSchemes
-){
+)
+{
 
     public static TemplateValidationContext VarsAndMatcherFlags(IReadOnlyDictionary<string, MatcherVariableInfo>? matcherVariables, ExpressionFlags? matcherFlags)
     {
-        return new TemplateValidationContext(matcherVariables, matcherFlags, null, null, false, false, null);
+        var dualFlags = DualExpressionFlags.FromExpressionFlags(matcherFlags, ExpressionFlagOrigin.AfterMatcher);
+        return new TemplateValidationContext(matcherVariables, dualFlags, null, false, false, null);
     }
+    
+    public static TemplateValidationContext Empty => new(null, DualExpressionFlags.Empty, null, false, false, null);
 }

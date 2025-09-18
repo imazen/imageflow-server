@@ -31,19 +31,19 @@ public record QueryParsingOptions
         ValuesOrdinalIgnoreCase = false,
     };
 
-    public static QueryParsingOptions SubtractFromFlags(List<string> flags, QueryParsingOptions defaults)
+    public static QueryParsingOptions ClaimFlags(DualExpressionFlags flags, QueryParsingOptions defaults)
     {
-        if (flags.Remove("query-ignore-case"))
+        if (flags.ClaimForMatcher("query-ignore-case"))
         {
             defaults = defaults with { KeysOrdinalIgnoreCase = true, ValuesOrdinalIgnoreCase = true };
         }
 
-        if (flags.Remove("query-keys-ignore-case"))
+        if (flags.ClaimForMatcher("query-keys-ignore-case"))
         {
             defaults = defaults with { KeysOrdinalIgnoreCase = true };
         }
 
-        if (flags.Remove("query-values-ignore-case"))
+        if (flags.ClaimForMatcher("query-values-ignore-case"))
         {
             defaults = defaults with { ValuesOrdinalIgnoreCase = true };
         }
@@ -53,13 +53,13 @@ public record QueryParsingOptions
         //     defaults = defaults with { QueryValuesCaptureSlashes = true };
         // }
 
-        if (flags.Remove("query-prohibit-excess"))
+        if (flags.ClaimForMatcher("query-prohibit-excess"))
         {
             defaults = defaults with { ProhibitExcessQueryKeys = true };
         }
 
 
-        if (flags.Remove("allow-star-literal"))
+        if (flags.ClaimForMatcher("allow-star-literal"))
         {
             defaults = defaults with { AllowStarLiteral = true };
         }

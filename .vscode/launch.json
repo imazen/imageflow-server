@@ -2,6 +2,20 @@
     "version": "0.2.0",
     "configurations": [
 
+        // Build solution in repo root, Imageflow.Server.sln
+        {
+            "name": "build",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/src/Imageflow.Server/bin/Debug/net8.0/Imageflow.Server.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/src/Imageflow.Server",
+            "console": "internalConsole",
+            "stopAtEntry": false
+        },
+
+
         {
             "name": "netcoredbg ImazenShared.Tests",
             "type": "coreclr",

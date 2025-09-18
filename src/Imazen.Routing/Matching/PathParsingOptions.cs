@@ -26,17 +26,17 @@ public record PathParsingOptions
     /// </summary>
     // public bool CaptureSlashesByDefault { get; init; } = false;
     //
-    public static PathParsingOptions SubtractFromFlags(List<string> flags, PathParsingOptions defaults)
+    public static PathParsingOptions ClaimFlags(DualExpressionFlags flags, PathParsingOptions defaults)
     {
-        if (flags.Remove("path-ignore-case"))
+        if (flags.ClaimForMatcher("path-ignore-case"))
         {
             defaults = defaults with { OrdinalIgnoreCase = true };
         }
-        if (flags.Remove("allow-star-literal"))
+        if (flags.ClaimForMatcher("allow-star-literal"))
         {
             defaults = defaults with { AllowStarLiteral = true };
         }
-        if (flags.Remove("/"))
+        if (flags.ClaimForMatcher("/"))
         {
             defaults = defaults with { MatchOptionalTrailingSlash = true };
         }

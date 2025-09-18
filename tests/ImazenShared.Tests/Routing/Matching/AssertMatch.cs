@@ -41,7 +41,7 @@ public static class AssertMatch
         var expression = expressionAttr.Expression;
 
         // Parse the expression
-        if (!MultiValueMatcher.TryParse(expression, null, null, out var matcher, out var parseError))
+        if (!MultiValueMatcher.TryParse(expression.AsMemory(), out var matcher, out var parseError))
         {
             Assert.Fail($"[{testMethod}:{lineNumber}] Failed to parse expression '{expression}': {parseError}");
             return;

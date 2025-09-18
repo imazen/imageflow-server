@@ -13,7 +13,7 @@ public record MultiValueMatcher(
     MatchExpression? PathMatcher,
     IReadOnlyDictionary<string, MatchExpression>? QueryValueMatchers,
     ParsingOptions ParsingOptions,
-    ExpressionFlags? UnusedFlags)
+    DualExpressionFlags AllFlags)
 {
     public Dictionary<string, MatcherVariableInfo>? GetMatcherVariableInfo()
     {
@@ -59,40 +59,70 @@ public record MultiValueMatcher(
 
     public static MultiValueMatcher Parse(string expressionWithFlags)
     {
-        return TryParse(expressionWithFlags.AsMemory(),null, null, out var result, out var error)
+        return TryParse(expressionWithFlags.AsMemory(), out var result, out var error)
             ? result
             : throw new ArgumentException(error);
     }
     // as string
-    public static bool TryParse(string expressionWithFlags, ExpressionFlags? templateFlags,
-        [NotNullWhen(true)] out MultiValueMatcher? result, [NotNullWhen(false)] out string? error)
-    {
-        return TryParse(expressionWithFlags.AsMemory(), null, templateFlags, out result, out error);
-    }
+    // public static bool TryParse(string expressionWithFlags, ExpressionFlags? templateFlags,
+    //     [NotNullWhen(true)] out MultiValueMatcher? result, [NotNullWhen(false)] out string? error)
+    // {
+    //     return TryParse(expressionWithFlags.AsMemory(), null, templateFlags, out result, out error);
+    // }
 
 
-    public static bool TryParse(string expressionWithFlags,
+    // public static bool TryParse(string expressionWithFlags,
+    //     [NotNullWhen(true)] out MultiValueMatcher? result, [NotNullWhen(false)] out string? error)
+    // {
+    //     return TryParse(expressionWithFlags.AsMemory(), null, null, out result, out error);
+    // }
+    // public static bool TryParse(string expressionWithFlags, ExpressionFlags? flagsAlreadyParsed, ExpressionFlags? templateFlags,
+    //     [NotNullWhen(true)] out MultiValueMatcher? result, [NotNullWhen(false)] out string? error)
+    // {
+    //     return TryParse(expressionWithFlags.AsMemory(), flagsAlreadyParsed, templateFlags, out result, out error);
+    // }
+
+    /// <summary>
+    /// Presumes you have already parsed the flags, and they are in allFlags.
+    /// Still removes any remaining flags from the expression.
+    /// </summary>
+    /// <param name="expression"></param>
+    /// <param name="allFlags"></param>
+    /// <param name="result"></param>
+    /// <param name="error"></param>
+    /// <returns></returns>
+    public static bool TryParseWithoutFlags(ReadOnlyMemory<char> expression, DualExpressionFlags allFlags,
         [NotNullWhen(true)] out MultiValueMatcher? result, [NotNullWhen(false)] out string? error)
     {
-        return TryParse(expressionWithFlags.AsMemory(), null, null, out result, out error);
+        var allFlagsCopy = allFlags;
+        return TryParse(expression, false, ref allFlagsCopy, out result, out error);
     }
-    public static bool TryParse(string expressionWithFlags, ExpressionFlags? flagsAlreadyParsed, ExpressionFlags? templateFlags,
+    public static bool TryParse(ReadOnlyMemory<char> expressionWithFlags,
         [NotNullWhen(true)] out MultiValueMatcher? result, [NotNullWhen(false)] out string? error)
     {
-        return TryParse(expressionWithFlags.AsMemory(), flagsAlreadyParsed, templateFlags, out result, out error);
+        DualExpressionFlags? flags = null;
+        return TryParse(expressionWithFlags, true, ref flags, out result, out error);
     }
-    public static bool TryParse(ReadOnlyMemory<char> expressionWithFlags, ExpressionFlags? flagsAlreadyParsed, ExpressionFlags? templateFlags,
+    public static bool TryParse(ReadOnlyMemory<char> expressionWithFlags, bool reparseFlags, ref DualExpressionFlags? allFlags,
         [NotNullWhen(true)] out MultiValueMatcher? result, [NotNullWhen(false)] out string? error)
     {
-        if (!ExpressionFlags.TryParseFromEnd(expressionWithFlags, out var expression, out var flags, out error,
+        if (!ExpressionFlags.TryParseFromEnd(expressionWithFlags, out var expression, out var newTemplateFlags, out error,
             ExpressionFlagParsingOptions.Permissive))
         {
             result = null;
             return false;
         }
+        if (reparseFlags)
+        {
+            var newFlags = DualExpressionFlags.FromExpressionFlags(newTemplateFlags, ExpressionFlagOrigin.AfterMatcher);
+            allFlags = DualExpressionFlags.Combine(allFlags, newFlags);
+        }
+        if (allFlags == null)
+        {
+            allFlags = DualExpressionFlags.Empty;
+        }
 
-        var combinedFlags = ExpressionFlags.Combine(ExpressionFlags.Combine(flags, flagsAlreadyParsed), templateFlags);
-        var context = ParsingOptions.SubtractFromFlags(combinedFlags, out var unusedFlags);
+        var context = ParsingOptions.ClaimFlags(allFlags!);
 
         if (!MatchExpression.TryParseWithSmartQuery(context, expression, out var pathMatcher, out var queryMatchers,
                 out error))
@@ -102,7 +132,7 @@ public record MultiValueMatcher(
         }
 
         result = new MultiValueMatcher(pathMatcher, queryMatchers, context,
-            unusedFlags);
+            allFlags!);
         error = result.GetValidationErrors();
         if (error != null)
         {

@@ -187,7 +187,7 @@ public class MatchExpressionParsingTests
     [InlineData("/path/{required}/more", null)] // Not optional
     public void TestBookendedOptionalSegmentValidation(string matchExpression, string? expectedError)
     {
-        var multiMatcher = MultiValueMatcher.TryParse(matchExpression, out var result, out var error);
+        var multiMatcher = MultiValueMatcher.TryParse(matchExpression.AsMemory(), out var result, out var error);
         if (multiMatcher && expectedError != null)
         {
             _testOutputHelper.WriteLine($"Expression '{matchExpression}' should not parse successfully, but it did.");
@@ -215,13 +215,13 @@ public class MatchExpressionParsingTests
     [InlineData("{path}?key={value}&key2={value2}[raw]", true)]
     public void TestMultiValueMatcherParsing(string exp, bool ok)
     {
-        if (ok != MultiValueMatcher.TryParse(exp, out var result, out var error))
+        if (ok != MultiValueMatcher.TryParse(exp.AsMemory(), out var result, out var error))
         {
             if (ok)
             {
                 Assert.Null(error);
                 Assert.NotNull(result);
-                Assert.True(result.UnusedFlags == null || result.UnusedFlags.Flags.Count == 0);
+                Assert.True(result.AllFlags.UnclaimedCount == 0);
             }
             if (!ok) Assert.Fail($"Expression {exp} parsed, but should have failed");
         }

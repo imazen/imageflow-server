@@ -13,7 +13,7 @@ namespace Imazen.Routing.Matching.Templating;
 public record MultiTemplate(StringTemplate? PathTemplate,
     IReadOnlyList<(StringTemplate KeyTemplate, StringTemplate ValueTemplate)>? QueryTemplates,
     MultiTemplateOptions? Options, // Placeholder for future options
-    ExpressionFlags? Flags, // Added Flags property
+    DualExpressionFlags? Flags, // Added Flags property
     string? Scheme
     )
 {
@@ -23,43 +23,28 @@ public record MultiTemplate(StringTemplate? PathTemplate,
     }
     public static MultiTemplate Parse(ReadOnlyMemory<char> expression, TemplateValidationContext? validationContext)
     {
-        if (!TryParse(expression, null, validationContext, out var result, out var error))
+        if (!TryParse(expression, true, validationContext, out var result, out var error))
         {
             throw new ArgumentException(error, nameof(expression));
         }
         return result!;
     }
-
-    public static bool TryParseRemoveFlags(
-        ReadOnlyMemory<char> expressionWithFlags,
-        out ReadOnlyMemory<char> remainingExpression,
-        out ExpressionFlags? result,
-        [NotNullWhen(false)] out string? error)
-    {
-        if (!ExpressionFlags.TryParseFromEnd(expressionWithFlags, out remainingExpression, out result, out error,
-         ExpressionFlagParsingOptions.Permissive))
-        {
-            result = null;
-            return false;
-        }
-        return true;
-    }
-    
-        public static bool TryParse(
+    public static bool TryParse(
         ReadOnlyMemory<char> expressionWithFlags,
         TemplateValidationContext? validationContext,
         [NotNullWhen(true)] out MultiTemplate? result,
         [NotNullWhen(false)] out string? error)
     {
-        if (!TryParse(expressionWithFlags, null, validationContext, out result, out error))
+        if (!TryParse(expressionWithFlags,true, validationContext, out result, out error))
         {
             return false;
         }
         return true;
     }
+
     public static bool TryParse(
         ReadOnlyMemory<char> expressionWithFlags,
-        ExpressionFlags? flagsAlreadyParsed,
+        bool reparseFlags,
         TemplateValidationContext? validationContext,
         [NotNullWhen(true)] out MultiTemplate? result,
         [NotNullWhen(false)] out string? error)
@@ -70,13 +55,13 @@ public record MultiTemplate(StringTemplate? PathTemplate,
             result = null;
             return false;
         }
-        var templateFlags = ExpressionFlags.Combine(flagsAlreadyParsed, newFlags);
-
-        TemplateValidationContext? currentValidationContext = null;
-        if (validationContext != null)
+        validationContext ??= TemplateValidationContext.Empty;
+        if (reparseFlags)
         {
-            currentValidationContext = validationContext with { TemplateFlags = templateFlags };
+            var combined = validationContext.Flags.Combine(DualExpressionFlags.FromExpressionFlags(newFlags, ExpressionFlagOrigin.AfterTemplate));
+            validationContext = validationContext with { Flags = combined };
         }
+        var currentValidationContext = validationContext;
 
         ReadOnlyMemory<char> pathPart;
         ReadOnlyMemory<char> queryPart;
@@ -161,7 +146,7 @@ public record MultiTemplate(StringTemplate? PathTemplate,
             }
         }
 
-        result = new MultiTemplate(pathTemplate, queryTemplates, null, templateFlags, scheme);
+        result = new MultiTemplate(pathTemplate, queryTemplates, null, validationContext.Flags, scheme);
         error = result.GetValidationErrors();
         if (error != null)
         {
@@ -251,7 +236,7 @@ public record MultiTemplate(StringTemplate? PathTemplate,
             queryPairs = new List<KeyValuePair<string?, string?>>(QueryTemplates?.Count ?? 0);
             var sb = new StringBuilder();
             bool firstQueryParam = true;
-            foreach (var (keyTemplate, valueTemplate) in QueryTemplates)
+            foreach (var (keyTemplate, valueTemplate) in QueryTemplates!)
             {
                 var keyResult = keyTemplate.Evaluate(variables, out bool keyOptionalEmpty);
                 var valueResult = valueTemplate.Evaluate(variables, out bool valueOptionalEmpty);
@@ -287,7 +272,7 @@ public record MultiTemplate(StringTemplate? PathTemplate,
         [NotNullWhen(true)] out MultiTemplate? result,
         [NotNullWhen(false)] out string? error)
     {
-        return TryParse(expressionWithFlags,null,null, out result, out error);
+        return TryParse(expressionWithFlags,null, out result, out error);
     }
 }
 

@@ -44,54 +44,44 @@ public record ParsingOptions
         PathParsingOptions = PathParsingOptions.DefaultCaseSensitive
     };
 
-    public static ParsingOptions SubtractFromFlags(ExpressionFlags? flagsIn, out ExpressionFlags? flagsOut){
-        if (flagsIn == null) 
-        {
-            flagsOut = null;
-            return new ParsingOptions();
-        }
-        var mutableFlags = flagsIn.Flags.ToList();
-        var options = SubtractFromFlags(mutableFlags);
-        flagsOut = new ExpressionFlags(new ReadOnlyCollection<string>(mutableFlags), flagsIn.Pairs);
-        return options;
-    }
-    private static ParsingOptions SubtractFromFlags(List<string> flags)
+
+    public static ParsingOptions ClaimFlags(DualExpressionFlags flags)
     {
         var context = new ParsingOptions();
-        if (flags.Remove("ignore-case") || flags.Remove("i"))
+        if (flags.ClaimForMatcher("ignore-case") || flags.ClaimForMatcher("i"))
         {
             context = context with { QueryParsingOptions = QueryParsingOptions.DefaultCaseInsensitive, PathParsingOptions = PathParsingOptions.DefaultCaseInsensitive };
         }
-        if (flags.Remove("case-sensitive"))
+        if (flags.ClaimForMatcher("case-sensitive"))
         {
             context = context with { QueryParsingOptions = QueryParsingOptions.DefaultCaseSensitive, PathParsingOptions = PathParsingOptions.DefaultCaseSensitive };
         }
-        if (flags.Remove("raw"))
+        if (flags.ClaimForMatcher("raw"))
         {
             context = context with { RawQueryAndPath = true };
         }
-        if (flags.Remove("sort-raw"))
+        if (flags.ClaimForMatcher("sort-raw"))
         {
             context = context with { SortRawQueryValuesFirst = true, RawQueryAndPath = true };
         }
         
-        if (flags.Remove("ignore-path"))
+        if (flags.ClaimForMatcher("ignore-path"))
         {
             context = context with { IgnorePath = true };
         }
 
-        if (flags.Contains("accept.format"))
+        if (flags.ClaimForMatcher("accept.format"))
         {
             context = context with { ImportAcceptHeader = true };
         }
 
         context = context with
         {
-            QueryParsingOptions = QueryParsingOptions.SubtractFromFlags(flags, context.QueryParsingOptions)
+            QueryParsingOptions = QueryParsingOptions.ClaimFlags(flags, context.QueryParsingOptions)
         };
         context = context with
         {
-            PathParsingOptions = PathParsingOptions.SubtractFromFlags(flags, context.PathParsingOptions)
+            PathParsingOptions = PathParsingOptions.ClaimFlags(flags, context.PathParsingOptions)
         };
         return context;
     }

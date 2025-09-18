@@ -50,10 +50,9 @@ internal class RoutingExpressionProviderSet : IIssueProvider
     }
     public static bool TryCreate(IEnumerable<IRoutedBlobProvider> providers,
         IEnumerable<ParsedRoutingExpression> parsedRoutingExpressions,
-        ILogger logger, out RoutingExpressionProviderSet set, out string criticalError)
+        ILogger logger, [NotNullWhen(true)] out RoutingExpressionProviderSet set, [NotNullWhen(false)] out string criticalError)
     {
-        set = null;
-        criticalError = null;
+        criticalError = null!;
 
         var providerList = providers.ToList();
         var expressionList = parsedRoutingExpressions.ToList();

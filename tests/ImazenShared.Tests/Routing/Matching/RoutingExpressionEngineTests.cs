@@ -55,7 +55,9 @@ public class RoutingExpressionEngineTests
             var context = MatchingContext.Default;
 
             var result = parsed!.Value.Matcher.Match(context, inputUrl, null);
-            if (!result.Success) Assert.Fail($"InputUrl '{inputUrl}' did not match expression '{expression}'. Error: {result.Error}");
+            if (!result.Success && expectedOutput != null) Assert.Fail($"InputUrl '{inputUrl}' did not match expression '{expression}'. Error: {result.Error}");
+            if (result.Success && expectedOutput == null) Assert.Fail($"InputUrl '{inputUrl}' matched expression '{expression}' but was not expected to. Captures: {string.Join(", ", result.Captures?.Select(kv => kv.Key + "=" + kv.Value) ?? Array.Empty<string>())}");
+            if (!result.Success && expectedOutput == null) return; // as expected, no match
             if (!parsed!.Value.Template.TryEvaluateToCombinedString(result.Captures ?? new Dictionary<string, string>(),
                 out string? pathAndQuery, out string? templateError))
             {
@@ -69,10 +71,6 @@ public class RoutingExpressionEngineTests
             Output.WriteLine($"Result.PathAndQuery: {pathAndQuery}");
             Output.WriteLine($"ExpectedOutput: {pathAndQuery}");
 
-            if (!result.Success && expectedOutput != null)
-            {
-                Assert.Fail("Router returned Not Found, but a result was expected");
-            }
             Assert.Equal(expectedOutput,pathAndQuery);
         }
     }
