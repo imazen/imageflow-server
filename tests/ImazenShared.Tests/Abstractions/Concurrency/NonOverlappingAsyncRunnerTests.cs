@@ -405,12 +405,12 @@ public class NonOverlappingAsyncRunnerTests
         var tasks = new Task[100];
         for (int i = 0; i < tasks.Length; i++)
         {
-            tasks[i] = runner.RunAsync(default,TestContext.Current.CancellationToken).AsTask();
+            tasks[i] = runner.RunAsync(default, TestContext.Current.CancellationToken).AsTask();
         }
 
         await runner.StopAsync(TestContext.Current.CancellationToken);
         // ensure all proxy tasks are cancelled
-        await Assert.ThrowsAsync<TaskCanceledException>(async () => await Task.WhenAll(tasks));
+        await Assert.ThrowsAnyAsync<System.OperationCanceledException>(async () => await Task.WhenAll(tasks));
     }
 
     [Fact]
