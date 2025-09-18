@@ -20,6 +20,16 @@ bool TrimWhitespaceAroundFlags){
 }
 public partial record ExpressionFlags(ReadOnlyCollection<string> Flags, ReadOnlyCollection<KeyValuePair<string, string>> Pairs)
 {
+    public bool IsEmpty => Flags.Count == 0 && Pairs.Count == 0;
+
+    public override string ToString()
+    {
+        if (IsEmpty)
+        {
+            return string.Empty;
+        }
+        return "[" + string.Join(",", Flags) + string.Join(",", Pairs.Select(kv => $"{kv.Key}={kv.Value}")) + "]";
+    }
 
     public static ExpressionFlags? Combine(ExpressionFlags? a, ExpressionFlags? b)
     {

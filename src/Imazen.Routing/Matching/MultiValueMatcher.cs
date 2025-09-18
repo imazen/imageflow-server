@@ -64,6 +64,18 @@ public record MultiValueMatcher(
             : throw new ArgumentException(error);
     }
     // as string
+    public static bool TryParse(string expressionWithFlags, ExpressionFlags? templateFlags,
+        [NotNullWhen(true)] out MultiValueMatcher? result, [NotNullWhen(false)] out string? error)
+    {
+        return TryParse(expressionWithFlags.AsMemory(), null, templateFlags, out result, out error);
+    }
+
+
+    public static bool TryParse(string expressionWithFlags,
+        [NotNullWhen(true)] out MultiValueMatcher? result, [NotNullWhen(false)] out string? error)
+    {
+        return TryParse(expressionWithFlags.AsMemory(), null, null, out result, out error);
+    }
     public static bool TryParse(string expressionWithFlags, ExpressionFlags? flagsAlreadyParsed, ExpressionFlags? templateFlags,
         [NotNullWhen(true)] out MultiValueMatcher? result, [NotNullWhen(false)] out string? error)
     {

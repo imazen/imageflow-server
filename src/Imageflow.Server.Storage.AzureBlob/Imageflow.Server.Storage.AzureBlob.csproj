@@ -12,10 +12,7 @@
 
     <ItemGroup>
         
-        <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="4.14.0">
-          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-          <PrivateAssets>all</PrivateAssets>
-        </PackageReference>
+   
         
         <PackageReference Include="Azure.Storage.Blobs" Version="12.23.0" />
         <PackageReference Include="Microsoft.Extensions.Azure" Version="1.7.6" />

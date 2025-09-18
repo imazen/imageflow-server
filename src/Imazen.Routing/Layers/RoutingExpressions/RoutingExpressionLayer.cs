@@ -38,6 +38,7 @@ public class RoutingExpressionLayer : IRoutingLayer, IIssueProvider, IDisposable
 
     private RoutingExpressionProviderSet _providerSet;
     private readonly List<IRoutedBlobProvider> _providers;
+    private readonly List<IRoutedBlobProviderGroup> _providerGroups;
     
     private readonly IReLogger _logger;
 
@@ -46,9 +47,14 @@ public class RoutingExpressionLayer : IRoutingLayer, IIssueProvider, IDisposable
     IEnumerable<IRoutedBlobProvider> providerDefinitions)
     {
         _logger = loggerFactory.CreateReLogger("RoutingExpressionLayer");
-        _providers = providerDefinitions.Concat(providerGroups.SelectMany(g => g.Providers)).ToList();
-        _optionsListener = options.OnChange((options) => ReloadRoutes(options, _providers));
-        ReloadRoutes(options.CurrentValue,_providers);
+        _providers = providerDefinitions.ToList();
+        _providerGroups = providerGroups.ToList();
+        _optionsListener = options.OnChange((options) => ReloadRoutes(options, _providers, _providerGroups));
+        foreach (var group in _providerGroups)
+        {
+            group.OnProvidersChanged += () => ReloadRoutes(options.CurrentValue,_providers, _providerGroups);
+        }
+        ReloadRoutes(options.CurrentValue,_providers, _providerGroups);
     }
 
     // Any schema allowed, but a scheme: is required.
@@ -62,7 +68,7 @@ public class RoutingExpressionLayer : IRoutingLayer, IIssueProvider, IDisposable
         AllowedFlagRegexes: null);
 
 
-    private void ReloadRoutes(UriRoutingOptions options, List<IRoutedBlobProvider> providers)
+    private void ReloadRoutes(UriRoutingOptions options, List<IRoutedBlobProvider> providers, List<IRoutedBlobProviderGroup> providerGroups)
     {
 
         configIssues.ClearIssues();
@@ -78,7 +84,8 @@ public class RoutingExpressionLayer : IRoutingLayer, IIssueProvider, IDisposable
                 configIssues.AcceptIssue(new Issue("Invalid route expression: " + expression + " Error: " + error, IssueSeverity.ConfigurationError));
             }
         }
-        if (!RoutingExpressionProviderSet.TryCreate(providers, parsedRoutingExpressions, _logger, out var set, out var criticalError))
+        var combined = providers.Concat(providerGroups.SelectMany(g => g.Providers)).ToList();
+        if (!RoutingExpressionProviderSet.TryCreate(combined, parsedRoutingExpressions, _logger, out var set, out var criticalError))
         {
             throw new Exception("Failed to create routing expression provider set: " + criticalError);
         }

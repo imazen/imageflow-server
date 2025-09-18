@@ -31,11 +31,13 @@ namespace Imazen.Routing.Providers
     // At least, in theory. Let's do it and test it? We also might want to pass in a credential set name?
 
     /// <summary>
-    /// Represents a group of named provider instances that can handle one or more URI schemes.
+    /// By implementing this, you can (at runtime) change the set of IRoutedBlobProvider instances that are available.
     /// </summary>
     public interface IRoutedBlobProviderGroup : IUniqueNamed, IIssueProvider
     {
         IReadOnlyCollection<IRoutedBlobProvider> Providers { get; }
+        // Event to push IOptionsMonitor to listen to
+        event Action OnProvidersChanged;
        
     }
 }

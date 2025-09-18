@@ -1,3 +1,5 @@
+using System.Collections.ObjectModel;
+
 namespace Imazen.Routing.Matching;
 
 public record ExpressionParsingOptions
@@ -21,8 +23,19 @@ public record ExpressionParsingOptions
     // /// </summary>
     // public bool CaptureSlashesByDefault { get; init; } = true;
     //
-    internal static ExpressionParsingOptions SubtractFromFlags(List<string> flags, List<KeyValuePair<string, string>> pairs, ExpressionParsingOptions defaults)
+    internal static ExpressionParsingOptions SubtractFromFlags(ExpressionFlags? expressionFlags, out ExpressionFlags? remainingFlags, ExpressionParsingOptions defaults)
     {
+        if (expressionFlags == null)
+        {
+            remainingFlags = null;
+            return defaults;
+        }
+        var flags = expressionFlags?.Flags.ToList();
+        if (flags == null || expressionFlags == null)
+        {
+            remainingFlags = null;
+            return defaults;
+        }
         if (flags.Remove("ignore-case"))
         {
             defaults = defaults with { OrdinalIgnoreCase = true };
@@ -43,21 +56,21 @@ public record ExpressionParsingOptions
         {
             defaults = defaults with { MatchOptionalTrailingSlash = true };
         }
+        remainingFlags = new ExpressionFlags(new ReadOnlyCollection<string>(flags), expressionFlags.Pairs);
         return defaults;
     }
     public static ExpressionParsingOptions ParseComplete(ReadOnlyMemory<char> expressionWithFlags, out ReadOnlyMemory<char> remainingExpression)
     {
-        if (!ExpressionFlags.TryParseFromEnd(expressionWithFlags, out var expression, out var flags, out var pairs, out var error,
+        if (!ExpressionFlags.TryParseFromEnd(expressionWithFlags, out remainingExpression, out var flags, out var error,
             ExpressionFlagParsingOptions.Permissive.WithValidationRegex(ExpressionFlags.LowercaseDash())))
         {
             throw new ArgumentException(error, nameof(expressionWithFlags));
         }
-        
-        var context = SubtractFromFlags(flags!, pairs!, new ExpressionParsingOptions());
-        remainingExpression = expression;
-        if (flags!.Count > 0)
+        var context = SubtractFromFlags(flags, out var remainingFlags, Default);
+
+        if (remainingFlags?.IsEmpty == false)
         {
-            throw new ArgumentException($"Unrecognized flags: {string.Join(", ", flags)}", nameof(expressionWithFlags));
+            throw new ArgumentException($"Unrecognized flags: {remainingFlags}", nameof(expressionWithFlags));
         }
         return context;
     }

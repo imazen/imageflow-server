@@ -15,12 +15,6 @@
           "Imageflow.Net": "0.13.2"
         }
       },
-      "Microsoft.CodeAnalysis.PublicApiAnalyzers": {
-        "type": "Direct",
-        "requested": "[4.14.0, )",
-        "resolved": "4.14.0",
-        "contentHash": "5zBDSa8D1pfn5VyDzRekcYdVx/DGAzwegblVJhzdN0kvPt97TPr12haA6ZG0wS2WgBb1W42GeZJRiRtlNaoY1w=="
-      },
       "Microsoft.IO.RecyclableMemoryStream": {
         "type": "Direct",
         "requested": "[3.0.0, )",
@@ -29,9 +23,9 @@
       },
       "Microsoft.NET.ILLink.Tasks": {
         "type": "Direct",
-        "requested": "[8.0.18, )",
-        "resolved": "8.0.18",
-        "contentHash": "OiXqr2YIBEV9dsAWEtasK470ALyJ0VxJ9k4MotOxlWV6HeEgrJKYMW4HHj1OCCXvqE0/A25wEKPkpfiBARgDZA=="
+        "requested": "[8.0.20, )",
+        "resolved": "8.0.20",
+        "contentHash": "Rhcto2AjGvTO62+/VTmBpumBOmqIGp7nYEbTbmEXkCq4yPGxV8whju3/HsIA/bKyo2+DggaYk5+/8sxb1AbPTw=="
       },
       "Microsoft.SourceLink.GitHub": {
         "type": "Direct",
@@ -441,6 +435,7 @@
           "Imazen.Abstractions": "[0.1.0--notset, )",
           "Imazen.Common": "[0.1.0--notset, )",
           "Microsoft.Extensions.Hosting": "[8.0.1, )",
+          "Microsoft.Extensions.Options": "[8.0.1, )",
           "sly": "[3.7.3, )"
         }
       }

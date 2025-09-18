@@ -16,9 +16,9 @@
       },
       "Microsoft.DotNet.ILCompiler": {
         "type": "Direct",
-        "requested": "[8.0.18, )",
-        "resolved": "8.0.18",
-        "contentHash": "tqfcjG/zm193qDP5FN0vdvqo0KpBzSpnu6M5IpZdn3sU5y0OS/dUrqqYrqlc6uaSlZEuHA5/wQNX4nd6ILx+Ew=="
+        "requested": "[8.0.20, )",
+        "resolved": "8.0.20",
+        "contentHash": "BnTvC6mpQ4rKzKzRpHb1M2SxsNGn6FiSa7xaJenuwXjmDqCAZWZg5noPnBtCqPTXYu8ng3FSIeVq9OY87bgLzw=="
       },
       "Microsoft.Extensions.Http.Polly": {
         "type": "Direct",
@@ -33,9 +33,9 @@
       },
       "Microsoft.NET.ILLink.Tasks": {
         "type": "Direct",
-        "requested": "[8.0.18, )",
-        "resolved": "8.0.18",
-        "contentHash": "OiXqr2YIBEV9dsAWEtasK470ALyJ0VxJ9k4MotOxlWV6HeEgrJKYMW4HHj1OCCXvqE0/A25wEKPkpfiBARgDZA=="
+        "requested": "[8.0.20, )",
+        "resolved": "8.0.20",
+        "contentHash": "Rhcto2AjGvTO62+/VTmBpumBOmqIGp7nYEbTbmEXkCq4yPGxV8whju3/HsIA/bKyo2+DggaYk5+/8sxb1AbPTw=="
       },
       "AWSSDK.Core": {
         "type": "Transitive",
@@ -697,6 +697,7 @@
           "Imazen.Abstractions": "[0.1.0--notset, )",
           "Imazen.Common": "[0.1.0--notset, )",
           "Microsoft.Extensions.Hosting": "[8.0.1, )",
+          "Microsoft.Extensions.Options": "[8.0.1, )",
           "sly": "[3.7.3, )"
         }
       }

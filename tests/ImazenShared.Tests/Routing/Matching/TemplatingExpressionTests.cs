@@ -200,7 +200,7 @@ public class TemplatingExpressionTests
         var inputVars = Vars(variables);
         var prettyPrintInputVars = string.Join(", ", inputVars.Select(kvp => $"{kvp.Key}: {kvp.Value}"));
 
-        if (!parsedTemplate.TryEvaluate(inputVars, out var result, out var error))
+        if (!parsedTemplate.TryEvaluateToCombinedString(inputVars, out var result, out var error))
         {
             throw new Exception($"Parsing failed: {error}, input vars: {prettyPrintInputVars}, template: {template}");
         }
@@ -307,7 +307,7 @@ public class TemplatingExpressionTests
         }
 
         // Call the overload that accepts the validation context
-        bool success = MultiTemplate.TryParse(template.AsMemory(), validationContext, out var multiTemplate, out var error); // Pass context
+        bool success = MultiTemplate.TryParse(template.AsMemory(), null, validationContext, out var multiTemplate, out var error); // Pass context
 
         if (shouldSucceed)
         {

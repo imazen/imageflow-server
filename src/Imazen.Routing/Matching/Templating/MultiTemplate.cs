@@ -44,6 +44,19 @@ public record MultiTemplate(StringTemplate? PathTemplate,
         }
         return true;
     }
+    
+        public static bool TryParse(
+        ReadOnlyMemory<char> expressionWithFlags,
+        TemplateValidationContext? validationContext,
+        [NotNullWhen(true)] out MultiTemplate? result,
+        [NotNullWhen(false)] out string? error)
+    {
+        if (!TryParse(expressionWithFlags, null, validationContext, out result, out error))
+        {
+            return false;
+        }
+        return true;
+    }
     public static bool TryParse(
         ReadOnlyMemory<char> expressionWithFlags,
         ExpressionFlags? flagsAlreadyParsed,
@@ -88,7 +101,7 @@ public record MultiTemplate(StringTemplate? PathTemplate,
         {
             if (!StringTemplate.TryParse(pathPart.Span, currentValidationContext, out pathTemplate, out error))
             {
-                 error = $"Failed to parse path template part: {error}";
+                error = $"Failed to parse path template part: {error}";
                 result = null;
                 return false;
             }
@@ -108,7 +121,8 @@ public record MultiTemplate(StringTemplate? PathTemplate,
                     return false;
                 }
             }
-        }else if (currentValidationContext?.RequirePath ?? false)
+        }
+        else if (currentValidationContext?.RequirePath ?? false)
         {
             error = "Template must include the URI path part.";
             result = null;
