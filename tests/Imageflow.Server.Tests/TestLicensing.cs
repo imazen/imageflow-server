@@ -16,6 +16,19 @@ using Xunit;
 
 namespace Imageflow.Server.Tests
 {
+
+    public static class HttpResponseMessageExtensions
+    {
+        public static void ExpectResponseCodeOrPrintResponse(this HttpResponseMessage response, HttpStatusCode expected, ITestOutputHelper output)
+        {
+            if (response.StatusCode != expected)
+            {
+                var body = response.Content.ReadAsStringAsync().Result;
+                output.WriteLine(body);
+                throw new Exception($"Expected {expected} but got {response.StatusCode}");
+            }
+        }
+    }
     class RequestUrlProvider
     {
         public Uri? Url { get; set; }
@@ -81,16 +94,16 @@ namespace Imageflow.Server.Tests
 
                 var clock = new RealClock();
                 var mgr = new LicenseManagerSingleton(ImazenPublicKeys.Test, clock, new StringCacheMem());
-                var licensing = new Licensing(mgr);
+                var licensing = Licensing.CreateForManagerSingleton(mgr, new LicenseOptions()
+                {
+                    MyOpenSourceProjectUrl = null,
+                    EnforcementMethod = (Imazen.Routing.Serving.EnforceLicenseWith?)EnforceLicenseWith.Http402Error
+                });
 
 
                 using var host = await StartAsyncWithOptions(licensing,new ImageflowMiddlewareOptions()
-                    {
-                        MyOpenSourceProjectUrl = null,
-                        EnforcementMethod = EnforceLicenseWith.Http402Error
-                    }
                     .SetDiagnosticsPageAccess(AccessDiagnosticsFrom.None)
-                    .SetDiagnosticsPagePassword("pass")
+                    .SetDiagnosticsPagePassword("10charpassword")
                     .MapPath("/", Path.Combine(contentRoot.PhysicalPath, "images")));
                 
                 // Create an HttpClient to send requests to the TestServer
@@ -105,7 +118,7 @@ namespace Imageflow.Server.Tests
                 using var notAuthorizedResponse = await client.GetAsync("/imageflow.debug", TestContext.Current.CancellationToken);
                 Assert.Equal(HttpStatusCode.Unauthorized,notAuthorizedResponse.StatusCode);
                 
-                using var debugPageResponse = await client.GetAsync("/imageflow.debug?password=pass", TestContext.Current.CancellationToken);
+                using var debugPageResponse = await client.GetAsync("/imageflow.debug?password=10charpassword", TestContext.Current.CancellationToken);
                 debugPageResponse.EnsureSuccessStatusCode();
                 
 
@@ -129,14 +142,13 @@ namespace Imageflow.Server.Tests
 
                 var clock = new RealClock();
                 var mgr = new LicenseManagerSingleton(ImazenPublicKeys.Test, clock, new StringCacheMem());
-                var licensing = new Licensing(mgr);
-
-
-                using var host = await StartAsyncWithOptions(licensing,new ImageflowMiddlewareOptions()
+                var licensing = Licensing.CreateForManagerSingleton(mgr, new LicenseOptions()
                 {
                     MyOpenSourceProjectUrl = "https://github.com/username/project",
-                    EnforcementMethod = EnforceLicenseWith.RedDotWatermark
-                }.MapPath("/", Path.Combine(contentRoot.PhysicalPath, "images")));
+                    EnforcementMethod = (Imazen.Routing.Serving.EnforceLicenseWith?)EnforceLicenseWith.RedDotWatermark
+                });
+                var host = await StartAsyncWithOptions(licensing,new ImageflowMiddlewareOptions()
+                    .MapPath("/", Path.Combine(contentRoot.PhysicalPath, "images")));
                 
                 // Create an HttpClient to send requests to the TestServer
                 using var client = host.GetTestClient();
@@ -171,14 +183,14 @@ namespace Imageflow.Server.Tests
                 var mgr = new LicenseManagerSingleton(ImazenPublicKeys.Test, clock, new StringCacheMem()); 
                 MockHttpHelpers.MockRemoteLicense(mgr, HttpStatusCode.OK, set.Remote, null);
                 var url = new RequestUrlProvider();
-                var licensing = new Licensing(mgr, url.Get);
+                var licensing = Licensing.CreateWithMockUrl(mgr, new LicenseOptions()
+                {
+                    MyOpenSourceProjectUrl = null,
+                    EnforcementMethod = EnforceLicenseWith.Http402Error.Into(),
+                    LicenseKey = set.Placeholder
+                },url.Get);
                 
                 using var host = await StartAsyncWithOptions(licensing,new ImageflowMiddlewareOptions()
-                    {
-                        MyOpenSourceProjectUrl = null
-                    }
-                    .SetLicenseKey(EnforceLicenseWith.Http402Error, 
-                        set.Placeholder)
                     .MapPath("/", Path.Combine(contentRoot.PhysicalPath, "images")));
                 
                 // Create an HttpClient to send requests to the TestServer
@@ -195,24 +207,24 @@ namespace Imageflow.Server.Tests
                 Thread.Sleep(50); //In case this helps with async
                 
                 url.Url = new Uri("https://unlicenseddomain.com");
-                using var notLicensedResponse = await client.GetAsync("/fire.jpg?w=1", TestContext.Current.CancellationToken);
+                using var notLicensedResponse = await client.GetAsync("/fire.jpg?w=1&debug.license=true", TestContext.Current.CancellationToken);
                 
                 // ON CI we sometimes get OK instead of 402 (Payment Required).
-                Assert.Equal(HttpStatusCode.PaymentRequired,notLicensedResponse.StatusCode);
+                notLicensedResponse.ExpectResponseCodeOrPrintResponse(HttpStatusCode.PaymentRequired, output);
 
                 
                 
                 url.Url = new Uri("https://acme.com");
-                using var licensedResponse1 = await client.GetAsync("/fire.jpg?w=1", TestContext.Current.CancellationToken);
-                licensedResponse1.EnsureSuccessStatusCode(); // ON CI we sometimes get System.Net.Http.HttpRequestException : Response status code does not indicate success: 402 (Payment Required).
+                using var licensedResponse1 = await client.GetAsync("/fire.jpg?w=1&debug.license=true", TestContext.Current.CancellationToken);
+                licensedResponse1.ExpectResponseCodeOrPrintResponse(HttpStatusCode.OK, output);
 
                 url.Url = new Uri("https://acmestaging.com");
-                using var licensedResponse2 = await client.GetAsync("/fire.jpg?w=1", TestContext.Current.CancellationToken);
-                licensedResponse2.EnsureSuccessStatusCode();
+                using var licensedResponse2 = await client.GetAsync("/fire.jpg?w=1&debug.license=true", TestContext.Current.CancellationToken);
+                licensedResponse2.ExpectResponseCodeOrPrintResponse(HttpStatusCode.OK, output);
                 
                 url.Url = new Uri("https://subdomain.acme.com");
                 using var licensedResponse3 = await client.GetAsync("/fire.jpg?w=1", TestContext.Current.CancellationToken);
-                licensedResponse3.EnsureSuccessStatusCode();
+                licensedResponse3.ExpectResponseCodeOrPrintResponse(HttpStatusCode.OK, output);
                 
                 Assert.Empty(mgr.GetIssues());
                 
@@ -240,14 +252,14 @@ namespace Imageflow.Server.Tests
                 var mgr = new LicenseManagerSingleton(ImazenPublicKeys.Test, clock, new StringCacheMem()); 
                 MockHttpHelpers.MockRemoteLicense(mgr, HttpStatusCode.OK, set.Remote, null);
                 var url = new RequestUrlProvider();
-                var licensing = new Licensing(mgr, url.Get);
+                var licensing = Licensing.CreateWithMockUrl(mgr, new LicenseOptions()
+                {
+                    MyOpenSourceProjectUrl = null,
+                    EnforcementMethod = (Imazen.Routing.Serving.EnforceLicenseWith?)EnforceLicenseWith.Http402Error,
+                    LicenseKey = set.Placeholder
+                },url.Get);
                 
                 using var host = await StartAsyncWithOptions(licensing,new ImageflowMiddlewareOptions()
-                    {
-                        MyOpenSourceProjectUrl = null
-                    }
-                    .SetLicenseKey(EnforceLicenseWith.Http402Error, 
-                        set.Placeholder)
                     .MapPath("/", Path.Combine(contentRoot.PhysicalPath, "images")));
                 
                 // Create an HttpClient to send requests to the TestServer
@@ -314,15 +326,15 @@ namespace Imageflow.Server.Tests
                 var mock = MockHttpHelpers.MockRemoteLicense(mgr, HttpStatusCode.OK, set.Remote, null);
 
                 var url = new RequestUrlProvider();
-                var licensing = new Licensing(mgr, url.Get);
+                var licensing = Licensing.CreateWithMockUrl(mgr, new LicenseOptions()
+                {
+                    MyOpenSourceProjectUrl = null,
+                    EnforcementMethod = (Imazen.Routing.Serving.EnforceLicenseWith?)EnforceLicenseWith.Http402Error,
+                    LicenseKey = set.Placeholder
+                },url.Get);
 
                 
                 using var host = await StartAsyncWithOptions(licensing, new ImageflowMiddlewareOptions()
-                    {
-                        MyOpenSourceProjectUrl = null
-                    }
-                    .SetLicenseKey(EnforceLicenseWith.Http402Error,
-                        set.Placeholder)
                     .MapPath("/", Path.Combine(contentRoot.PhysicalPath, "images")));
 
                 // Create an HttpClient to send requests to the TestServer

@@ -7,7 +7,7 @@ using Xunit;
 namespace Imageflow.Server.Tests
 {
   
-    internal class TempContentRoot: IDisposable
+    public class TempContentRoot: IDisposable
     {
         public string PhysicalPath { get; }
         

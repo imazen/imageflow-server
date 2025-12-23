@@ -128,7 +128,6 @@ internal class ImageServer<TRequest, TResponse, TContext> : IImageServer<TReques
         IServiceProvider serviceProvider,
         IEnumerable<IInfoProvider> infoProviders,
         ILicenseChecker licenseChecker,
-        LicenseOptions licenseOptions,
         IRoutingEngine routingEngine, 
         IPerformanceTracker perfTracker,
         IReLoggerFactory loggerFactory,
@@ -150,8 +149,7 @@ internal class ImageServer<TRequest, TResponse, TContext> : IImageServer<TReques
         this.uploadQueue = uploadQueue;
         this.perf = perfTracker;
         this.cacheHealthTracker = cacheHealthTracker;
-        licenseChecker.Initialize(licenseOptions);
-                     
+
         licenseChecker.FireHeartbeat();
         GlobalPerf.Singleton.SetInfoProviders(infoProviders.ToList());
         

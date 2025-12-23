@@ -114,11 +114,17 @@ internal class RouteBase : ITomlMetadataProvider, IValidationCapable
 
 internal class RouteSection : RouteBase
 {
+
     public string? Prefix { get; set; }
     //public RouteSource? Source { get; set; }
     public string? MapToPhysicalFolder { get; set; }
 
     public bool? AllowExtensionlessUrls { get; set; }
+
+    /// <summary>
+    /// If set, this is a routing expression string for RoutingExpressionLayer.
+    /// </summary>
+    public string? Route { get; set; }
 
     public override void Validate(ValidationContext c)
     {

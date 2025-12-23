@@ -18,4 +18,11 @@ namespace Imageflow.Server
         /// </summary>
         AnyHost
     }
+
+    internal static class AccessDiagnosticsFromExtensions
+    {
+        public static AccessDiagnosticsFrom IntoLegacyEnum(this Imazen.Routing.Layers.DiagnosticsPageOptions.AccessDiagnosticsFrom value) => (AccessDiagnosticsFrom)(int)value;
+
+        public static Imazen.Routing.Layers.DiagnosticsPageOptions.AccessDiagnosticsFrom Into(this AccessDiagnosticsFrom value) => (Imazen.Routing.Layers.DiagnosticsPageOptions.AccessDiagnosticsFrom)(int)value;
+    }
 }

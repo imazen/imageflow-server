@@ -1,49 +1,118 @@
+using System.Collections;
 using Imazen.Common.Licensing;
 using Imazen.Routing.HttpAbstractions;
 using Imazen.Routing.Serving;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 
 namespace Imazen.Routing.Layers;
 
 public class LicenseOptions{
-    internal string? LicenseKey { get; set; } = "";
-    internal string? MyOpenSourceProjectUrl { get; set; } = "";
-        
-    internal string ProcessWideKeyPrefixDefault { get; set; } = "imageflow_";
-    internal string[] ProcessWideCandidateCacheFoldersDefault { get; set; } = new[] { Path.GetTempPath() };
-    internal EnforceLicenseWith EnforcementMethod { get; set; } = EnforceLicenseWith.RedDotWatermark;
-        
+    public string? LicenseKey { get; set; } = "";
+    public string? MyOpenSourceProjectUrl { get; set; } = "";
+    public EnforceLicenseWith? EnforcementMethod { get; set; } = EnforceLicenseWith.RedDotWatermark;
 }
+
+internal class LicenseCacheOptions{
+    internal string ProcessWideKeyPrefixDefault { get; set; } = "imageflow_";
+    internal string[] ProcessWideCandidateCacheFoldersDefault { get; set; } = [Path.GetTempPath()];
+}
+
+internal static class LicensingExtensions{
+    public static void AddILicenseChecker(this IServiceCollection services, LicenseCacheOptions? cacheOptions = null, LicenseOptions? defaultOptions = null)
+    {
+        services.AddOptions<LicenseOptions>()
+                .BindConfiguration("Imageflow:License");
+        services.PostConfigure<LicenseOptions>(opts => 
+        {
+            opts.LicenseKey ??= defaultOptions?.LicenseKey;
+            opts.MyOpenSourceProjectUrl ??= defaultOptions?.MyOpenSourceProjectUrl;
+            opts.EnforcementMethod ??= defaultOptions?.EnforcementMethod;
+        });
+
+       services.TryAddSingleton<ILicenseChecker>(p => {
+                
+                var optionsMonitor = p.GetRequiredService<IOptionsMonitor<LicenseOptions>>();
+
+                if (cacheOptions == null) {
+                    var env = p.GetRequiredService<IDefaultContentRootPathProvider>();
+                    cacheOptions= new LicenseCacheOptions(){
+                    ProcessWideKeyPrefixDefault = "imageflow_",
+                    ProcessWideCandidateCacheFoldersDefault =
+                    [
+                        env.DefaultContentRootPath,
+                        Path.GetTempPath()
+                    ]
+                };
+                }
+                
+                return Licensing.CreateAndEnsureManagerSingletonCreated(cacheOptions!, optionsMonitor);
+            });
+    }
+}
+
 internal class Licensing : ILicenseConfig, ILicenseChecker, IHasDiagnosticPageSection
 {
     private static LicenseManagerSingleton GetOrCreateLicenseManagerProcessSingleton(string keyPrefix, string[] candidateCacheFolders) 
         => LicenseManagerSingleton.GetOrCreateSingleton(keyPrefix, candidateCacheFolders);
-    internal static Licensing CreateAndEnsureManagerSingletonCreated(LicenseOptions options)
-     => new Licensing(GetOrCreateLicenseManagerProcessSingleton(options.ProcessWideKeyPrefixDefault, options.ProcessWideCandidateCacheFoldersDefault));
+    internal static Licensing CreateAndEnsureManagerSingletonCreated(LicenseCacheOptions options, IOptionsMonitor<LicenseOptions> optionsMonitor)
+     => CreateWithOptionsMonitoring(GetOrCreateLicenseManagerProcessSingleton(options.ProcessWideKeyPrefixDefault, options.ProcessWideCandidateCacheFoldersDefault), optionsMonitor);
     private readonly Func<Uri?>? getCurrentRequestUrl;
 
     private readonly LicenseManagerSingleton mgr;
 
     private Computation? cachedResult;
-    internal Licensing(LicenseManagerSingleton mgr, Func<Uri?>? getCurrentRequestUrl = null)
+    internal Licensing(LicenseManagerSingleton mgr, Func<Uri?>? getCurrentRequestUrl = null, IOptionsMonitor<LicenseOptions>? optionsMonitor = null)
     {
         this.mgr = mgr;
         this.getCurrentRequestUrl = getCurrentRequestUrl;
+        optionsMonitor?.OnChange(Initialize);
+        Initialize(optionsMonitor?.CurrentValue);
+    }
+
+    private Licensing(LicenseManagerSingleton mgr, LicenseOptions options, Func<Uri?>? getCurrentRequestUrl = null)
+    {
+        this.mgr = mgr;
+        this.getCurrentRequestUrl = getCurrentRequestUrl;
+        Initialize(options);
+    }
+
+    private static Licensing CreateWithOptionsMonitoring(LicenseManagerSingleton mgr, IOptionsMonitor<LicenseOptions> optionsMonitor)
+    {
+        return new Licensing(mgr, optionsMonitor: optionsMonitor);
+    }
+
+    internal static Licensing CreateForManagerSingleton(LicenseManagerSingleton mgr, LicenseOptions options)
+    {
+        return new Licensing(mgr, options, getCurrentRequestUrl: null);
+    }
+    internal static Licensing CreateWithMockUrl(LicenseManagerSingleton mgr, LicenseOptions options, Func<Uri?> getCurrentRequestUrl = null)
+    {
+        return new Licensing(mgr, options, getCurrentRequestUrl);
     }
     private LicenseOptions? options;
-    public void Initialize(LicenseOptions licenseOptions)
+
+    private LicenseManagerEvent? registeredChangeHandler;
+    public void Initialize(LicenseOptions? licenseOptions)
     {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
         options = licenseOptions;
         mgr.MonitorLicenses(this);
         mgr.MonitorHeartbeat(this);
 
         // Ensure our cache is appropriately invalidated
         cachedResult = null;
-        mgr.AddLicenseChangeHandler(this, (me, manager) => me.cachedResult = null);
+        if (registeredChangeHandler != null) {
+            mgr.RemoveLicenseChangeHandler(registeredChangeHandler);
+        }
+        registeredChangeHandler = mgr.AddLicenseChangeHandler(this, (me, manager) => me.cachedResult = null);
 
         // And repopulated, so that errors show up.
         if (Result == null) {
             throw new ApplicationException("Failed to populate license result");
         }
+        sw.Stop();
     }
 
     private bool EnforcementEnabled()
@@ -160,6 +229,38 @@ internal class Licensing : ILicenseConfig, ILicenseChecker, IHasDiagnosticPageSe
         if (requestUrl == null && Result.LicensedForSomething()) {
             return null;
         }
+
+        return options?.EnforcementMethod;
+    }
+
+    public EnforceLicenseWith? RequestNeedsEnforcementActionExplained(IHttpRequestStreamAdapter request, out string? message)
+    {
+        if (!EnforcementEnabled()) {
+            message = "License Enforcement is disabled";
+            return null;
+        }
+        var explain = "";    
+
+        var requestUrl = getCurrentRequestUrl != null ? getCurrentRequestUrl() : 
+            request.GetUri();
+        var requestUrlProvider = getCurrentRequestUrl != null ? "getCurrentRequestUrl" : "request.GetUri";
+        explain += $"Request URL: {requestUrl} (from {requestUrlProvider})\n";
+
+        var isLicensed = Result.LicensedForRequestUrl(requestUrl);
+        if (isLicensed) {
+            explain += "Request is licensed\n";
+            message = explain;
+            return null;
+        }
+
+        if (requestUrl == null && Result.LicensedForSomething()) {
+            explain += "Request URL is null, but a validlicense for *something* exists, so we are permitting this action\n";
+            message = explain;
+            return null;
+        }
+        explain += "Request is not licensed, and no valid license exists for *something*\n";
+        explain += "Enforcement method is " + options?.EnforcementMethod + "\n";
+        message = explain;
 
         return options?.EnforcementMethod;
     }

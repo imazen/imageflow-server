@@ -4,7 +4,11 @@
     <Import Project="..\TestDefaults.props" />
     <PropertyGroup>
       <TargetFramework>net8.0</TargetFramework>
-  </PropertyGroup>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <InternalsVisibleTo>Imageflow.Server.Configuration.Tests</InternalsVisibleTo>
+    </PropertyGroup>
     <ItemGroup>
        
 
@@ -23,9 +27,9 @@
       <ProjectReference Include="..\Imazen.TestingHelpers\Imazen.TestingHelpers.csproj" />
     </ItemGroup>
 
-    <ItemGroup>
+    <!-- <ItemGroup>
       <ProjectReference Include="..\..\src\Imazen.Analyzers\Imazen.Analyzers.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
-    </ItemGroup>
+    </ItemGroup> -->
 
     <ItemGroup>
       <Folder Include="TestFiles" />

@@ -20,10 +20,10 @@ using Imazen.Routing.RoutingExpressions;
 
 namespace Imazen.Routing.Layers.RoutingExpressions;
 
-public record UriRoutingOptions(List<string> Routes)
+public class UriRoutingOptions
 {
-
-};
+    public List<string> Routes { get; set; } = new();
+}
 
 public class RoutingExpressionLayer : IRoutingLayer, IIssueProvider, IDisposable
 {

@@ -12,9 +12,9 @@
 
     </ItemGroup>
 
-    <ItemGroup>
+    <!-- <ItemGroup>
       <ProjectReference Include="..\Imazen.Analyzers\Imazen.Analyzers.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
-    </ItemGroup>
+    </ItemGroup> -->
 
     
     <ItemGroup>

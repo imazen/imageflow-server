@@ -54,6 +54,8 @@ namespace Imageflow.Server
         internal List<string>? ExtraMediaFileExtensions;
 
         internal List<Action<RoutingBuilder>>? RoutingConfigurationActions;
+
+        internal List<string>? RoutingExpressions;
         
         internal readonly List<PathPrefixHandler<Action<UrlEventArgs>>> Rewrite = [];
 
@@ -103,6 +105,14 @@ namespace Imageflow.Server
         {
             RoutingConfigurationActions ??= new();
             RoutingConfigurationActions.Add(configure);
+            return this;
+        }
+
+
+        public ImageflowMiddlewareOptions AddRoute(string route)
+        {
+            RoutingExpressions ??= new();
+            RoutingExpressions.Add(route);
             return this;
         }
         
@@ -170,6 +180,9 @@ namespace Imageflow.Server
             LicenseKey = licenseKey;
             return this;
         }
+
+ 
+        
         
         public ImageflowMiddlewareOptions SetRequestSignatureOptions(RequestSignatureOptions options)
         {

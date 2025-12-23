@@ -11,6 +11,7 @@ using Imazen.Routing.Engine;
 using Imazen.Routing.Health;
 using Imazen.Routing.HttpAbstractions;
 using Imazen.Routing.Layers;
+using Imazen.Routing.Layers.RoutingExpressions;
 using Imazen.Routing.Promises;
 using Imazen.Routing.Promises.Pipelines.Watermarking;
 using Imazen.Routing.Requests;
@@ -19,6 +20,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 
 namespace Imageflow.Server.Internal;
 
@@ -38,41 +40,30 @@ internal class MiddlewareOptionsServerBuilder(
 
         services.AddSingleton<IDefaultContentRootPathProvider, WebRootPathProvider>();
 
-        var diagPageOptions = new DiagnosticsPageOptions(
-            options.DiagnosticsPassword,
-            (Imazen.Routing.Layers.DiagnosticsPageOptions.AccessDiagnosticsFrom)options.DiagnosticsAccess);
-        services.AddDiagnosticsPage(diagPageOptions);
+        services.AddDiagnosticsPage(new DiagnosticsPageOptions()
+        {
+            Password = options.DiagnosticsPassword,
+            AccessFrom = (Imazen.Routing.Layers.DiagnosticsPageOptions.AccessDiagnosticsFrom)options.DiagnosticsAccess
+        });
+
         services.TryAddSingleton(
             new GlobalInfoProviderServiceCollectionReference(services)
         );
         services.TryAddSingleton<GlobalInfoProvider>();
 
 
-        services.AddSingleton<LicenseOptions>(p =>
+        services.AddILicenseChecker(defaultOptions: new LicenseOptions
         {
-            var env = p.GetRequiredService<IWebHostEnvironment>();
-            var options = p.GetRequiredService<ImageflowMiddlewareOptions>();
-            return new LicenseOptions
-            {
-                LicenseKey = options.LicenseKey,
-                MyOpenSourceProjectUrl = options.MyOpenSourceProjectUrl,
-                ProcessWideKeyPrefixDefault = "imageflow_",
-                ProcessWideCandidateCacheFoldersDefault = new[]
-                {
-                    env.ContentRootPath,
-                    Path.GetTempPath()
-                },
-                EnforcementMethod = (Imazen.Routing.Serving.EnforceLicenseWith)options.EnforcementMethod
-
-            };
+            LicenseKey = options.LicenseKey,
+            MyOpenSourceProjectUrl = options.MyOpenSourceProjectUrl,
+            EnforcementMethod = (Imazen.Routing.Serving.EnforceLicenseWith)options.EnforcementMethod
         });
-        services.TryAddSingleton<ILicenseChecker>(p => Licensing.CreateAndEnsureManagerSingletonCreated(p.GetRequiredService<LicenseOptions>()));
-
-
+        
         // Do watermark settings mappings
         WatermarkingLogicOptions? watermarkingLogicOptions = null;
 
-
+        // TODO: Making this IOptions compatible is difficult since NamedWatermark.Watermark.Fitbox is an interface type that can have different impls
+        // We probably have to duplicate at least that deep
         watermarkingLogicOptions = new WatermarkingLogicOptions(
             (name) =>
             {
@@ -104,6 +95,24 @@ internal class MiddlewareOptionsServerBuilder(
             });
         services.AddSingleton(watermarkingLogicOptions);
         services.AddSingleton<IRoutingEngine, LegacyRoutingEngine>();
+        // if there's no UriRoutingOptions or monitor, create one.
+        services.AddOptions<UriRoutingOptions>()
+        .BindConfiguration("Imageflow::Routing")
+        .PostConfigure(opt =>
+        {
+            if (options.RoutingExpressions != null)
+            {
+                opt.Routes ??= [];
+                foreach (var expr in options.RoutingExpressions)
+                {
+                    if (!opt.Routes.Contains(expr))
+                    {
+                        opt.Routes.Add(expr);
+                    }
+                }
+            }
+        });
+        services.AddSingleton<RoutingExpressionLayer>();
         services.AddImageServer<RequestStreamAdapter, ResponseStreamAdapter, HttpContext>();
 
     }
@@ -128,11 +137,14 @@ internal class LegacyRoutingEngine : IRoutingEngine
         IEnumerable<IBlobWrapperProvider> blobWrapperProviders, 
         IEnumerable<IBlobWrapperProviderZoned> blobWrapperProvidersZoned,
         #pragma warning disable CS0618
-        IEnumerable<IBlobProvider> blobProviders
+        IEnumerable<IBlobProvider> blobProviders,
         #pragma warning restore CS0618
+
+        RoutingExpressionLayer routingExpressionLayer
         )
         {
-            this.logger = loggerFactory.CreateReLogger("LegacyRoutingEngine");
+        
+        this.logger = loggerFactory.CreateReLogger("LegacyRoutingEngine");
         var mappedPaths = options.MappedPaths.Cast<IPathMapping>().ToList();
         if (options.MapWebRoot)
         {
@@ -268,6 +280,9 @@ internal class LegacyRoutingEngine : IRoutingEngine
                 });
             });
         }
+
+        builder.AddMediaLayer(routingExpressionLayer);
+
         if (options.RoutingConfigurationActions != null)
         {
             foreach (var action in options.RoutingConfigurationActions)

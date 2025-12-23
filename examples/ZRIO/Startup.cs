@@ -103,8 +103,8 @@ namespace Imageflow.Server.Example
                 app.UseExceptionHandler("/Home/Error");
                 // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
                 app.UseHsts();
-            }
-            .UseSetting("https_port", "443")
+            };
+            app.UseSetting("https_port", "443");
 
             app.UseHttpsRedirection();
 

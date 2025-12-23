@@ -44,20 +44,29 @@ internal class Executor : IAppConfigurator{
         if (config.Routes != null){
             // Map physical path routes
             foreach (var route in config.Routes){
-                //throw if from or to is null or whitespace
-                if (string.IsNullOrWhiteSpace(route.Prefix)){
-                    throw new ArgumentNullException($"route.prefix is missing. Defined in file '{sourcePath}'");
+                if (string.IsNullOrEmpty(route.Route))
+                {
+
+                    //throw if from or to is null or whitespace
+                    if (string.IsNullOrWhiteSpace(route.Prefix))
+                    {
+                        throw new ArgumentNullException($"route.prefix AND route.route is missing. Defined in file '{sourcePath}'");
+                    }
+                    if (string.IsNullOrWhiteSpace(route.MapToPhysicalFolder))
+                    {
+                        throw new ArgumentNullException($"route.map_to_physical_folder AND route.route is missing (other route types not yet supported). Defined in file '{sourcePath}'");
+                    }
+                    var prefixCaseSensitive = route.PrefixCaseSensitive ?? routeDefaults?.PrefixCaseSensitive ?? true;
+                    var from = InterpolateString(route.Prefix, "route.prefix");
+                    var to = InterpolateString(route.MapToPhysicalFolder, "route.map_to_physical_folder");
+                    if (!Context.Fs.DirectoryExists(to))
+                    {
+                        throw new DirectoryNotFoundException($"Folder '{to}' does not exist. Cannot route '{from}' to a non-existent folder. Create folder or modify [[route]] prefix='{to}' from='fix this' in '{sourcePath}' ");
+                    }
+                    options.MapPath(from, to, prefixCaseSensitive);
+                } else{
+                    options.AddRoute(route.Route);
                 }
-                if (string.IsNullOrWhiteSpace(route.MapToPhysicalFolder)){
-                    throw new ArgumentNullException($"route.map_to_physical_folder is missing (other route types not yet supported). Defined in file '{sourcePath}'");
-                }
-                var prefixCaseSensitive = route.PrefixCaseSensitive ?? routeDefaults?.PrefixCaseSensitive ?? true;
-                var from = InterpolateString(route.Prefix, "route.prefix");
-                var to = InterpolateString(route.MapToPhysicalFolder, "route.map_to_physical_folder");
-                if (!Context.Fs.DirectoryExists(to)){
-                    throw new DirectoryNotFoundException($"Folder '{to}' does not exist. Cannot route '{from}' to a non-existent folder. Create folder or modify [[route]] prefix='{to}' from='fix this' in '{sourcePath}' ");
-                }
-                options.MapPath(from, to, prefixCaseSensitive);
             }
         }
         // TODO: map physical paths
@@ -264,6 +273,26 @@ internal class Executor : IAppConfigurator{
             services.AddImageflowHybridCache(GetHybridCacheOptions());
         }
 
+
+        // Gather routing expressions from config.Routes where Route is not null or whitespace
+        var routingExpressions = (config.Routes != null)
+            ? config.Routes.Where(r => !string.IsNullOrWhiteSpace(r.Route)).Select(r => r.Route!).ToList()
+            : new List<string>();
+        services.AddOptions<Imazen.Routing.Layers.RoutingExpressions.UriRoutingOptions>().Configure(opts =>
+        {
+            opts.Routes = routingExpressions;
+            
+        });
+
+        // Register all IRoutedBlobProviderGroup implementations (if any)
+        // This assumes you have concrete implementations elsewhere registered, e.g. LocalFileBlobProviderGroup
+        // If you have options for these, bind them similarly
+
+        // Register RoutingExpressionLayer as an IRoutingLayer
+        services.AddSingleton<global::Imazen.Routing.Layers.RoutingExpressions.RoutingExpressionLayer>();
+        services.AddSingleton<global::Imazen.Routing.Layers.IRoutingLayer>(sp =>
+            sp.GetRequiredService<global::Imazen.Routing.Layers.RoutingExpressions.RoutingExpressionLayer>());
+
         services.ConfigureImageflowMiddleware(GetImageflowMiddlewareOptions());
     }
     public void ConfigureApp(IApplicationBuilder app, IWebHostEnvironment env){
@@ -336,3 +365,4 @@ internal class Executor : IAppConfigurator{
         return d;
     }
 }
+    

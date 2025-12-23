@@ -1,4 +1,5 @@
 using Xunit;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Imageflow.Server.Configuration.Tests;
 
@@ -243,9 +244,9 @@ cache_control = "public, max-age=20"
 apply_default_commands = "quality=76"
 apply_default_commands_to_queryless_urls = true
 
+
 [[routes]]
-prefix = '/images/'
-map_to_physical_folder='${app.wwwroot}\images\'
+route = '/images/{path} => {app.wwwroot}/{path}'
 
 [disk_cache]
 enabled = true
@@ -302,6 +303,33 @@ megapixels = 80
 """";
 
 
-    // Test parsing 
+
+    [Fact]
+    public void RoutingExpressionLayer_Receives_Configured_Expressions()
+    {
+        // Arrange
+        Dictionary<string, string> appVars = new(){
+            {"approot", "D:\\inetpub\\site"},
+            {"wwwroot", "D:\\inetpub\\site\\wwwroot"}
+        };
+        var context = new TomlParserContext(DeploymentEnvironment.Development, appVars,
+            key => key.ToLowerInvariant() switch
+            {
+                "homedrive" => "D:",
+                "homepath" => "\\inetpub\\site",
+                _ => null,
+            },
+            new TestFileMethods(new Dictionary<string, string>{{"rewrites.ini", ""}})
+        );
+        var result = TomlParser.Parse(MINIMAL_TOML, "embedded.minimal.toml", context);
+        var services = new ServiceCollection();
+        var executor = result.GetAppConfigurator();
+        executor.ConfigureServices(services);
+        var provider = services.BuildServiceProvider();
+        var optionsMonitor = provider.GetService<Microsoft.Extensions.Options.IOptionsMonitor<Imazen.Routing.Layers.RoutingExpressions.UriRoutingOptions>>();
+        Assert.NotNull(optionsMonitor);
+        var opts = optionsMonitor!.CurrentValue;
+        Assert.Contains("myexpression://foo/bar", opts.Routes);
+    }
 
 }

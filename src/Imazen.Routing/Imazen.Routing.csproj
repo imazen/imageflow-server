@@ -2,6 +2,7 @@
     
     <PropertyGroup>
         <Title>Imazen.Routing - Routing and serving for Imageflow and ImageResizer.</Title>
+        <EnableConfigurationBindingGenerator>true</EnableConfigurationBindingGenerator>
     </PropertyGroup>
     <Import Project="..\NugetPackageDefaults.targets" />
 
@@ -25,9 +26,9 @@
       <ProjectReference Include="..\Imazen.Common\Imazen.Common.csproj" />
     </ItemGroup>
 
-    <ItemGroup>
+    <!-- <ItemGroup>
       <ProjectReference Include="..\Imazen.Analyzers\Imazen.Analyzers.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
-    </ItemGroup>
+    </ItemGroup> -->
 
     <ItemGroup>
         <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />

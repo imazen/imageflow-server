@@ -15,7 +15,7 @@ public interface IAppConfigurator{
     bool RestartWhenThisFileChanges { get; }
 
     void ConfigureApp(IApplicationBuilder app, IWebHostEnvironment env);
-    void ConfigureServices(IServiceCollection services);
+    void    ConfigureServices(IServiceCollection services);
 
     // For diagnostic purposes
     Dictionary<string, string> GetComputedConfiguration(bool redactSecrets);

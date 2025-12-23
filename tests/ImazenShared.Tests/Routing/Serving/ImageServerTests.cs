@@ -32,15 +32,10 @@ public class ImageServerTests : ReLoggerTestBase
         sharedServices.AddSingleton<ILicenseChecker>(licenseChecker);
         sharedServices.AddSingleton<IReLoggerFactory>(loggerFactory);
         sharedServices.AddSingleton<IReLogStore>(logStore);
-        sharedServices.AddSingleton<LicenseOptions>((_) => new LicenseOptions
+        sharedServices.AddOptions<DiagnosticsPageOptions>().PostConfigure(opt =>
         {
-            
-            ProcessWideCandidateCacheFoldersDefault = new string[]
-            {
-                Path.GetTempPath() // Typical env.ContentRootPath as well
-            }
+            opt.AccessFrom = DiagnosticsPageOptions.AccessDiagnosticsFrom.AnyHost;
         });
-        sharedServices.AddSingleton(new DiagnosticsPageOptions(null, DiagnosticsPageOptions.AccessDiagnosticsFrom.AnyHost));
         sharedServices.MakeReadOnly();
     }
 
