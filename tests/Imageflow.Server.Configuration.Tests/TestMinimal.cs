@@ -1,4 +1,5 @@
 using Xunit;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Imageflow.Server.Configuration.Tests;
@@ -82,11 +83,7 @@ public class MinimalTomlTest
       {"ImageflowMiddlewareOptions.MyOpenSourceProjectUrl", "https://i-need-a-license.com"},
     {"ImageflowMiddlewareOptions.AllowCaching", "True"},
     {"ImageflowMiddlewareOptions.AllowDiskCaching", "True"},
-    {"ImageflowMiddlewareOptions.MappedPaths[0]..VirtualPath", "/images/"},
-    {"ImageflowMiddlewareOptions.MappedPaths[0]..PhysicalPath", @"D:\inetpub\site\wwwroot\images"},
-    {"ImageflowMiddlewareOptions.MappedPaths[0]..IgnorePrefixCase", "False"},
-    {"ImageflowMiddlewareOptions.MappedPaths[0]..StringToCompare", "/images/"},
-    {"ImageflowMiddlewareOptions.MappedPaths[0]..StringComparison", "Ordinal"},
+    // Route expressions don't add MappedPaths - they use the routing expression layer instead
     {"ImageflowMiddlewareOptions.MapWebRoot", "False"},
     {"ImageflowMiddlewareOptions.UsePresetsExclusively", "False"},
     {"ImageflowMiddlewareOptions.DefaultCacheControlString", "public, max-age=20"},
@@ -132,11 +129,7 @@ public class MinimalTomlTest
      {"ImageflowMiddlewareOptions.MyOpenSourceProjectUrl", "https://i-need-a-license.com"},
     {"ImageflowMiddlewareOptions.AllowCaching", "True"},
     {"ImageflowMiddlewareOptions.AllowDiskCaching", "True"},
-    {"ImageflowMiddlewareOptions.MappedPaths[0]..VirtualPath", "/images/"},
-    {"ImageflowMiddlewareOptions.MappedPaths[0]..PhysicalPath", @"D:\inetpub\site\wwwroot\images"},
-    {"ImageflowMiddlewareOptions.MappedPaths[0]..IgnorePrefixCase", "False"},
-    {"ImageflowMiddlewareOptions.MappedPaths[0]..StringToCompare", "/images/"},
-    {"ImageflowMiddlewareOptions.MappedPaths[0]..StringComparison", "Ordinal"},
+    // Route expressions don't add MappedPaths - they use the routing expression layer instead
     {"ImageflowMiddlewareOptions.MapWebRoot", "False"},
     {"ImageflowMiddlewareOptions.UsePresetsExclusively", "False"},
     {"ImageflowMiddlewareOptions.DefaultCacheControlString", "public, max-age=20"},
@@ -183,11 +176,7 @@ public class MinimalTomlTest
     {"ImageflowMiddlewareOptions.MyOpenSourceProjectUrl", "https://i-need-a-license.com"},
     {"ImageflowMiddlewareOptions.AllowCaching", "True"},
     {"ImageflowMiddlewareOptions.AllowDiskCaching", "True"},
-    {"ImageflowMiddlewareOptions.MappedPaths[0]..VirtualPath", "/images/"},
-    {"ImageflowMiddlewareOptions.MappedPaths[0]..PhysicalPath", @"D:\inetpub\site\wwwroot\images"},
-    {"ImageflowMiddlewareOptions.MappedPaths[0]..IgnorePrefixCase", "False"},
-    {"ImageflowMiddlewareOptions.MappedPaths[0]..StringToCompare", "/images/"},
-    {"ImageflowMiddlewareOptions.MappedPaths[0]..StringComparison", "Ordinal"},
+    // Route expressions don't add MappedPaths - they use the routing expression layer instead
     {"ImageflowMiddlewareOptions.MapWebRoot", "False"},
     {"ImageflowMiddlewareOptions.UsePresetsExclusively", "False"},
     {"ImageflowMiddlewareOptions.DefaultCacheControlString", "public, max-age=20"},
@@ -323,13 +312,23 @@ megapixels = 80
         );
         var result = TomlParser.Parse(MINIMAL_TOML, "embedded.minimal.toml", context);
         var services = new ServiceCollection();
+
+        // Add empty configuration - required for IOptionsMonitor to work
+        var config = new Microsoft.Extensions.Configuration.ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>())
+            .Build();
+        services.AddSingleton<Microsoft.Extensions.Configuration.IConfiguration>(config);
+
         var executor = result.GetAppConfigurator();
         executor.ConfigureServices(services);
         var provider = services.BuildServiceProvider();
         var optionsMonitor = provider.GetService<Microsoft.Extensions.Options.IOptionsMonitor<Imazen.Routing.Layers.RoutingExpressions.UriRoutingOptions>>();
         Assert.NotNull(optionsMonitor);
         var opts = optionsMonitor!.CurrentValue;
-        Assert.Contains("myexpression://foo/bar", opts.Routes);
+        // The MINIMAL_TOML has: route = '/images/{path} => {app.wwwroot}/{path}'
+        // After interpolation: /images/{path} => D:\inetpub\site\wwwroot/{path}
+        Assert.Single(opts.Routes);
+        Assert.Contains("/images/{path} =>", opts.Routes.First());
     }
 
 }
