@@ -426,6 +426,148 @@ Routing layer picks up new providers
 | `src/Imageflow.Server.Storage.S3/S3ProviderFactory.cs` | NEW - S3 plugin factory |
 | `src/Imageflow.Server.Storage.S3/S3ProviderOptions.cs` | NEW - S3 config-bound options |
 
+## Interface Design Exploration
+
+### Current Interface Problems
+
+**IRoutedBlobProvider** has too many responsibilities:
+```csharp
+public interface IRoutedBlobProvider
+{
+    // Routing hints (should this even be here?)
+    IReadOnlyCollection<string> RespondsToStaticPrefixes { get; }
+    IReadOnlyCollection<string> ProviderNames { get; }
+    bool NeedsUri { get; }
+
+    // Two matching methods with overlapping concerns
+    bool ProvidesFor(RouteProviderInfo providerInfo);
+    bool RespondsTo(string? path, ICollection<KeyValuePair<string?, string?>>? query, RouteProviderInfo providerInfo);
+
+    // Actual blob fetching - 6 parameters!
+    ValueTask<CodeResult<ICacheableBlobPromise>?> GetBlobAsync(
+        string? path,
+        ICollection<KeyValuePair<string?, string?>>? query,
+        Uri? uri,
+        RouteProviderInfo providerInfo,
+        IRequestSnapshot request,
+        CancellationToken cancellationToken);
+}
+```
+
+**Issues:**
+1. Too many parameters on `GetBlobAsync` (6!)
+2. `RespondsTo` and `ProvidesFor` have overlapping concerns
+3. `NeedsUri` is awkward - why should caller care?
+4. Mixes routing concerns with blob fetching
+5. Returns nullable `CodeResult<T>?` - confusing (null = "not my problem", Err = "my problem, failed")
+
+### Proposed Cleaner Design
+
+**Separate routing from fetching:**
+
+```csharp
+// Context passed to provider - replaces 6 parameters
+public sealed class BlobFetchContext
+{
+    public required string Path { get; init; }
+    public required IReadOnlyDictionary<string, string> Params { get; init; }  // From route template
+    public required IReadOnlyDictionary<string, string> Query { get; init; }
+    public required IRequestSnapshot Request { get; init; }
+    public CancellationToken CancellationToken { get; init; }
+
+    // Computed on demand
+    public Uri? Uri => ...;  // Built from scheme + path if needed
+}
+
+// Simple provider interface - just fetches blobs
+public interface IBlobProvider2  // Better name TBD
+{
+    string ProviderName { get; }
+
+    // Single method, returns result or null if can't handle
+    ValueTask<BlobFetchResult?> FetchAsync(BlobFetchContext context);
+}
+
+// Result type - clearer than CodeResult<ICacheableBlobPromise>?
+public abstract class BlobFetchResult
+{
+    public static BlobFetchResult Success(IBlobWrapper blob) => new SuccessResult(blob);
+    public static BlobFetchResult NotFound(string? message = null) => new NotFoundResult(message);
+    public static BlobFetchResult Error(int statusCode, string message) => new ErrorResult(statusCode, message);
+    public static BlobFetchResult Redirect(string url, int statusCode = 302) => new RedirectResult(url, statusCode);
+}
+```
+
+**Routing handled separately:**
+```csharp
+// Route knows which provider to use and what params to extract
+public class ConfiguredRoute
+{
+    public required string ProviderName { get; init; }
+    public required MultiValueMatcher Matcher { get; init; }
+    public required MultiTemplate Template { get; init; }
+    public List<HeaderCondition>? HeaderConditions { get; init; }
+}
+
+// Router matches request to route, builds context, calls provider
+public interface IRoutingEngine
+{
+    ValueTask<BlobFetchResult?> RouteAsync(IRequestSnapshot request, CancellationToken ct);
+}
+```
+
+**Provider factory - simple:**
+```csharp
+public interface IBlobProviderFactory
+{
+    string ProviderType { get; }  // "s3", "azure_blob", "filesystem"
+
+    IBlobProvider2 Create(string name, ProviderConfig config);
+}
+
+// Config is just the parsed TOML section
+public class ProviderConfig
+{
+    public required string Type { get; init; }
+    public required IReadOnlyDictionary<string, string> Config { get; init; }  // config.*
+    public required IReadOnlyDictionary<string, string> Params { get; init; }  // params.* templates
+    public required IReadOnlyList<string> PathParsers { get; init; }           // path.parsers
+}
+```
+
+### Comparison
+
+| Aspect | Current | Proposed |
+|--------|---------|----------|
+| Provider method params | 6 | 1 (context) |
+| Routing in provider | Yes (RespondsTo, ProvidesFor) | No (separate) |
+| Return type | `CodeResult<ICacheableBlobPromise>?` | `BlobFetchResult?` |
+| Null meaning | "Not my problem" | Same, but clearer |
+| Uri handling | `NeedsUri` property | Context computes on demand |
+| Provider names | `ProviderNames` collection | Single `ProviderName` |
+
+### Migration Path
+
+1. Create new interfaces (`IBlobProvider2`, `BlobFetchContext`, etc.)
+2. Implement adapter: `RoutedBlobProviderAdapter : IBlobProvider2`
+3. Migrate providers one by one
+4. Remove old interfaces
+
+### Open Questions
+
+1. **Caching integration** - Current `ICacheableBlobPromise` has cache key computation. Where does this go?
+   - Option A: `BlobFetchResult` includes cache metadata
+   - Option B: Separate `ICacheKeyProvider` interface
+   - Option C: Provider returns `IBlobWrapper` which has cache info
+
+2. **Pre-signed URLs** - Current `ISupportsPreSignedUrls`. Keep as optional interface?
+
+3. **Latency zones** - Current `LatencyTrackingZone`. Include in result or separate?
+
+4. **Hot-reload** - Provider instances are long-lived. How to update config?
+   - Option A: Recreate provider on config change
+   - Option B: Provider observes `IOptionsMonitor` internally
+
 ## Existing API Alignment
 
 ### Two Provider Systems Currently Exist
@@ -513,11 +655,11 @@ public class S3RoutedProvider : IRoutedBlobProvider
 }
 ```
 
-**Recommendation: Option A first, Option B over time**
-- Keep `IBlobWrapperProvider` working for backward compatibility
-- Add adapter layer to integrate with new routing
-- Migrate plugins to `IRoutedBlobProvider` incrementally
-- Eventually deprecate `IBlobWrapperProvider`
+**Recommendation: Break new APIs, adapt only IBlobProvider**
+- `IBlobProvider` (obsolete, in main branch) - Keep adapter for backward compatibility
+- `IBlobWrapperProvider`, `IRoutedBlobProvider`, etc. - **CAN BREAK** (not in main branch)
+- Redesign new interfaces cleanly without legacy baggage
+- Only maintain `LegacyBlobProviderAdapter` for old `IBlobProvider` implementations
 
 ### Routing Layer Integration
 
