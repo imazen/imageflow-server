@@ -467,75 +467,106 @@ route = "/posts/{slug} => posts/{slug} [provider=local]"
 
 ## Host and Subdomain Matching
 
-Routes and rewrites can match on the request host, enabling multi-tenancy and CDN configurations.
+Routes and rewrites can match on the full URL including scheme and host. When the match expression starts with `://`, `http://`, or `https://`, host matching is enabled.
 
 ### Syntax
 
 ```toml
 [[routes]]
-# Match specific host
-route = "/images/{path*} => {path} [provider=local, host=cdn.example.com]"
+# Match specific host (any scheme)
+route = "://cdn.example.com/images/{path*} => {path} [provider=local]"
 
 [[routes]]
-# Match subdomain pattern - captures {tenant} variable
-route = "/images/{path*} => {tenant}/{path} [provider=s3-multi, host={tenant}.example.com]"
+# Match HTTPS only
+route = "https://secure.example.com/{path*} => {path} [provider=s3-secure]"
+
+[[routes]]
+# Capture subdomain as variable
+route = "://{tenant}.example.com/images/{path*} => {tenant}/{path} [provider=s3-multi]"
 
 [[rewrites]]
-# Redirect based on subdomain
-redirect = "/{path*} => https://main.example.com/{tenant}/{path} [host={tenant}.cdn.example.com, status=301]"
+# Redirect subdomain to path-based multi-tenancy
+redirect = "://{tenant}.cdn.example.com/{path*} => https://main.example.com/{tenant}/{path} [status=301]"
+
+[[rewrites]]
+# Normalize www to non-www
+redirect = "://www.example.com/{path*} => https://example.com/{path} [status=301]"
 ```
 
-### Host Flags
+### Host Matching Patterns
 
-| Flag | Meaning |
-|------|---------|
-| `host=example.com` | Match exact host |
-| `host={var}.example.com` | Capture subdomain into variable |
-| `host=*.example.com` | Wildcard subdomain match (no capture) |
-| `host-i` | Case-insensitive host matching (default) |
-| `host-case-sensitive` | Case-sensitive host matching |
+| Pattern | Matches |
+|---------|---------|
+| `://example.com/...` | Any scheme, exact host |
+| `https://example.com/...` | HTTPS only, exact host |
+| `://{sub}.example.com/...` | Capture subdomain into `{sub}` |
+| `://*.example.com/...` | Wildcard subdomain (no capture) |
+| `/...` | Any host (path-only matching, current behavior) |
 
-## Accept Header Detection
+## Header Conditions
 
-Routes can detect browser format support from the Accept header and expose it as query parameters.
+Routes and rewrites can require specific header values to match. This is useful for content negotiation, authentication checks, or conditional routing.
 
-### Flags
-
-| Flag | Meaning |
-|------|---------|
-| `accept.format` | Import Accept header, adds `accept.webp=1`, `accept.avif=1`, `accept.jxl=1` to query |
-| `require-accept-webp` | Only match if Accept header includes `image/webp` |
-| `require-accept-avif` | Only match if Accept header includes `image/avif` |
-| `require-accept-jxl` | Only match if Accept header includes `image/jxl` |
-
-### Usage
+### Syntax
 
 ```toml
 [[routes]]
-# Import Accept header as query params for downstream processing
-route = "/images/{path*} => {path} [provider=local, accept.format]"
+route = "/images/{path*} => webp/{path} [provider=s3-cdn]"
+[[routes.header_conditions]]
+header = "Accept"
+must = "contain"
+value = "image/webp"
 
 [[routes]]
-# Only serve WebP variant if browser supports it
-route = "/optimized/{path*} => webp/{path} [provider=s3-cdn, require-accept-webp]"
+route = "/images/{path*} => avif/{path} [provider=s3-cdn]"
+[[routes.header_conditions]]
+header = "Accept"
+must = "contain"
+value = "image/avif"
+
+[[routes]]
+# Multiple conditions (all must match)
+route = "/api/{path*} => {path} [provider=api-backend]"
+[[routes.header_conditions]]
+header = "Authorization"
+must = "exist"
+[[routes.header_conditions]]
+header = "X-API-Version"
+must = "equal"
+value = "2"
 ```
 
-### How It Works
+### Condition Operators
 
-When `accept.format` is enabled, the Accept header is parsed and the following query parameters are added if the corresponding MIME type is present:
+| Operator | Meaning |
+|----------|---------|
+| `exist` | Header must be present (any value) |
+| `not-exist` | Header must not be present |
+| `equal` | Header value must exactly equal `value` |
+| `equal-i` | Case-insensitive equality |
+| `contain` | Header value must contain `value` |
+| `contain-i` | Case-insensitive contains |
+| `start-with` | Header value must start with `value` |
+| `end-with` | Header value must end with `value` |
+| `match` | Header value must match regex `value` |
+
+### Accept Header Shorthand
+
+For the common case of content negotiation, a shorthand flag is available:
+
+```toml
+[[routes]]
+# Adds accept.webp=1, accept.avif=1, accept.jxl=1 to query based on Accept header
+route = "/images/{path*} => {path} [provider=local, accept.format=auto]"
+```
+
+This is equivalent to parsing the Accept header and adding query parameters:
 
 | Accept Header Contains | Query Param Added |
 |------------------------|-------------------|
 | `image/webp` | `accept.webp=1` |
 | `image/avif` | `accept.avif=1` |
 | `image/jxl` | `accept.jxl=1` |
-
-Example Accept headers:
-```
-image/avif,image/webp,*/*              → accept.avif=1&accept.webp=1
-image/webp,*/*                          → accept.webp=1
-image/png,image/*;q=0.8,*/*;q=0.5       → (nothing added)
-```
 
 ## Open Questions
 
