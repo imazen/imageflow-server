@@ -93,6 +93,7 @@ There are two separate condition systems that should NOT be unified:
 - [ ] Implement route expression parsing in config
 - [ ] Implement provider configuration binding
 - [ ] Wire up rewrites in request pipeline
+- [ ] Create intuitive parallel C# configuration methods for routes, rewrites, and providers (fluent API parity with TOML)
 
 ### Medium Priority
 
