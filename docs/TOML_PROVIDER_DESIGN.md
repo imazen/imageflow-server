@@ -327,6 +327,144 @@ cache_control = "public, max-age=2592000"
 apply_default_commands = "quality=76&webp.quality=70"
 ```
 
+## Rewrite Rules
+
+Rewrites run **before** routes. They modify the request URL before provider routing occurs.
+
+### Syntax
+
+Same match/template syntax as routes, but with `rewrite` or `redirect` key:
+
+```toml
+[[rewrites]]
+# Internal rewrite - modifies URL, continues processing
+rewrite = "/old/{path*} => /new/{path}"
+
+[[rewrites]]
+# Redirect - sends HTTP redirect to client
+redirect = "/legacy/{id:int} => /modern/item/{id} [status=301]"
+
+[[rewrites]]
+# External redirect
+redirect = "/ext/{path*} => https://cdn.example.com/{path} [status=302]"
+```
+
+### Rewrite vs Redirect
+
+| Key | Behavior |
+|-----|----------|
+| `rewrite` | Internal URL modification, client doesn't see it, processing continues |
+| `redirect` | HTTP redirect response sent to client, processing stops |
+
+### Rewrite Flags
+
+| Flag | Meaning |
+|------|---------|
+| `status=301` | Permanent redirect (for `redirect` only) |
+| `status=302` | Temporary redirect (for `redirect` only, default) |
+| `status=307` | Temporary redirect, preserve method |
+| `status=308` | Permanent redirect, preserve method |
+| `stop` | Stop processing after this rewrite (no further rewrites or routes) |
+| `last` | Stop rewrites, proceed directly to routes |
+| `ignore-case` | Case-insensitive matching |
+
+### Querystring Handling
+
+By default, rewrites **preserve** the original querystring. Flags modify this:
+
+| Flag | Behavior |
+|------|----------|
+| (default) | Append unmatched query params to output |
+| `[query-replace]` | Only include query params from template, drop others |
+| `[query-prohibit-excess]` | Fail if input has query params not in template |
+
+```toml
+[[rewrites]]
+# Preserves querystring: /old/foo?a=1&b=2 => /new/foo?a=1&b=2
+rewrite = "/old/{path*} => /new/{path}"
+
+[[rewrites]]
+# Captures and re-emits specific param, preserves others
+# /search?q=test&page=2 => /find?query=test&page=2
+rewrite = "/search?q={term} => /find?query={term}"
+
+[[rewrites]]
+# Replaces querystring entirely
+# /api?a=1&b=2 => /v2?version=2  (drops a, b)
+rewrite = "/api => /v2?version=2 [query-replace]"
+```
+
+### Examples
+
+```toml
+# SEO: permanent redirect from old URLs
+[[rewrites]]
+redirect = "/blog/{year:int}/{month:int}/{slug} => /posts/{slug} [status=301]"
+
+# Normalize: remove trailing slashes
+[[rewrites]]
+rewrite = "/{path*}/ => /{path} [last]"
+
+# Legacy API version redirect
+[[rewrites]]
+redirect = "/api/v1/{path*} => /api/v3/{path} [status=308]"
+
+# Multi-tenant: add tenant prefix from subdomain (if subdomain matching added)
+# [[rewrites]]
+# rewrite = "/{path*} => /{tenant}/{path}" # tenant from host match
+
+# External CDN redirect
+[[rewrites]]
+redirect = "/cdn/{path*} => https://cdn.example.com/assets/{path} [status=302]"
+
+# Case normalization
+[[rewrites]]
+rewrite = "/{path*} => /{path:lower} [ignore-case, last]"
+```
+
+### Processing Order
+
+1. **Rewrites** execute in order, top to bottom
+2. First matching rewrite applies (unless `continue` flag added - TBD)
+3. If rewrite matches:
+   - `redirect` → send redirect response, stop
+   - `rewrite` → modify URL, continue to next rewrite (unless `last` or `stop`)
+4. After all rewrites, **routes** execute against final URL
+
+### Complete Example with Rewrites
+
+```toml
+[imageflow_server]
+config_schema = "2"
+
+# Rewrites (run first)
+[[rewrites]]
+# Permanent redirect for old blog URLs
+redirect = "/blog/{year}/{month}/{slug} => /posts/{slug} [status=301]"
+
+[[rewrites]]
+# Normalize trailing slashes
+rewrite = "/{path*}/ => /{path}"
+
+[[rewrites]]
+# Legacy image paths
+rewrite = "/img/{path*} => /images/{path} [last]"
+
+# Providers
+[providers.local]
+type = "filesystem"
+config.root = "${app.approot}/images"
+params.path = "{path}"
+path.parsers = ["{path}"]
+
+# Routes (run after rewrites)
+[[routes]]
+route = "/images/{path*} => {path} [provider=local]"
+
+[[routes]]
+route = "/posts/{slug} => posts/{slug} [provider=local]"
+```
+
 ## Open Questions
 
 1. **Hot-reload of `config.*`** - Should changing config values trigger provider reconstruction without full restart?
@@ -339,3 +477,7 @@ apply_default_commands = "quality=76&webp.quality=70"
    ```
 
 4. **Multi-region with single provider** - Parser `[region=x]` sets config value - is this allowed, or must config be static?
+
+5. **Rewrite chaining** - Should `[continue]` flag allow multiple rewrites to apply in sequence, or is first-match-wins sufficient?
+
+6. **Host/subdomain matching** - Should rewrites support matching on `{subdomain}.example.com` patterns for multi-tenancy?
