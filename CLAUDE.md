@@ -307,15 +307,124 @@ services.AddImageflowServer(options =>
 });
 ```
 
+### Plugin Architecture for Options
+
+Plugins (S3, Azure, RemoteReader, third-party) need to:
+1. Define their own strongly-typed options
+2. Use `IOptionsMonitor<T>` for hot-reload
+3. Map from TOML `[providers.NAME]` to their options
+4. Be discoverable by the core system
+
+#### Current Plugin Pattern (to preserve)
+
+```csharp
+// Plugin defines its options
+public class S3ServiceOptions { ... }
+
+// Plugin registers via extension method
+services.AddImageflowS3Service(options => {
+    options.MapPrefix("/images/", "my-bucket");
+});
+```
+
+#### Target Plugin Pattern
+
+```csharp
+// 1. Plugin implements IImageflowProviderFactory
+public interface IImageflowProviderFactory
+{
+    string ProviderType { get; }  // "s3", "azure_blob", "filesystem"
+    Type OptionsType { get; }     // typeof(S3ProviderOptions)
+
+    IRoutedBlobProvider Create(
+        string providerName,
+        IConfiguration configSection,  // Providers:s3-main:Config
+        IServiceProvider services);
+}
+
+// 2. Plugin registers its factory
+services.AddImageflowProviderFactory<S3ProviderFactory>();
+
+// 3. Core discovers factories and wires up options
+// For each [providers.X] in config where type="s3":
+//   - Find factory with ProviderType == "s3"
+//   - Bind config section to factory.OptionsType
+//   - Call factory.Create() with bound options
+//   - Register as IOptionsMonitor for hot-reload
+
+// 4. Plugin can also register named options
+services.AddOptions<S3ProviderOptions>("s3-main")
+    .BindConfiguration("Providers:s3-main:Config");
+```
+
+#### Named Options for Multiple Instances
+
+```csharp
+// Core binds each provider instance to named options
+foreach (var (name, providerConfig) in config.Providers)
+{
+    var factory = factories[providerConfig.Type];
+    services.AddOptions(factory.OptionsType, name)
+        .BindConfiguration($"Providers:{name}:Config");
+}
+
+// Plugin retrieves its options by name
+public class S3ProviderFactory : IImageflowProviderFactory
+{
+    private readonly IOptionsMonitor<S3ProviderOptions> _options;
+
+    public IRoutedBlobProvider Create(string providerName, ...)
+    {
+        var opts = _options.Get(providerName);  // Named options
+        opts.OnChange(() => /* hot-reload logic */);
+        return new S3Provider(opts);
+    }
+}
+```
+
+#### TOML to Plugin Options Mapping
+
+```toml
+[providers.s3-main]
+type = "s3"                              # → Selects S3ProviderFactory
+config.region = "us-east-1"              # → S3ProviderOptions.Region
+config.access_key_id = "${secrets.key}"  # → S3ProviderOptions.AccessKeyId
+params.bucket = "{bucket}"               # → Passed to path parsing, not options
+path.parsers = ["{bucket}/{key}"]        # → Passed to path parsing, not options
+```
+
+The `config.*` keys map to plugin options. The `params.*` and `path.parsers` are handled by the routing layer, not the plugin.
+
+#### Hot-Reload Flow
+
+```
+TOML file changes
+    ↓
+TomlConfigurationProvider detects change
+    ↓
+IOptionsMonitor<ImageflowServerOptions>.OnChange fires
+    ↓
+For each changed provider:
+    ↓
+IOptionsMonitor<S3ProviderOptions>.Get("s3-main") returns new options
+    ↓
+IRoutedBlobProviderGroup.OnProvidersChanged fires (already exists!)
+    ↓
+Routing layer picks up new providers
+```
+
 ### Key Files to Create/Modify
 
 | File | Purpose |
 |------|---------|
+| `src/Imazen.Routing/Providers/IImageflowProviderFactory.cs` | NEW - Plugin factory interface |
 | `src/Imageflow.Server.Configuration/TomlConfigurationProvider.cs` | NEW - IConfigurationProvider for TOML |
 | `src/Imageflow.Server.Configuration/ImageflowServerOptions.cs` | NEW - Root options class |
 | `src/Imageflow.Server.Configuration/ImageflowOptionsPostConfigure.cs` | NEW - Post-config validation |
 | `src/Imageflow.Server/ImageflowServerBuilderExtensions.cs` | NEW - Fluent API |
 | `src/Imageflow.Server.Configuration/Executor.cs` | MODIFY - Use options pattern |
+| `src/Imageflow.Server.Storage.S3/S3ProviderFactory.cs` | NEW - S3 plugin factory |
+| `src/Imageflow.Server.Storage.S3/S3ProviderOptions.cs` | NEW - S3 config-bound options |
 
 ## Build & Test
 
