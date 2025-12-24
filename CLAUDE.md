@@ -110,6 +110,213 @@ There are two separate condition systems that should NOT be unified:
 - [ ] Review and update README.md
 - [ ] Implement `continue` flag for rewrite chaining
 
+## Test Coverage Analysis
+
+### Current Coverage
+
+| Area | File | Status |
+|------|------|--------|
+| Match expression parsing | `MatchExpressionParsingTests.cs` | ✅ Good |
+| Match expression matching | `MatchExpressionTests.cs` | ✅ Good |
+| Template expressions | `TemplatingExpressionTests.cs` | ✅ Good |
+| Routing expressions (`=> [v1]`) | `RoutingExpressionParserTests.cs` | ✅ Basic |
+| End-to-end routing | `RoutingExpressionEngineTests.cs` | ✅ Good |
+| Character classes | `CharacterClassTests.cs` | ✅ Good |
+| TOML preprocessing | `TomlPreprocessorTests.cs` | ✅ Exists |
+| TOML integration | `TomlIntegrationTests.cs` | ⏸️ SKIPPED |
+| Invalid TOML config | `InvalidTomlConfigurationTests.cs` | ⏸️ SKIPPED |
+
+### Coverage Gaps - Tests Needed
+
+| Area | Suggested File | Priority |
+|------|----------------|----------|
+| Provider configuration | `ProviderConfigurationTests.cs` | HIGH |
+| Rewrite rules | `RewriteRuleTests.cs` | HIGH |
+| Host/subdomain matching | `HostMatchingTests.cs` | MEDIUM |
+| Header conditions | `HeaderConditionTests.cs` | MEDIUM |
+| Variable interpolation | `VariableInterpolationTests.cs` | MEDIUM |
+| C# fluent API | `FluentApiTests.cs` | MEDIUM |
+| IOptionsMonitor integration | `OptionsMonitorTests.cs` | HIGH |
+
+### Test File Locations
+
+```
+tests/
+├── Imageflow.Server.Configuration.Tests/
+│   ├── ProviderConfigurationTests.cs     # NEW - provider parsing
+│   ├── RewriteRuleTests.cs               # NEW - rewrite/redirect
+│   ├── HeaderConditionTests.cs           # NEW - header conditions
+│   ├── VariableInterpolationTests.cs     # NEW - ${env.X} etc
+│   ├── OptionsMonitorTests.cs            # NEW - hot reload
+│   ├── TomlIntegrationTests.cs           # UNSKIP
+│   └── InvalidTomlConfigurationTests.cs  # UNSKIP
+├── ImazenShared.Tests/Routing/Matching/
+│   └── HostMatchingTests.cs              # NEW - ://host patterns
+```
+
+## IOptionsMonitor Integration Plan
+
+### Current Architecture (to be replaced)
+
+```
+TomlParser.LoadAndParse(path)
+    → TomlParseResult
+        → Executor (IAppConfigurator)
+            → ConfigureServices() / ConfigureApp()
+```
+
+**Problem**: Bypasses Microsoft.Extensions.Configuration, no hot-reload, no layering.
+
+### Target Architecture
+
+```
+Configuration Sources (layered, later wins):
+├── appsettings.json                 # Base defaults
+├── appsettings.{Environment}.json   # Environment overrides
+├── imageflow.toml                   # Main config file
+├── Environment variables            # IMAGEFLOW__* prefix
+└── Command line args                # --key=value
+
+         ↓ Microsoft.Extensions.Configuration
+
+IConfiguration (unified key-value store)
+
+         ↓ Options pattern binding
+
+IOptions<ImageflowServerOptions>
+IOptionsMonitor<ImageflowServerOptions>  ← Hot reload!
+
+         ↓ Post-configuration validation
+
+Parsed & Validated Configuration
+├── Providers → IRoutedBlobProvider instances
+├── Routes → RoutingExpression instances
+├── Rewrites → RewriteRule instances
+└── Ready for request handling
+```
+
+### Options Classes Design
+
+```csharp
+// Root options
+public class ImageflowServerOptions
+{
+    public string ConfigSchema { get; set; } = "2";
+    public LicenseOptions License { get; set; }
+    public Dictionary<string, ProviderOptions> Providers { get; set; }
+    public List<RouteOptions> Routes { get; set; }
+    public List<RewriteOptions> Rewrites { get; set; }
+    public RouteDefaultsOptions RouteDefaults { get; set; }
+    public DiskCacheOptions DiskCache { get; set; }
+    public DiagnosticsOptions Diagnostics { get; set; }
+}
+
+// Provider options (type-discriminated)
+public class ProviderOptions
+{
+    public string Type { get; set; }  // filesystem, s3, azure_blob, http_client
+    public Dictionary<string, string> Config { get; set; }
+    public Dictionary<string, string> Params { get; set; }
+    public List<string> PathParsers { get; set; }
+}
+
+// Route options
+public class RouteOptions
+{
+    public string Route { get; set; }  // "match => template [flags]"
+    public List<HeaderConditionOptions> HeaderConditions { get; set; }
+
+    // Legacy v1 support
+    public string Prefix { get; set; }
+    public string MapToPhysicalFolder { get; set; }
+}
+
+// Rewrite options
+public class RewriteOptions
+{
+    public string Rewrite { get; set; }   // Internal rewrite
+    public string Redirect { get; set; }  // HTTP redirect
+}
+```
+
+### Implementation Steps
+
+1. **Create TomlConfigurationProvider**
+   - Implement `IConfigurationProvider` and `IConfigurationSource`
+   - Flatten TOML to dotted key paths (`Providers:s3-main:Config:region`)
+   - Handle `[[arrays]]` → indexed keys (`Routes:0:Route`, `Routes:1:Route`)
+
+2. **Create Options Classes**
+   - `ImageflowServerOptions` and nested types
+   - Data annotations for validation
+   - XML docs for IntelliSense
+
+3. **Create PostConfigureOptions**
+   - Parse route expressions from strings
+   - Validate provider references exist
+   - Resolve `${...}` interpolation
+   - Build provider instances
+
+4. **Wire up DI**
+   ```csharp
+   services.AddOptions<ImageflowServerOptions>()
+       .BindConfiguration("ImageflowServer")
+       .ValidateDataAnnotations()
+       .ValidateOnStart();
+
+   services.AddSingleton<IPostConfigureOptions<ImageflowServerOptions>,
+       ImageflowOptionsPostConfigure>();
+   ```
+
+5. **Support Hot Reload**
+   - Use `IOptionsMonitor<T>` in middleware
+   - React to `OnChange` for provider/route updates
+   - Graceful transition (don't drop in-flight requests)
+
+### C# Fluent API (Parallel to TOML)
+
+```csharp
+services.AddImageflowServer(options =>
+{
+    // Providers
+    options.AddFilesystemProvider("local", provider =>
+    {
+        provider.Root = "./images";
+    });
+
+    options.AddS3Provider("s3-main", provider =>
+    {
+        provider.Region = "us-east-1";
+        provider.AccessKeyId = Environment.GetEnvironmentVariable("AWS_KEY");
+        provider.Bucket("{bucket:equals(images|assets)}");
+        provider.Key("{key}");
+        provider.PathParsers("{bucket}/{key}", "{key} [bucket=default]");
+    });
+
+    // Routes
+    options.AddRoute("/images/{path*} => {path} [provider=local]");
+    options.AddRoute("/cdn/{bucket}/{path*} => {bucket}/{path} [provider=s3-main]");
+
+    // Rewrites
+    options.AddRewrite("/old/{path*} => /new/{path}");
+    options.AddRedirect("/legacy/{id} => /modern/{id}", status: 301);
+
+    // Route with header condition
+    options.AddRoute("/images/{path*} => avif/{path} [provider=s3-cdn]")
+        .WhenHeader("Accept", contains: "image/avif");
+});
+```
+
+### Key Files to Create/Modify
+
+| File | Purpose |
+|------|---------|
+| `src/Imageflow.Server.Configuration/TomlConfigurationProvider.cs` | NEW - IConfigurationProvider for TOML |
+| `src/Imageflow.Server.Configuration/ImageflowServerOptions.cs` | NEW - Root options class |
+| `src/Imageflow.Server.Configuration/ImageflowOptionsPostConfigure.cs` | NEW - Post-config validation |
+| `src/Imageflow.Server/ImageflowServerBuilderExtensions.cs` | NEW - Fluent API |
+| `src/Imageflow.Server.Configuration/Executor.cs` | MODIFY - Use options pattern |
+
 ## Build & Test
 
 ```bash
@@ -121,6 +328,9 @@ dotnet test
 
 # Run specific test project
 dotnet test tests/ImazenShared.Tests/ImazenShared.Tests.csproj
+
+# Run with filter
+dotnet test --filter "FullyQualifiedName~Routing"
 ```
 
 ## Git Branch
