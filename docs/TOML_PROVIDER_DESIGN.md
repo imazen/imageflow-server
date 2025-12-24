@@ -465,6 +465,78 @@ route = "/images/{path*} => {path} [provider=local]"
 route = "/posts/{slug} => posts/{slug} [provider=local]"
 ```
 
+## Host and Subdomain Matching
+
+Routes and rewrites can match on the request host, enabling multi-tenancy and CDN configurations.
+
+### Syntax
+
+```toml
+[[routes]]
+# Match specific host
+route = "/images/{path*} => {path} [provider=local, host=cdn.example.com]"
+
+[[routes]]
+# Match subdomain pattern - captures {tenant} variable
+route = "/images/{path*} => {tenant}/{path} [provider=s3-multi, host={tenant}.example.com]"
+
+[[rewrites]]
+# Redirect based on subdomain
+redirect = "/{path*} => https://main.example.com/{tenant}/{path} [host={tenant}.cdn.example.com, status=301]"
+```
+
+### Host Flags
+
+| Flag | Meaning |
+|------|---------|
+| `host=example.com` | Match exact host |
+| `host={var}.example.com` | Capture subdomain into variable |
+| `host=*.example.com` | Wildcard subdomain match (no capture) |
+| `host-i` | Case-insensitive host matching (default) |
+| `host-case-sensitive` | Case-sensitive host matching |
+
+## Accept Header Detection
+
+Routes can detect browser format support from the Accept header and expose it as query parameters.
+
+### Flags
+
+| Flag | Meaning |
+|------|---------|
+| `accept.format` | Import Accept header, adds `accept.webp=1`, `accept.avif=1`, `accept.jxl=1` to query |
+| `require-accept-webp` | Only match if Accept header includes `image/webp` |
+| `require-accept-avif` | Only match if Accept header includes `image/avif` |
+| `require-accept-jxl` | Only match if Accept header includes `image/jxl` |
+
+### Usage
+
+```toml
+[[routes]]
+# Import Accept header as query params for downstream processing
+route = "/images/{path*} => {path} [provider=local, accept.format]"
+
+[[routes]]
+# Only serve WebP variant if browser supports it
+route = "/optimized/{path*} => webp/{path} [provider=s3-cdn, require-accept-webp]"
+```
+
+### How It Works
+
+When `accept.format` is enabled, the Accept header is parsed and the following query parameters are added if the corresponding MIME type is present:
+
+| Accept Header Contains | Query Param Added |
+|------------------------|-------------------|
+| `image/webp` | `accept.webp=1` |
+| `image/avif` | `accept.avif=1` |
+| `image/jxl` | `accept.jxl=1` |
+
+Example Accept headers:
+```
+image/avif,image/webp,*/*              → accept.avif=1&accept.webp=1
+image/webp,*/*                          → accept.webp=1
+image/png,image/*;q=0.8,*/*;q=0.5       → (nothing added)
+```
+
 ## Open Questions
 
 1. **Hot-reload of `config.*`** - Should changing config values trigger provider reconstruction without full restart?
@@ -477,7 +549,3 @@ route = "/posts/{slug} => posts/{slug} [provider=local]"
    ```
 
 4. **Multi-region with single provider** - Parser `[region=x]` sets config value - is this allowed, or must config be static?
-
-5. **Rewrite chaining** - Should `[continue]` flag allow multiple rewrites to apply in sequence, or is first-match-wins sufficient?
-
-6. **Host/subdomain matching** - Should rewrites support matching on `{subdomain}.example.com` patterns for multi-tenancy?

@@ -140,13 +140,22 @@ All boundary functions support `-i` suffix for case-insensitive matching.
 | `provider=NAME` | IMPLEMENTED | Route to named provider |
 | `v1` | IMPLEMENTED | Version flag |
 
+### IMPLEMENTED - Accept Header Handling
+| Flag | Status | Notes |
+|------|--------|-------|
+| `accept.format` | IMPLEMENTED | Adds `accept.webp=1`, `accept.avif=1`, `accept.jxl=1` to query from Accept header (`ParsingOptions.cs:73`, `MultiValueMatcher.cs:170-207`) |
+
+### PARSED BUT NOT IMPLEMENTED - Accept Header Flags
+| Flag | Status | Notes |
+|------|--------|-------|
+| `import-accept-header` | PARSED ONLY | Parses but not connected to `accept.format` implementation |
+| `require-accept-webp` | PARSED ONLY | Parses but no runtime filtering logic |
+| `require-accept-avif` | PARSED ONLY | Parses but no runtime filtering logic |
+| `require-accept-jxl` | PARSED ONLY | Parses but no runtime filtering logic |
+
 ### ASPIRATIONAL (in matching.md but not implemented)
 | Flag | Status | Notes |
 |------|--------|-------|
-| `import-accept-header` | ASPIRATIONAL | Parse Accept header to query params |
-| `require-accept-webp` | ASPIRATIONAL | Match only if Accept includes webp |
-| `require-accept-avif` | ASPIRATIONAL | Match only if Accept includes avif |
-| `require-accept-jxl` | ASPIRATIONAL | Match only if Accept includes jxl |
 | `stop-here` | ASPIRATIONAL | Prevent further rewrite rules |
 | `keep-query` | ASPIRATIONAL | |
 | `copy-path` | ASPIRATIONAL | |
