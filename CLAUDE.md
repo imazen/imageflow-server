@@ -426,6 +426,202 @@ Routing layer picks up new providers
 | `src/Imageflow.Server.Storage.S3/S3ProviderFactory.cs` | NEW - S3 plugin factory |
 | `src/Imageflow.Server.Storage.S3/S3ProviderOptions.cs` | NEW - S3 config-bound options |
 
+## Dependency Injection & Multi-Targeting
+
+### Target Frameworks
+
+```
+Current:  net8.0, netstandard2.0
+Planned:  net8.0, net10.0, netstandard2.0 (covers .NET Framework 4.6.1+, including 4.8.1)
+```
+
+### DI Compatibility Matrix
+
+| Feature | netstandard2.0 / .NET 4.8.1 | .NET 8 | .NET 10 |
+|---------|----------------------------|--------|---------|
+| `IServiceCollection` | ✅ | ✅ | ✅ |
+| `IOptions<T>` | ✅ | ✅ | ✅ |
+| `IOptionsMonitor<T>` | ✅ | ✅ | ✅ |
+| `IOptionsMonitor<T>.Get(name)` | ✅ | ✅ | ✅ |
+| `IOptionsFactory<T>` | ✅ | ✅ | ✅ |
+| `IConfigurationRoot` | ✅ | ✅ | ✅ |
+| Keyed Services `[FromKeyedServices]` | ❌ | ✅ | ✅ |
+| `IServiceProviderIsService` | ❌ | ✅ | ✅ |
+| Generic host `IHost` | ✅ | ✅ | ✅ |
+| Configuration binding generator | ❌ | ✅ | ✅ |
+
+### DI Strategy
+
+**Avoid .NET 8+ only features for core functionality:**
+- ❌ Don't use Keyed Services (`services.AddKeyedSingleton`)
+- ✅ Use Named Options (`IOptionsMonitor<T>.Get("name")`) - works everywhere
+
+**Service Lifetimes:**
+
+```csharp
+// Provider factories - Singleton (stateless, creates providers)
+services.AddSingleton<IImageflowProviderFactory, S3ProviderFactory>();
+
+// Provider instances - Singleton with hot-reload via IOptionsMonitor
+// NOT Scoped - providers have connection pools, caches, etc.
+services.AddSingleton<IRoutedBlobProviderGroup, ConfiguredProviderGroup>();
+
+// Options - use standard pattern
+services.AddOptions<S3ProviderOptions>("s3-main")
+    .BindConfiguration("Providers:s3-main:Config")
+    .ValidateDataAnnotations();
+```
+
+### Factory Pattern for Providers
+
+```csharp
+// Works on all targets - no keyed services needed
+public interface IImageflowProviderFactory
+{
+    string ProviderType { get; }  // "s3", "azure_blob", etc.
+
+    // Factory method - called once per provider instance
+    IRoutedBlobProvider Create(
+        string providerName,
+        IOptionsMonitor<ProviderOptions> options,  // Named options
+        IServiceProvider services);
+}
+
+// Registration (works on netstandard2.0)
+public static class S3ProviderExtensions
+{
+    public static IServiceCollection AddS3ProviderFactory(this IServiceCollection services)
+    {
+        services.AddSingleton<IImageflowProviderFactory, S3ProviderFactory>();
+        return services;
+    }
+}
+```
+
+### Provider Lifecycle with Hot-Reload
+
+```csharp
+public class ConfiguredProviderGroup : IRoutedBlobProviderGroup, IDisposable
+{
+    private readonly IOptionsMonitor<ImageflowServerOptions> _serverOptions;
+    private readonly IEnumerable<IImageflowProviderFactory> _factories;
+    private readonly IServiceProvider _services;
+
+    private IReadOnlyCollection<IRoutedBlobProvider> _providers;
+    private IDisposable? _optionsChangeToken;
+
+    public ConfiguredProviderGroup(
+        IOptionsMonitor<ImageflowServerOptions> serverOptions,
+        IEnumerable<IImageflowProviderFactory> factories,
+        IServiceProvider services)
+    {
+        _serverOptions = serverOptions;
+        _factories = factories;
+        _services = services;
+
+        // Build initial providers
+        _providers = BuildProviders(serverOptions.CurrentValue);
+
+        // Subscribe to changes
+        _optionsChangeToken = serverOptions.OnChange(opts =>
+        {
+            var oldProviders = _providers;
+            _providers = BuildProviders(opts);
+
+            // Dispose old providers if they implement IDisposable
+            foreach (var p in oldProviders.OfType<IDisposable>())
+                p.Dispose();
+
+            OnProvidersChanged?.Invoke();
+        });
+    }
+
+    private IReadOnlyCollection<IRoutedBlobProvider> BuildProviders(ImageflowServerOptions opts)
+    {
+        var providers = new List<IRoutedBlobProvider>();
+        foreach (var (name, config) in opts.Providers ?? new())
+        {
+            var factory = _factories.FirstOrDefault(f => f.ProviderType == config.Type);
+            if (factory == null)
+                throw new InvalidOperationException($"No factory for provider type '{config.Type}'");
+
+            // Get named options for this provider
+            var namedOptions = _services
+                .GetRequiredService<IOptionsMonitor<ProviderOptions>>()
+                .Get(name);
+
+            providers.Add(factory.Create(name, namedOptions, _services));
+        }
+        return providers;
+    }
+
+    public IReadOnlyCollection<IRoutedBlobProvider> Providers => _providers;
+    public event Action? OnProvidersChanged;
+
+    public void Dispose() => _optionsChangeToken?.Dispose();
+}
+```
+
+### Conditional Compilation for .NET 8+ Features
+
+```csharp
+#if NET8_0_OR_GREATER
+    // Use source-generated configuration binding (faster startup)
+    services.AddOptions<S3ProviderOptions>()
+        .BindConfiguration("Providers:s3-main:Config");
+#else
+    // Fallback to reflection-based binding
+    services.Configure<S3ProviderOptions>(
+        configuration.GetSection("Providers:s3-main:Config"));
+#endif
+```
+
+### Plugin Discovery
+
+```csharp
+// Option 1: Explicit registration (recommended, works everywhere)
+services.AddS3ProviderFactory();
+services.AddAzureBlobProviderFactory();
+services.AddFilesystemProviderFactory();
+
+// Option 2: Assembly scanning (works but slower startup)
+public static IServiceCollection AddImageflowProviderFactories(
+    this IServiceCollection services,
+    params Assembly[] assemblies)
+{
+    foreach (var assembly in assemblies)
+    {
+        var factoryTypes = assembly.GetTypes()
+            .Where(t => typeof(IImageflowProviderFactory).IsAssignableFrom(t) && !t.IsAbstract);
+
+        foreach (var type in factoryTypes)
+            services.AddSingleton(typeof(IImageflowProviderFactory), type);
+    }
+    return services;
+}
+```
+
+### Testing Considerations
+
+```csharp
+// For tests, can register mock options directly
+services.AddSingleton<IOptionsMonitor<S3ProviderOptions>>(
+    new TestOptionsMonitor<S3ProviderOptions>(new S3ProviderOptions
+    {
+        Region = "us-east-1",
+        Bucket = "test-bucket"
+    }));
+
+// Or use in-memory configuration
+var config = new ConfigurationBuilder()
+    .AddInMemoryCollection(new Dictionary<string, string?>
+    {
+        ["Providers:s3-main:Type"] = "s3",
+        ["Providers:s3-main:Config:Region"] = "us-east-1",
+    })
+    .Build();
+```
+
 ## Build & Test
 
 ```bash
