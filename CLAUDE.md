@@ -426,6 +426,138 @@ Routing layer picks up new providers
 | `src/Imageflow.Server.Storage.S3/S3ProviderFactory.cs` | NEW - S3 plugin factory |
 | `src/Imageflow.Server.Storage.S3/S3ProviderOptions.cs` | NEW - S3 config-bound options |
 
+## Existing API Alignment
+
+### Two Provider Systems Currently Exist
+
+| System | Interface | Hot-Reload | Used By |
+|--------|-----------|-----------|---------|
+| **Legacy** | `IBlobWrapperProvider` | ❌ No | S3, Azure, RemoteReader |
+| **New** | `IRoutedBlobProvider` / `IRoutedBlobProviderGroup` | ✅ Yes | LocalFileBlobProviderGroup |
+
+### What Already Works ✅
+
+**LocalFileBlobProviderGroup** (`Providers/Local/`) already implements the target pattern:
+```csharp
+public class LocalFileBlobProviderGroup : IRoutedBlobProvider
+{
+    private readonly IOptionsMonitor<LocalFileBlobProviderGroupOptions> _optionsMonitor;
+
+    public LocalFileBlobProviderGroup(IOptionsMonitor<LocalFileBlobProviderGroupOptions> options, ...)
+    {
+        ReloadOptions(_optionsMonitor.CurrentValue);
+        _optionsMonitor.OnChange(ReloadOptions);  // ✅ Hot-reload!
+    }
+
+    private void ReloadOptions(LocalFileBlobProviderGroupOptions options) { ... }
+}
+```
+
+**IRoutedBlobProviderGroup** already has the change event:
+```csharp
+public interface IRoutedBlobProviderGroup : IUniqueNamed, IIssueProvider
+{
+    IReadOnlyCollection<IRoutedBlobProvider> Providers { get; }
+    event Action OnProvidersChanged;  // ✅ Already there!
+}
+```
+
+### What Needs Migration ❌
+
+**S3Service, AzureBlobService, RemoteReaderService** use legacy pattern:
+```csharp
+// Current - options passed directly, no hot-reload
+public class S3Service : IBlobWrapperProvider
+{
+    public S3Service(S3ServiceOptions options, IAmazonS3 s3Client, ...)
+    {
+        // Options baked in at construction time
+    }
+}
+
+// Registration - no IOptionsMonitor
+services.AddImageflowS3Service(new S3ServiceOptions()
+    .MapPrefix("/images/", "bucket"));
+```
+
+### Migration Strategy
+
+**Option A: Wrapper Adapter** (backward compatible)
+```csharp
+// Wrap legacy IBlobWrapperProvider in IRoutedBlobProvider
+public class LegacyProviderAdapter : IRoutedBlobProvider
+{
+    private readonly IBlobWrapperProvider _legacy;
+    public LegacyProviderAdapter(IBlobWrapperProvider legacy) => _legacy = legacy;
+    // Delegate all calls to _legacy
+}
+
+// Then wrap in a group with hot-reload
+public class LegacyProviderGroup : IRoutedBlobProviderGroup
+{
+    // Rebuilds adapters when options change
+}
+```
+
+**Option B: Migrate Plugins** (breaking change)
+```csharp
+// New S3 provider implements IRoutedBlobProvider directly
+public class S3RoutedProvider : IRoutedBlobProvider
+{
+    private readonly IOptionsMonitor<S3ProviderOptions> _options;
+
+    public S3RoutedProvider(IOptionsMonitor<S3ProviderOptions> options, ...)
+    {
+        _options.OnChange(ReloadOptions);
+    }
+}
+```
+
+**Recommendation: Option A first, Option B over time**
+- Keep `IBlobWrapperProvider` working for backward compatibility
+- Add adapter layer to integrate with new routing
+- Migrate plugins to `IRoutedBlobProvider` incrementally
+- Eventually deprecate `IBlobWrapperProvider`
+
+### Routing Layer Integration
+
+Two routing layers handle providers:
+
+| Layer | Handles | Source |
+|-------|---------|--------|
+| `BlobProvidersLayer` | `IBlobWrapperProvider`, `IBlobProvider` | Legacy, prefix-based |
+| `RoutingExpressionLayer` | `IRoutedBlobProvider` | New, expression-based |
+
+**Current flow:**
+```
+Request → RoutingExpressionLayer → (if matched) → IRoutedBlobProvider
+        ↓ (if not matched)
+        BlobProvidersLayer → IBlobWrapperProvider
+```
+
+**This is fine** - both layers can coexist. New TOML-configured providers go through `RoutingExpressionLayer`, legacy code-configured providers through `BlobProvidersLayer`.
+
+### Plan Adjustments
+
+The `IImageflowProviderFactory` pattern should:
+1. Create `IRoutedBlobProvider` instances (not `IBlobWrapperProvider`)
+2. Work with the existing `IRoutedBlobProviderGroup.OnProvidersChanged` event
+3. Integrate with `RoutingExpressionLayer`, not `BlobProvidersLayer`
+
+```csharp
+// Revised factory interface
+public interface IImageflowProviderFactory
+{
+    string ProviderType { get; }
+
+    // Creates IRoutedBlobProvider, not IBlobWrapperProvider
+    IRoutedBlobProvider Create(
+        string providerName,
+        ProviderOptions options,
+        IServiceProvider services);
+}
+```
+
 ## Dependency Injection & Multi-Targeting
 
 ### Target Frameworks
