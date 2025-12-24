@@ -553,20 +553,160 @@ public class ProviderConfig
 3. Migrate providers one by one
 4. Remove old interfaces
 
-### Open Questions
+### Even Simpler: Routing Does All Path Work
 
-1. **Caching integration** - Current `ICacheableBlobPromise` has cache key computation. Where does this go?
-   - Option A: `BlobFetchResult` includes cache metadata
-   - Option B: Separate `ICacheKeyProvider` interface
-   - Option C: Provider returns `IBlobWrapper` which has cache info
+If routing handles path parsing completely, provider just gets final params:
 
-2. **Pre-signed URLs** - Current `ISupportsPreSignedUrls`. Keep as optional interface?
+```csharp
+// Minimal provider interface
+public interface IBlobSource
+{
+    string Name { get; }
 
-3. **Latency zones** - Current `LatencyTrackingZone`. Include in result or separate?
+    ValueTask<BlobResult> FetchAsync(
+        IReadOnlyDictionary<string, string> params,
+        CancellationToken ct = default);
+}
 
-4. **Hot-reload** - Provider instances are long-lived. How to update config?
-   - Option A: Recreate provider on config change
-   - Option B: Provider observes `IOptionsMonitor` internally
+// Result is simple
+public readonly struct BlobResult
+{
+    public bool Found { get; init; }
+    public IBlobWrapper? Blob { get; init; }
+    public int? ErrorCode { get; init; }
+    public string? ErrorMessage { get; init; }
+
+    public static BlobResult Ok(IBlobWrapper blob) => new() { Found = true, Blob = blob };
+    public static BlobResult NotFound() => new() { Found = false };
+    public static BlobResult Error(int code, string msg) => new() { ErrorCode = code, ErrorMessage = msg };
+}
+```
+
+**What each provider receives:**
+
+| Provider | Params |
+|----------|--------|
+| S3 | `bucket`, `key` |
+| Azure | `container`, `blob` |
+| Filesystem | `path` |
+| HTTP | `url` or `path` |
+
+**What provider does NOT need to know:**
+- Original request path ❌
+- Route that matched ❌
+- Query string parsing ❌
+- URI construction ❌
+- Template evaluation ❌
+
+**Example S3 implementation:**
+```csharp
+public class S3BlobSource : IBlobSource
+{
+    private readonly IAmazonS3 _client;
+    private readonly S3Options _options;
+
+    public string Name { get; }
+
+    public async ValueTask<BlobResult> FetchAsync(
+        IReadOnlyDictionary<string, string> params,
+        CancellationToken ct)
+    {
+        var bucket = params["bucket"];
+        var key = params["key"];
+
+        try
+        {
+            var response = await _client.GetObjectAsync(bucket, key, ct);
+            return BlobResult.Ok(new S3BlobWrapper(response));
+        }
+        catch (AmazonS3Exception ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            return BlobResult.NotFound();
+        }
+    }
+}
+```
+
+**Routing layer does the heavy lifting:**
+```csharp
+public class RoutingEngine
+{
+    public async ValueTask<BlobResult?> RouteAsync(IRequestSnapshot request, CancellationToken ct)
+    {
+        foreach (var route in _routes)
+        {
+            // 1. Match request path
+            if (!route.Matcher.TryMatch(request.Path, out var captures))
+                continue;
+
+            // 2. Check header conditions
+            if (!route.HeaderConditions.All(c => c.Matches(request)))
+                continue;
+
+            // 3. Evaluate template to get provider path
+            var templateOutput = route.Template.Evaluate(captures);
+
+            // 4. Run provider's path parsers to extract params
+            var params = route.Provider.PathParsers
+                .Select(p => p.TryParse(templateOutput))
+                .FirstOrDefault(r => r != null);
+
+            if (params == null)
+                continue;  // No parser matched
+
+            // 5. Merge with any static flags [bucket=default]
+            params = MergeWithFlags(params, route.Flags);
+
+            // 6. Call provider with just the params
+            var provider = _providers[route.ProviderName];
+            return await provider.FetchAsync(params, ct);
+        }
+        return null;  // No route matched
+    }
+}
+```
+
+### Remaining Questions
+
+1. **Caching** - Cache key needs to include provider name + params. Routing layer can compute this.
+
+2. **Pre-signed URLs** - Optional interface on provider:
+   ```csharp
+   public interface ISupportsPreSignedUrls : IBlobSource
+   {
+       string? GeneratePreSignedUrl(IReadOnlyDictionary<string, string> params, TimeSpan expiry);
+   }
+   ```
+
+3. **Latency zones** - Provider declares its zone, routing layer tracks:
+   ```csharp
+   public interface IBlobSource
+   {
+       string Name { get; }
+       LatencyTrackingZone LatencyZone { get; }  // e.g., "s3:us-east-1:my-bucket"
+       ValueTask<BlobResult> FetchAsync(...);
+   }
+   ```
+
+4. **Request context** - If provider needs headers (conditional GET):
+   ```csharp
+   // Option A: Pass minimal context
+   ValueTask<BlobResult> FetchAsync(
+       IReadOnlyDictionary<string, string> params,
+       BlobFetchHints? hints,  // If-None-Match, Accept-Encoding, etc.
+       CancellationToken ct);
+
+   // Option B: Let routing layer handle conditional logic
+   // Provider always fetches, routing layer returns 304 if appropriate
+   ```
+
+### Interface Evolution Summary
+
+| Version | Interface | Params | Responsibility |
+|---------|-----------|--------|----------------|
+| Legacy | `IBlobProvider` | `virtualPath` | Provider parses path |
+| Current | `IRoutedBlobProvider` | 6 params | Provider + routing mixed |
+| Proposed | `IBlobSource` | `params` dict | Routing parses, provider fetches |
 
 ## Existing API Alignment
 
