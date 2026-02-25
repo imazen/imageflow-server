@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <Import Project="..\ProjectDefaults.targets" />
+
+    <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+        <PackageReference Include="System.Threading.Tasks.Extensions" Version="4.6.1" />
+        <PackageReference Include="System.Memory" Version="4.6.3" />
+    </ItemGroup>
+</Project>
