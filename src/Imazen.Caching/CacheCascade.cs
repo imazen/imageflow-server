@@ -264,6 +264,7 @@ public sealed class CacheCascade : ICacheEngine
                                     detail: $"Inline store failed: {t.Exception?.GetBaseException().Message}");
                         }, TaskScheduler.Default);
                     }
+                    FireEvent(CacheEventKind.Store, key, providerName);
                 }
                 catch
                 {
