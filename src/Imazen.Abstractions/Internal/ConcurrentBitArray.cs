@@ -48,7 +48,7 @@ namespace Imazen.Common.Instrumentation.Support
                 throw new ArgumentException($"Invalid input span size - must match the number of bytes in the ConcurrentBitArray {bytes.Length} != {ByteCount}");
             }
             if (bytes.Length > Buffer.ByteLength(_data)) throw new Exception($"Buffer is too small, {bytes.Length} > {Buffer.ByteLength(_data)}");
-            bytes.CopyTo(MemoryMarshal.Cast<long, byte>(_data));
+            bytes.CopyTo(MemoryMarshal.Cast<long, byte>((Span<long>)_data));
         }
 
 

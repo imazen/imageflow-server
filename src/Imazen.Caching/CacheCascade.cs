@@ -187,27 +187,18 @@ public sealed class CacheCascade : ICacheEngine
     private async ValueTask<(CacheFetchResult? Result, int ProviderIndex, string? ProviderName)> TryFetchAsync(
         CacheKey key, string stringKey, CancellationToken ct)
     {
-        // Check upload queue first (in-flight writes are readable)
+        // Sequential fetch through providers, checking upload queue at each tier
         for (int i = 0; i < _providerOrder.Count; i++)
         {
             var providerName = _providerOrder[i];
+
+            // Check upload queue for this provider (in-flight writes are readable)
             var queueKey = stringKey + ":" + providerName;
             if (_uploadQueue.TryGet(queueKey, out var queueData, out var queueMeta) && queueData != null && queueMeta != null)
             {
                 return (new CacheFetchResult(queueData, queueMeta), i, providerName);
             }
-        }
 
-        // Also check for a general queue key
-        if (_uploadQueue.TryGet(stringKey, out var generalData, out var generalMeta) && generalData != null && generalMeta != null)
-        {
-            return (new CacheFetchResult(generalData, generalMeta), 0, "upload-queue");
-        }
-
-        // Sequential fetch through providers
-        for (int i = 0; i < _providerOrder.Count; i++)
-        {
-            var providerName = _providerOrder[i];
             if (!_providers.TryGetValue(providerName, out var provider)) continue;
 
             // Cloud providers: skip if bloom says definitely not present
@@ -232,6 +223,12 @@ public sealed class CacheCascade : ICacheEngine
             {
                 FireEvent(CacheEventKind.Error, key, providerName, detail: "Fetch failed");
             }
+        }
+
+        // Check for a general queue key (not tier-specific)
+        if (_uploadQueue.TryGet(stringKey, out var generalData, out var generalMeta) && generalData != null && generalMeta != null)
+        {
+            return (new CacheFetchResult(generalData, generalMeta), 0, "upload-queue");
         }
 
         return (null, -1, null);

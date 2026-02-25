@@ -276,8 +276,7 @@ namespace Imazen.Common.Licensing
             if (inputBytes.Length > BlockSize) {
                 throw new ArgumentOutOfRangeException(nameof(inputBytes), "input too long for RSA cipher block size.");
             }
-            var input = new BigInteger(inputBytes
-                .Reverse()
+            var input = new BigInteger(Enumerable.Reverse(inputBytes)
                 .Concat(Enumerable.Repeat<byte>(0, 1))
                 .ToArray()); //Add a zero to prevent interpretation as twos-complement
 
