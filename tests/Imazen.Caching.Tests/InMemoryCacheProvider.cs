@@ -100,6 +100,87 @@ public class InMemoryCacheProvider : ICacheProvider
 }
 
 /// <summary>
+/// A provider that returns data as Streams (simulating disk providers).
+/// Stores data in memory but returns CacheFetchResult with a MemoryStream,
+/// not a byte[]. This exercises the streaming hit path in CacheCascade.
+/// </summary>
+public class StreamingCacheProvider : ICacheProvider
+{
+    private readonly ConcurrentDictionary<string, (byte[] Data, CacheEntryMetadata Metadata)> _store = new();
+    public int FetchCount;
+    public int BufferFetchCount; // Tracks how many times Data (not Stream) was returned — should be 0
+
+    public bool AcceptsFreshResults { get; set; } = true;
+    public bool AcceptsMissed { get; set; } = true;
+    public bool AcceptsNotQueried { get; set; } = false;
+    public long MaxAcceptableBytes { get; set; } = -1;
+
+    public string Name { get; }
+    public CacheProviderCapabilities Capabilities { get; }
+
+    public StreamingCacheProvider(string name, string latencyZone = "local")
+    {
+        Name = name;
+        Capabilities = new CacheProviderCapabilities
+        {
+            RequiresInlineExecution = false,
+            LatencyZone = latencyZone
+        };
+    }
+
+    public ValueTask<CacheFetchResult?> FetchAsync(CacheKey key, CancellationToken ct = default)
+    {
+        Interlocked.Increment(ref FetchCount);
+        var path = key.ToStoragePath();
+        if (_store.TryGetValue(path, out var entry))
+        {
+            // Return as Stream (not byte[]) — simulates disk provider
+            var stream = new MemoryStream(entry.Data, writable: false);
+            var metadata = new CacheEntryMetadata
+            {
+                ContentType = entry.Metadata.ContentType,
+                ContentLength = entry.Data.Length,
+                CreatedAt = entry.Metadata.CreatedAt
+            };
+            return new ValueTask<CacheFetchResult?>(new CacheFetchResult(stream, metadata));
+        }
+        return new ValueTask<CacheFetchResult?>((CacheFetchResult?)null);
+    }
+
+    public ValueTask StoreAsync(CacheKey key, byte[] data, CacheEntryMetadata metadata, CancellationToken ct = default)
+    {
+        _store[key.ToStoragePath()] = (data, metadata);
+        return default;
+    }
+
+    public bool WantsToStore(CacheKey key, long sizeBytes, CacheStoreReason reason)
+    {
+        if (MaxAcceptableBytes >= 0 && sizeBytes > MaxAcceptableBytes) return false;
+        return reason switch
+        {
+            CacheStoreReason.FreshlyCreated => AcceptsFreshResults,
+            CacheStoreReason.Missed => AcceptsMissed,
+            CacheStoreReason.NotQueried => AcceptsNotQueried,
+            _ => true
+        };
+    }
+
+    public ValueTask<bool> InvalidateAsync(CacheKey key, CancellationToken ct = default)
+        => new ValueTask<bool>(_store.TryRemove(key.ToStoragePath(), out _));
+
+    public ValueTask<int> PurgeBySourceAsync(ReadOnlyMemory<byte> sourceHash, CancellationToken ct = default)
+    {
+        var count = _store.Count;
+        _store.Clear();
+        return new ValueTask<int>(count);
+    }
+
+    public bool ProbablyContains(CacheKey key) => _store.ContainsKey(key.ToStoragePath());
+    public ValueTask<bool> HealthCheckAsync(CancellationToken ct = default) => new ValueTask<bool>(true);
+    public bool Contains(CacheKey key) => _store.ContainsKey(key.ToStoragePath());
+}
+
+/// <summary>
 /// A slow in-memory provider that simulates cloud latency.
 /// </summary>
 public class SlowCacheProvider : ICacheProvider

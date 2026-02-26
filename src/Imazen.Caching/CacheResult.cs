@@ -79,18 +79,18 @@ public sealed class CacheResult : IDisposable
     // --- Factory methods for the cascade ---
 
     /// <summary>
-    /// Path A: Stream-through hit. No buffering, no subscribers wanted the data.
-    /// The caller streams from DataStream and disposes it.
+    /// Stream-through hit. No subscribers wanted the data — stream passes directly
+    /// to the caller with no buffering. The caller owns the stream and must dispose it
+    /// (via disposing this CacheResult).
+    /// This is the hot path for disk cache hits in CDN scenarios.
     /// </summary>
-    internal static CacheResult StreamHit(CacheResultStatus status, byte[] data,
+    internal static CacheResult StreamHit(CacheResultStatus status, Stream dataStream,
         string? contentType, string providerName, TimeSpan? latency = null)
     {
-        // For now, providers return byte[]. When providers return Stream in the future,
-        // this factory will set DataStream instead. The cascade decides the path.
         return new CacheResult
         {
             Status = status,
-            Data = data,
+            DataStream = dataStream,
             ContentType = contentType,
             ProviderName = providerName,
             Latency = latency
@@ -98,8 +98,9 @@ public sealed class CacheResult : IDisposable
     }
 
     /// <summary>
-    /// Path B: Buffered hit. Data was buffered because subscribers wanted it.
-    /// The cascade has already distributed copies to subscribers.
+    /// Buffered hit. Data was buffered either because:
+    /// - Subscribers needed it for replication, or
+    /// - The provider returned byte[] directly (memory hit, queue hit).
     /// </summary>
     internal static CacheResult BufferedHit(CacheResultStatus status, byte[] data,
         string? contentType, string providerName, TimeSpan? latency = null)

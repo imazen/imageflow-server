@@ -96,20 +96,38 @@ public sealed class CacheCascade : ICacheEngine
             var status = ClassifyHitStatus(outcome.HitProviderName!);
             FireEvent(CacheEventKind.Hit, key, outcome.HitProviderName!, sw.Elapsed);
 
-            // Ask non-hit providers if they want this data.
-            // Each provider gets Missed or NotQueried depending on whether
-            // the cascade actually checked it during this fetch.
-            var subscribers = GetHitSubscribers(key, stringKey, outcome.Result.Data.Length,
+            // Check if any non-hit providers want this data for replication.
+            // Use ContentLength from metadata/data — no buffering needed for this check.
+            var contentLength = outcome.Result.ContentLength;
+            var subscribers = GetHitSubscribers(key, stringKey, contentLength,
                 outcome.HitProviderName!, outcome.CheckedAndMissed);
 
             if (subscribers.Count > 0)
             {
-                DistributeToSubscribers(key, stringKey, outcome.Result.Data,
+                // Subscribers need bytes — buffer if we have a stream, then distribute.
+                var data = outcome.Result.Data
+                    ?? await BufferStreamAsync(outcome.Result.DataStream!, ct).ConfigureAwait(false);
+                outcome.Result.Dispose(); // close original stream if any
+
+                DistributeToSubscribers(key, stringKey, data,
                     outcome.Result.Metadata, subscribers);
+
+                return CacheResult.BufferedHit(status, data,
+                    outcome.Result.Metadata.ContentType, outcome.HitProviderName!, sw.Elapsed);
             }
 
-            return CacheResult.BufferedHit(status, outcome.Result.Data,
-                outcome.Result.Metadata.ContentType, outcome.HitProviderName!, sw.Elapsed);
+            // No subscribers — stream through directly (hot path for CDN).
+            if (outcome.Result.Data != null)
+            {
+                return CacheResult.BufferedHit(status, outcome.Result.Data,
+                    outcome.Result.Metadata.ContentType, outcome.HitProviderName!, sw.Elapsed);
+            }
+            else
+            {
+                // Transfer stream ownership to CacheResult. Caller disposes.
+                return CacheResult.StreamHit(status, outcome.Result.DataStream!,
+                    outcome.Result.Metadata.ContentType, outcome.HitProviderName!, sw.Elapsed);
+            }
         }
 
         // 2. Cache miss — invoke factory (with optional coalescing)
@@ -418,6 +436,32 @@ public sealed class CacheCascade : ICacheEngine
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Buffer a stream to a byte array. Only called when subscribers need the data.
+    /// Uses the stream's length for pre-allocation when available.
+    /// </summary>
+    private static async ValueTask<byte[]> BufferStreamAsync(Stream stream, CancellationToken ct)
+    {
+        if (stream.CanSeek)
+        {
+            var length = (int)stream.Length;
+            var buffer = new byte[length];
+            int offset = 0;
+            while (offset < length)
+            {
+                var read = await stream.ReadAsync(buffer, offset, length - offset, ct).ConfigureAwait(false);
+                if (read == 0) break;
+                offset += read;
+            }
+            return buffer;
+        }
+
+        // Unknown length — use MemoryStream for dynamic sizing
+        using var ms = new MemoryStream();
+        await stream.CopyToAsync(ms, 81920, ct).ConfigureAwait(false);
+        return ms.ToArray();
     }
 
     private CacheResultStatus ClassifyHitStatus(string providerName)

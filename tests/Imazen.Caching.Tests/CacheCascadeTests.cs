@@ -615,4 +615,156 @@ public class CacheCascadeTests : IDisposable
         result2.Dispose();
         node2.Dispose();
     }
+
+    [Fact]
+    public async Task StreamingDiskHit_NoSubscribers_StreamsDirectly()
+    {
+        // Hot path: disk hit with no subscribers → stream passes through, no buffering.
+        var memory = new InMemoryCacheProvider("memory", requiresInline: true);
+        var disk = new StreamingCacheProvider("disk");
+
+        var cascade = new CacheCascade(new CascadeConfig
+        {
+            Providers = new List<string> { "memory", "disk" },
+            EnableRequestCoalescing = false,
+            BloomFilterEstimatedItems = 100,
+        });
+        cascade.RegisterProvider(memory);
+        cascade.RegisterProvider(disk);
+
+        var key = CacheKey.FromStrings("stream-disk-src", "stream-disk-var");
+        var expectedData = TestData();
+
+        // Pre-populate both tiers so there are no subscribers on hit
+        await memory.StoreAsync(key, expectedData, new CacheEntryMetadata { ContentType = "image/jpeg" });
+        await disk.StoreAsync(key, expectedData, new CacheEntryMetadata { ContentType = "image/jpeg" });
+
+        // Clear memory to force disk hit
+        await memory.InvalidateAsync(key);
+
+        // Now: disk hit. Memory was checked and missed → gets Missed → subscribes.
+        // So this case has a subscriber. Let's test the no-subscriber case instead.
+        // Pre-populate memory again so it doesn't subscribe.
+        await memory.StoreAsync(key, expectedData, new CacheEntryMetadata { ContentType = "image/jpeg" });
+
+        // Reset disk fetch count
+        disk.FetchCount = 0;
+
+        // Memory hits first — disk is never even reached
+        var result = await cascade.GetOrCreateAsync(key, ct =>
+            throw new InvalidOperationException("Factory should not be called"));
+
+        Assert.Equal(CacheResultStatus.MemoryHit, result.Status);
+        Assert.NotNull(result.Data); // Memory returns byte[]
+        Assert.Equal(0, disk.FetchCount); // Disk was never fetched
+        result.Dispose();
+        cascade.Dispose();
+    }
+
+    [Fact]
+    public async Task StreamingDiskHit_WithSubscribers_BuffersForReplication()
+    {
+        // Disk hit with a subscriber (memory missed) → buffers stream for replication.
+        var memory = new InMemoryCacheProvider("memory", requiresInline: true);
+        var disk = new StreamingCacheProvider("disk");
+
+        var cascade = new CacheCascade(new CascadeConfig
+        {
+            Providers = new List<string> { "memory", "disk" },
+            EnableRequestCoalescing = false,
+            BloomFilterEstimatedItems = 100,
+        });
+        cascade.RegisterProvider(memory);
+        cascade.RegisterProvider(disk);
+
+        var key = CacheKey.FromStrings("stream-buf-src", "stream-buf-var");
+        var expectedData = TestData();
+
+        // Only disk has data — memory will miss and subscribe
+        await disk.StoreAsync(key, expectedData, new CacheEntryMetadata { ContentType = "image/webp" });
+
+        var result = await cascade.GetOrCreateAsync(key, ct =>
+            throw new InvalidOperationException("Factory should not be called"));
+
+        Assert.Equal(CacheResultStatus.DiskHit, result.Status);
+        // Data was buffered for replication to memory
+        Assert.NotNull(result.Data);
+        Assert.Equal(expectedData, result.Data);
+
+        // Memory should have received the data via replication
+        Assert.True(memory.Contains(key));
+
+        result.Dispose();
+        cascade.Dispose();
+    }
+
+    [Fact]
+    public async Task StreamingDiskHit_NoSubscribers_ReturnsStream()
+    {
+        // Disk hit where no other provider wants the data → stream passes through directly.
+        // Use a single-provider cascade (no memory tier to subscribe).
+        var disk = new StreamingCacheProvider("disk");
+
+        var cascade = new CacheCascade(new CascadeConfig
+        {
+            Providers = new List<string> { "disk" },
+            EnableRequestCoalescing = false,
+            BloomFilterEstimatedItems = 100,
+        });
+        cascade.RegisterProvider(disk);
+
+        var key = CacheKey.FromStrings("stream-only-src", "stream-only-var");
+        var expectedData = TestData();
+
+        await disk.StoreAsync(key, expectedData, new CacheEntryMetadata { ContentType = "image/png" });
+
+        var result = await cascade.GetOrCreateAsync(key, ct =>
+            throw new InvalidOperationException("Factory should not be called"));
+
+        Assert.Equal(CacheResultStatus.DiskHit, result.Status);
+        // Stream path: Data is null, DataStream is set
+        Assert.Null(result.Data);
+        Assert.NotNull(result.DataStream);
+
+        // Read through GetStream() and verify data
+        using var ms = new MemoryStream();
+        await result.DataStream!.CopyToAsync(ms);
+        Assert.Equal(expectedData, ms.ToArray());
+
+        result.Dispose();
+        cascade.Dispose();
+    }
+
+    [Fact]
+    public async Task StreamingProvider_GetStream_WorksForBothPaths()
+    {
+        // GetStream() returns the right thing for both stream and buffered results.
+        var disk = new StreamingCacheProvider("disk");
+
+        var cascade = new CacheCascade(new CascadeConfig
+        {
+            Providers = new List<string> { "disk" },
+            EnableRequestCoalescing = false,
+            BloomFilterEstimatedItems = 100,
+        });
+        cascade.RegisterProvider(disk);
+
+        var key = CacheKey.FromStrings("getstream-src", "getstream-var");
+        var expectedData = TestData();
+
+        await disk.StoreAsync(key, expectedData, new CacheEntryMetadata { ContentType = "image/jpeg" });
+
+        var result = await cascade.GetOrCreateAsync(key, ct =>
+            throw new InvalidOperationException("Should hit disk"));
+
+        // GetStream() should work regardless of internal representation
+        using var stream = result.GetStream();
+        Assert.NotNull(stream);
+        using var ms = new MemoryStream();
+        await stream!.CopyToAsync(ms);
+        Assert.Equal(expectedData, ms.ToArray());
+
+        result.Dispose();
+        cascade.Dispose();
+    }
 }

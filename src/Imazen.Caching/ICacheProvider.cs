@@ -110,29 +110,69 @@ public interface ICacheProvider
 
 /// <summary>
 /// Result of fetching from a cache provider.
-/// Providers return the raw data; the cascade decides whether to buffer or stream through.
+/// Exactly one of Data or DataStream is non-null:
+/// - Memory providers set Data (byte[], already in memory)
+/// - Disk/cloud providers set DataStream (stream, avoids full buffering)
+///
+/// The cascade decides whether to buffer based on whether subscribers need the data.
+/// When no subscribers want it (steady-state hot path), the stream passes through
+/// directly to the HTTP response with no buffering.
 /// </summary>
 public sealed class CacheFetchResult : IDisposable
 {
     /// <summary>
-    /// The cached data as a byte array.
+    /// Buffered data (memory providers). Null for stream-based providers.
     /// </summary>
-    public byte[] Data { get; }
+    public byte[]? Data { get; }
+
+    /// <summary>
+    /// Stream data (disk/cloud providers). Owned by the caller — must be disposed.
+    /// Null for memory providers.
+    /// </summary>
+    public Stream? DataStream { get; }
 
     /// <summary>
     /// Metadata associated with this cache entry.
     /// </summary>
     public CacheEntryMetadata Metadata { get; }
 
+    /// <summary>
+    /// Content length in bytes, from Data.Length, Metadata.ContentLength, or Stream.Length.
+    /// Returns -1 if truly unknown.
+    /// </summary>
+    public long ContentLength
+    {
+        get
+        {
+            if (Data != null) return Data.Length;
+            if (Metadata.ContentLength >= 0) return Metadata.ContentLength;
+            if (DataStream != null && DataStream.CanSeek) return DataStream.Length;
+            return -1;
+        }
+    }
+
+    /// <summary>
+    /// Memory provider path: data already in byte[].
+    /// </summary>
     public CacheFetchResult(byte[] data, CacheEntryMetadata metadata)
     {
         Data = data ?? throw new ArgumentNullException(nameof(data));
         Metadata = metadata ?? throw new ArgumentNullException(nameof(metadata));
     }
 
+    /// <summary>
+    /// Disk/cloud provider path: data as a stream.
+    /// Metadata.ContentLength should be set so the cascade can check subscribers
+    /// without buffering.
+    /// </summary>
+    public CacheFetchResult(Stream dataStream, CacheEntryMetadata metadata)
+    {
+        DataStream = dataStream ?? throw new ArgumentNullException(nameof(dataStream));
+        Metadata = metadata ?? throw new ArgumentNullException(nameof(metadata));
+    }
+
     public void Dispose()
     {
-        // No-op for byte arrays. Present for future extensibility if we
-        // switch to pooled buffers.
+        DataStream?.Dispose();
     }
 }
