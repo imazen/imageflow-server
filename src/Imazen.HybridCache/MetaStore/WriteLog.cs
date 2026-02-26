@@ -81,6 +81,8 @@ namespace Imazen.HybridCache.MetaStore
             var rawFiles = Directory.GetFiles(databaseDir, "*", SearchOption.TopDirectoryOnly);
             var orderedLogs = rawFiles.Select(path =>
                 {
+                    // Reject non-metastore files
+                    if (!path.EndsWith(".metastore", StringComparison.OrdinalIgnoreCase)) return null;
                     var filename = Path.GetFileNameWithoutExtension(path);
                     return long.TryParse(filename, NumberStyles.Integer, CultureInfo.InvariantCulture, out long result)
                         ? new Tuple<string, long>(path, result)
@@ -113,7 +115,9 @@ namespace Imazen.HybridCache.MetaStore
                 catch (IOException ioException)
                 {
                     logger?.LogError(ioException, "Failed to open log file {Path} for reading in shard {ShardId}. Perhaps another process is still writing to the log?", lastOpenPath, shardId);
-                    throw;
+                    throw new HybridCacheInstanceConflictException(
+                        "Multiple instances of HybridCache may be attempting to use the same database directory. This is not supported.",
+                        lastOpenPath, shardId, ioException);
                 }
                 
                 // Open the write log file, even if we won't use it immediately.
@@ -180,6 +184,8 @@ namespace Imazen.HybridCache.MetaStore
                 {
                     await WriteLogEntry(new LogEntry(LogEntryType.Create, record), false);
                 }
+                if (writeLogStream == null)
+                    throw new InvalidOperationException("writeLogStream is null during log consolidation");
                 await writeLogStream.FlushAsync();
 
                 // Delete old logs
@@ -249,8 +255,8 @@ namespace Imazen.HybridCache.MetaStore
             {
                 if (startedAt == 0)
                     throw new InvalidOperationException("WriteLog cannot be used before calling Startup()");
-                if (writeLogStream == null)
-                    throw new InvalidOperationException("WriteLog cannot be after StopAsync is called");
+                if (writeLogStream == null || binaryLogWriter == null)
+                    throw new InvalidOperationException("WriteLog cannot be used after StopAsync is called");
                 var startPos = writeLogStream.Position;
                 binaryLogWriter.Write((byte) entry.EntryType);
                 binaryLogWriter.Write(entry.RelativePath);
