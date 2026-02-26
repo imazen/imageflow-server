@@ -540,6 +540,13 @@
           "System.Threading.Tasks.Extensions": "[4.6.1, )"
         }
       },
+      "imazen.caching": {
+        "type": "Project",
+        "dependencies": {
+          "System.Memory": "[4.6.3, )",
+          "System.Threading.Tasks.Extensions": "[4.6.1, )"
+        }
+      },
       "imazen.common": {
         "type": "Project",
         "dependencies": {
@@ -948,6 +955,9 @@
           "Microsoft.Extensions.DependencyInjection": "[8.0.1, )",
           "Microsoft.Extensions.Hosting.Abstractions": "[8.0.1, )"
         }
+      },
+      "imazen.caching": {
+        "type": "Project"
       },
       "imazen.common": {
         "type": "Project",

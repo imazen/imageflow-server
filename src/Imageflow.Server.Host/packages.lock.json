@@ -648,6 +648,7 @@
         "type": "Project",
         "dependencies": {
           "Azure.Storage.Blobs": "[12.23.0, )",
+          "Imazen.Caching": "[0.1.0--notset, )",
           "Imazen.Common": "[0.1.0--notset, )",
           "Microsoft.Extensions.Azure": "[1.7.6, )"
         }
@@ -663,6 +664,7 @@
         "type": "Project",
         "dependencies": {
           "AWSSDK.S3": "[3.7.412, )",
+          "Imazen.Caching": "[0.1.0--notset, )",
           "Imazen.Common": "[0.1.0--notset, )",
           "Imazen.Routing": "[0.1.0--notset, )"
         }
@@ -675,6 +677,9 @@
           "Microsoft.Extensions.Hosting.Abstractions": "[8.0.1, )"
         }
       },
+      "imazen.caching": {
+        "type": "Project"
+      },
       "imazen.common": {
         "type": "Project",
         "dependencies": {
@@ -685,6 +690,7 @@
       "imazen.hybridcache": {
         "type": "Project",
         "dependencies": {
+          "Imazen.Caching": "[0.1.0--notset, )",
           "Imazen.Common": "[0.1.0--notset, )",
           "System.Interactive.Async": "[6.0.1, )"
         }
@@ -695,6 +701,7 @@
           "CommunityToolkit.HighPerformance": "[8.4.0, )",
           "Imageflow.Net": "[0.13.2, )",
           "Imazen.Abstractions": "[0.1.0--notset, )",
+          "Imazen.Caching": "[0.1.0--notset, )",
           "Imazen.Common": "[0.1.0--notset, )",
           "Microsoft.Extensions.Hosting": "[8.0.1, )",
           "Microsoft.Extensions.Options": "[8.0.1, )",

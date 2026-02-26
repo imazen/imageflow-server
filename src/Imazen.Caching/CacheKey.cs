@@ -39,6 +39,30 @@ public readonly struct CacheKey : IEquatable<CacheKey>
     /// Creates a CacheKey from string identifiers. The source is hashed to produce
     /// the source prefix, and source+variant together produce the variant hash.
     /// </summary>
+    /// <summary>
+    /// Creates a CacheKey from a raw 32-byte hash by splitting into two 16-byte halves.
+    /// First 16 bytes → source hash, last 16 → variant hash.
+    /// Note: purge-by-source won't work meaningfully with keys created this way
+    /// since the first 16 bytes aren't a pure source hash.
+    /// Use FromStrings for proper source tracking.
+    /// </summary>
+    public static CacheKey FromRaw32(byte[] hash32)
+    {
+        if (hash32 == null) throw new ArgumentNullException(nameof(hash32));
+        if (hash32.Length != 32)
+            throw new ArgumentException("Hash must be 32 bytes", nameof(hash32));
+
+        var sourceHash = new byte[16];
+        var variantHash = new byte[16];
+        Buffer.BlockCopy(hash32, 0, sourceHash, 0, 16);
+        Buffer.BlockCopy(hash32, 16, variantHash, 0, 16);
+        return new CacheKey(sourceHash, variantHash);
+    }
+
+    /// <summary>
+    /// Creates a CacheKey from string identifiers. The source is hashed to produce
+    /// the source prefix, and source+variant together produce the variant hash.
+    /// </summary>
     public static CacheKey FromStrings(string source, string variant)
     {
         var sourceBytes = Encoding.UTF8.GetBytes(source);

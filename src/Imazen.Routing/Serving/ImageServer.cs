@@ -10,6 +10,7 @@ using Imazen.Common.Concurrency.BoundedTaskCollection;
 using Imazen.Common.Instrumentation;
 using Imazen.Common.Instrumentation.Support.InfoAccumulators;
 using Imazen.Common.Licensing;
+using Imazen.Caching;
 using Imazen.Routing.Caching;
 using Imazen.Routing.Engine;
 using Imazen.Routing.Health;
@@ -171,18 +172,6 @@ internal class ImageServer<TRequest, TResponse, TContext> : IImageServer<TReques
 
         logger.LogInformation("Caches: {Caches}", string.Join(",", allCaches?.Select(c => c.UniqueName).ToArray() ?? [])); //string.Format("Caches: {Caches}",
 
-        var sourceCacheOptions = new CacheEngineOptions
-        {
-            HealthTracker = cacheHealthTracker,
-            SeriesOfCacheGroups =
-            [
-                ..new[] { [memoryCache], allCachesExceptMemory ?? [] }
-            ],
-            SaveToCaches = allCaches!,
-            BlobFactory = blobFactory,
-            UploadQueue = uploadQueue,
-            Logger = logger
-        };
         var imagingOptions = new ImagingMiddlewareOptions
         {
             Logger = logger,
@@ -190,9 +179,33 @@ internal class ImageServer<TRequest, TResponse, TContext> : IImageServer<TReques
             WatermarkingLogic = watermarkingLogic
         };
 
-        pipeline = new CacheEngine(null, sourceCacheOptions);
-        pipeline = new ImagingMiddleware(pipeline, imagingOptions);
-        pipeline = new CacheEngine(pipeline, sourceCacheOptions);
+        // Use CacheCascade pipeline if ICacheEngine is registered, otherwise fall back to legacy CacheEngine
+        var cacheEngine = serviceProvider.GetService<ICacheEngine>();
+        if (cacheEngine != null)
+        {
+            logger.LogInformation("Using CascadeCachePipeline with ICacheEngine");
+            pipeline = new CascadeCachePipeline(null, cacheEngine);
+            pipeline = new ImagingMiddleware(pipeline, imagingOptions);
+            pipeline = new CascadeCachePipeline(pipeline, cacheEngine);
+        }
+        else
+        {
+            var sourceCacheOptions = new CacheEngineOptions
+            {
+                HealthTracker = cacheHealthTracker,
+                SeriesOfCacheGroups =
+                [
+                    ..new[] { [memoryCache], allCachesExceptMemory ?? [] }
+                ],
+                SaveToCaches = allCaches!,
+                BlobFactory = blobFactory,
+                UploadQueue = uploadQueue,
+                Logger = logger
+            };
+            pipeline = new CacheEngine(null, sourceCacheOptions);
+            pipeline = new ImagingMiddleware(pipeline, imagingOptions);
+            pipeline = new CacheEngine(pipeline, sourceCacheOptions);
+        }
 
         startupDiagnostics.LogIssues(logger);
 

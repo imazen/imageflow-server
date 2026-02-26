@@ -542,6 +542,13 @@
           "System.Threading.Tasks.Extensions": "[4.6.1, )"
         }
       },
+      "imazen.caching": {
+        "type": "Project",
+        "dependencies": {
+          "System.Memory": "[4.6.3, )",
+          "System.Threading.Tasks.Extensions": "[4.6.1, )"
+        }
+      },
       "imazen.common": {
         "type": "Project",
         "dependencies": {
@@ -552,6 +559,7 @@
       "imazen.hybridcache": {
         "type": "Project",
         "dependencies": {
+          "Imazen.Caching": "[0.1.0--notset, )",
           "Imazen.Common": "[0.1.0--notset, )",
           "System.Interactive.Async": "[6.0.1, )"
         }
@@ -562,6 +570,7 @@
           "CommunityToolkit.HighPerformance": "[8.4.0, )",
           "Imageflow.Net": "[0.13.2, )",
           "Imazen.Abstractions": "[0.1.0--notset, )",
+          "Imazen.Caching": "[0.1.0--notset, )",
           "Imazen.Common": "[0.1.0--notset, )",
           "Microsoft.Extensions.Hosting": "[8.0.1, )",
           "Microsoft.Extensions.Options": "[8.0.1, )",
@@ -983,6 +992,9 @@
           "Microsoft.Extensions.Hosting.Abstractions": "[8.0.1, )"
         }
       },
+      "imazen.caching": {
+        "type": "Project"
+      },
       "imazen.common": {
         "type": "Project",
         "dependencies": {
@@ -993,6 +1005,7 @@
       "imazen.hybridcache": {
         "type": "Project",
         "dependencies": {
+          "Imazen.Caching": "[0.1.0--notset, )",
           "Imazen.Common": "[0.1.0--notset, )",
           "System.Interactive.Async": "[6.0.1, )"
         }
@@ -1003,6 +1016,7 @@
           "CommunityToolkit.HighPerformance": "[8.4.0, )",
           "Imageflow.Net": "[0.13.2, )",
           "Imazen.Abstractions": "[0.1.0--notset, )",
+          "Imazen.Caching": "[0.1.0--notset, )",
           "Imazen.Common": "[0.1.0--notset, )",
           "Microsoft.Extensions.Hosting": "[8.0.1, )",
           "Microsoft.Extensions.Options": "[8.0.1, )",

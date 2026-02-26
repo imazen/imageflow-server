@@ -23,6 +23,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\Imazen.Abstractions\Imazen.Abstractions.csproj" />
+      <ProjectReference Include="..\Imazen.Caching\Imazen.Caching.csproj" />
       <ProjectReference Include="..\Imazen.Common\Imazen.Common.csproj" />
     </ItemGroup>
 
