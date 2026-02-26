@@ -492,4 +492,127 @@ public class CacheCascadeTests : IDisposable
 
         result.Dispose();
     }
+
+    [Fact]
+    public async Task BloomFilter_Checkpoint_And_Load_Survives_Restart()
+    {
+        // Simulate: populate bloom filter, checkpoint to disk, restart, load bloom, hit cloud.
+        // Disk stores the bloom checkpoint but rejects cache data — only cloud has content.
+        var disk = new InMemoryCacheProvider("disk") { AcceptsFreshResults = false, AcceptsMissed = false };
+        var cloud = new InMemoryCacheProvider("cloud", latencyZone: "s3:us-east-1");
+
+        var cascade1 = new CacheCascade(new CascadeConfig
+        {
+            Providers = new List<string> { "disk", "cloud" },
+            EnableRequestCoalescing = false,
+            BloomFilterEstimatedItems = 1000,
+            BloomFilterFalsePositiveRate = 0.01,
+            BloomFilterSlots = 2
+        });
+        cascade1.RegisterProvider(disk);
+        cascade1.RegisterProvider(cloud);
+
+        // Insert key → cloud gets data, bloom learns about it
+        var key = CacheKey.FromStrings("persist-src", "persist-var");
+        var data = TestData();
+        var result = await cascade1.GetOrCreateAsync(key, async ct =>
+            (data, new CacheEntryMetadata()));
+        result.Dispose();
+        await cascade1.UploadQueue.DrainAsync();
+
+        // Cloud has data, disk does not (rejected fresh)
+        Assert.True(cloud.Contains(key));
+        Assert.False(disk.Contains(key));
+        var bloomKey = key.ToStringKey() + ":cloud";
+        Assert.True(cascade1.BloomFilter.ProbablyContains(bloomKey));
+
+        // Checkpoint bloom filter to disk (stores under reserved __meta key)
+        await cascade1.CheckpointBloomFilterAsync();
+        cascade1.Dispose();
+
+        // Create a new cascade (simulating restart)
+        var cascade2 = new CacheCascade(new CascadeConfig
+        {
+            Providers = new List<string> { "disk", "cloud" },
+            EnableRequestCoalescing = false,
+            BloomFilterEstimatedItems = 1000,
+            BloomFilterFalsePositiveRate = 0.01,
+            BloomFilterSlots = 2
+        });
+        cascade2.RegisterProvider(disk);
+        cascade2.RegisterProvider(cloud);
+
+        // Before load: bloom is empty, cloud is invisible
+        Assert.False(cascade2.BloomFilter.ProbablyContains(bloomKey));
+
+        // Load from disk
+        await cascade2.LoadBloomFilterAsync();
+
+        // After load: bloom knows about cloud's data
+        Assert.True(cascade2.BloomFilter.ProbablyContains(bloomKey));
+
+        // Fetch should hit cloud (bloom says "maybe there", cloud has it)
+        var result2 = await cascade2.GetOrCreateAsync(key, ct =>
+            throw new InvalidOperationException("Factory should not be called — cloud has data"));
+
+        Assert.Equal(CacheResultStatus.CloudHit, result2.Status);
+        result2.Dispose();
+
+        cascade2.Dispose();
+    }
+
+    [Fact]
+    public async Task BloomFilter_PeerMerge_EnablesCloudHit()
+    {
+        // Simulate two cluster nodes: node1 populates cloud, node2 merges bloom from node1
+        var cloud = new InMemoryCacheProvider("cloud", latencyZone: "s3:us-east-1");
+
+        // Node 1: populates cloud and bloom filter
+        var node1 = new CacheCascade(new CascadeConfig
+        {
+            Providers = new List<string> { "cloud" },
+            EnableRequestCoalescing = false,
+            BloomFilterEstimatedItems = 1000,
+            BloomFilterSlots = 2
+        });
+        node1.RegisterProvider(cloud);
+
+        var key = CacheKey.FromStrings("cluster-src", "cluster-var");
+        var result1 = await node1.GetOrCreateAsync(key, async ct =>
+            (TestData(), new CacheEntryMetadata()));
+        result1.Dispose();
+        await node1.UploadQueue.DrainAsync();
+
+        // Export node1's bloom filter
+        var peerData = node1.BloomFilter.ToBytes();
+        node1.Dispose();
+
+        // Node 2: fresh cascade, cloud has data but bloom is empty
+        var node2 = new CacheCascade(new CascadeConfig
+        {
+            Providers = new List<string> { "cloud" },
+            EnableRequestCoalescing = false,
+            BloomFilterEstimatedItems = 1000,
+            BloomFilterSlots = 2
+        });
+        node2.RegisterProvider(cloud);
+
+        // Before merge: bloom says "not there", factory would be called
+        var bloomKey = key.ToStringKey() + ":cloud";
+        Assert.False(node2.BloomFilter.ProbablyContains(bloomKey));
+
+        // Merge peer's bloom filter (OR union)
+        node2.MergeBloomFilterFromPeer(peerData);
+
+        // After merge: bloom knows cloud has this key
+        Assert.True(node2.BloomFilter.ProbablyContains(bloomKey));
+
+        // Fetch hits cloud instead of calling factory
+        var result2 = await node2.GetOrCreateAsync(key, ct =>
+            throw new InvalidOperationException("Factory should not be called"));
+
+        Assert.Equal(CacheResultStatus.CloudHit, result2.Status);
+        result2.Dispose();
+        node2.Dispose();
+    }
 }

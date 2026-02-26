@@ -462,6 +462,89 @@ public sealed class CacheCascade : ICacheEngine
     /// </summary>
     public RequestCoalescer? Coalescer => _coalescer;
 
+    // Well-known key for bloom filter persistence.
+    // Uses a reserved prefix ("__meta") that won't collide with content keys.
+    private static readonly CacheKey BloomPersistenceKey =
+        CacheKey.FromStrings("__meta/bloom", "__meta/bloom/state");
+
+    /// <summary>
+    /// Find the first local non-inline provider (disk tier) for bloom filter persistence.
+    /// Returns null if no suitable provider exists.
+    /// </summary>
+    private ICacheProvider? GetBloomPersistenceProvider()
+    {
+        foreach (var name in _providerOrder)
+        {
+            if (!_providers.TryGetValue(name, out var provider)) continue;
+            if (provider.Capabilities.IsLocal && !provider.Capabilities.RequiresInlineExecution)
+                return provider;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Save the bloom filter to the first local non-inline provider (disk).
+    /// Call periodically and on graceful shutdown.
+    /// If no suitable provider exists, this is a no-op.
+    /// </summary>
+    public async ValueTask CheckpointBloomFilterAsync(CancellationToken ct = default)
+    {
+        var provider = GetBloomPersistenceProvider();
+        if (provider == null) return;
+
+        try
+        {
+            var data = _bloom.ToBytes();
+            await provider.StoreAsync(BloomPersistenceKey, data,
+                new CacheEntryMetadata { ContentType = "application/x-bloom-filter" }, ct)
+                .ConfigureAwait(false);
+        }
+        catch
+        {
+            FireEvent(CacheEventKind.Error, BloomPersistenceKey,
+                "cascade", detail: "Bloom filter checkpoint failed");
+        }
+    }
+
+    /// <summary>
+    /// Load the bloom filter from the first local non-inline provider (disk).
+    /// Call on startup before serving requests.
+    /// If no persisted state exists, the filter starts empty (cloud tiers become
+    /// invisible until re-warmed through normal traffic).
+    /// </summary>
+    public async ValueTask LoadBloomFilterAsync(CancellationToken ct = default)
+    {
+        var provider = GetBloomPersistenceProvider();
+        if (provider == null) return;
+
+        try
+        {
+            var result = await provider.FetchAsync(BloomPersistenceKey, ct).ConfigureAwait(false);
+            if (result?.Data != null)
+            {
+                _bloom.LoadFromBytes(result.Data);
+            }
+        }
+        catch
+        {
+            // No persisted state or incompatible format — start empty.
+            // Cloud tiers will re-warm through normal traffic.
+            FireEvent(CacheEventKind.Error, BloomPersistenceKey,
+                "cascade", detail: "Bloom filter load failed, starting empty");
+        }
+    }
+
+    /// <summary>
+    /// OR-merge a bloom filter received from another cluster node.
+    /// After merge, this node's bloom filter contains the union of both
+    /// nodes' knowledge about cloud contents.
+    /// </summary>
+    public void MergeBloomFilterFromPeer(byte[] peerBloomData)
+    {
+        if (peerBloomData == null) throw new ArgumentNullException(nameof(peerBloomData));
+        _bloom.MergeFromBytes(peerBloomData);
+    }
+
     public void Dispose()
     {
         if (_disposed) return;
