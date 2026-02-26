@@ -84,9 +84,17 @@ namespace Imazen.HybridCache
 
                     var subdirectoryPath = Path.GetDirectoryName(entry.PhysicalPath);
                     //Create subdirectory if needed.
-                    if (subdirectoryPath != null && !Directory.Exists(subdirectoryPath))
+                    if (!string.IsNullOrEmpty(subdirectoryPath))
                     {
-                        Directory.CreateDirectory(subdirectoryPath);
+                        if (!Directory.Exists(subdirectoryPath))
+                        {
+                            Directory.CreateDirectory(subdirectoryPath);
+                        }
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException(
+                            "CacheEntry.PhysicalPath must be a valid path; found " + entry.PhysicalPath);
                     }
 
                     string writeToFile;
