@@ -9,7 +9,7 @@
     
     <ItemGroup>
       <ProjectReference Include="..\Imazen.Common\Imazen.Common.csproj" />
-
+      <ProjectReference Include="..\Imazen.Caching\Imazen.Caching.csproj" />
     </ItemGroup>
 
     <!-- <ItemGroup>

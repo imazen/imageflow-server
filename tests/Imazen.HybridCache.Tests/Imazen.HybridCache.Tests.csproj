@@ -9,6 +9,7 @@
         <TargetFrameworks Condition="'$(TEST_DOTNET_48)' != 'true'">
             net8.0</TargetFrameworks>
         <NoWarn>$(NoWarn);CS8892</NoWarn>
+        <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
     </PropertyGroup>
     <ItemGroup>
 
@@ -16,6 +17,7 @@
     
     <ItemGroup>
       <ProjectReference Include="..\..\src\Imazen.HybridCache\Imazen.HybridCache.csproj" />
+      <ProjectReference Include="..\..\src\Imazen.Caching\Imazen.Caching.csproj" />
       <ProjectReference Include="..\..\src\Imazen.Routing\Imazen.Routing.csproj" />
       <ProjectReference Include="..\Imazen.TestingHelpers\Imazen.TestingHelpers.csproj" />
       </ItemGroup>

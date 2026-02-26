@@ -67,25 +67,25 @@ namespace Imazen.HybridCache
             LatencyZone = new LatencyTrackingZone($"Hybrid Disk Cache ('{UniqueName}')", 30);
         }
 
-        ICacheDatabase<ICacheDatabaseRecord> Database { get; }
+        internal ICacheDatabase<ICacheDatabaseRecord> Database { get; }
 
         private LatencyTrackingZone LatencyZone { get; set; }
-        
-        private AsyncCacheOptions Options { get; }
-        private HashBasedPathBuilder PathBuilder { get; }
+
+        internal AsyncCacheOptions Options { get; }
+        internal HashBasedPathBuilder PathBuilder { get; }
         private IReLogger? Logger { get; }
 
-        private ICacheCleanupManager CleanupManager { get; }
+        internal ICacheCleanupManager CleanupManager { get; }
 
         /// <summary>
         /// Provides string-based locking for file write access. Note: this doesn't lock on relativepath in filewriter!
         /// </summary>
-        private AsyncLockProvider FileWriteLocks { get; }
+        internal AsyncLockProvider FileWriteLocks { get; }
 
         // TODO: carefully review all these locks to ensure the key construction mechanism is the same on all
-        private AsyncLockProvider EvictAndWriteLocks { get; }
+        internal AsyncLockProvider EvictAndWriteLocks { get; }
 
-        private CacheFileWriter FileWriter { get; }
+        internal CacheFileWriter FileWriter { get; }
 
         // /// <summary>
         // /// Provides string-based locking for image resizing (not writing, just processing). Prevents duplication of efforts in asynchronous mode, where 'Locks' is not being used.
