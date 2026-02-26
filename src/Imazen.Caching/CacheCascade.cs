@@ -16,7 +16,9 @@ namespace Imazen.Caching;
 /// - Request coalescing prevents thundering herd on factory calls
 /// - Async upload queue for deferred writes to slow tiers (disk/cloud)
 /// - Backpressure: upload queue is byte-bounded, drops on overflow
-/// - Every produced image is stored to ALL tiers (no popularity filtering)
+/// - Subscription model: providers declare whether they want data via WantsToStore
+/// - Two paths: Path A (pure streaming, no buffering) when no subscribers,
+///   Path B (buffer and distribute) when subscribers exist
 /// </summary>
 public sealed class CacheCascade : ICacheEngine
 {
@@ -78,13 +80,20 @@ public sealed class CacheCascade : ICacheEngine
             var status = ClassifyHitStatus(hitProviderName!);
             FireEvent(CacheEventKind.Hit, key, hitProviderName!, sw.Elapsed);
 
-            // Async-replicate to missed faster tiers
-            if (hitProviderIndex > 0)
-            {
-                ReplicateToFasterTiers(key, stringKey, fetchResult.Data, fetchResult.Metadata, hitProviderIndex);
-            }
+            // Ask non-hit providers if they want this data (subscription model)
+            var subscribers = GetSubscribers(key, fetchResult.Data.Length,
+                CacheStoreReason.ExternalHit, hitProviderIndex, hitProviderName!);
 
-            return CacheResult.Hit(status, fetchResult.Data, fetchResult.Metadata.ContentType,
+            if (subscribers.Count > 0)
+            {
+                // Path B: subscribers want the data — distribute via store
+                DistributeToSubscribers(key, stringKey, fetchResult.Data, fetchResult.Metadata, subscribers);
+            }
+            // else: Path A — pure streaming, no buffering overhead
+            // (In both cases, data is byte[] from the provider, so no difference today.
+            //  When providers return Stream, Path A will skip the buffer-to-byte[] step.)
+
+            return CacheResult.BufferedHit(status, fetchResult.Data, fetchResult.Metadata.ContentType,
                 hitProviderName!, sw.Elapsed);
         }
 
@@ -124,7 +133,7 @@ public sealed class CacheCascade : ICacheEngine
             sw.Stop();
             if (result.WasCreated)
             {
-                StoreToAllTiers(key, stringKey, result.Data, result.Metadata!);
+                StoreToSubscribers(key, stringKey, result.Data, result.Metadata!);
             }
 
             return CacheResult.Created(result.Data, result.Metadata?.ContentType, sw.Elapsed);
@@ -139,7 +148,7 @@ public sealed class CacheCascade : ICacheEngine
             }
 
             sw.Stop();
-            StoreToAllTiers(key, stringKey, produced.Value.Data, produced.Value.Metadata);
+            StoreToSubscribers(key, stringKey, produced.Value.Data, produced.Value.Metadata);
             return CacheResult.Created(produced.Value.Data, produced.Value.Metadata.ContentType, sw.Elapsed);
         }
     }
@@ -234,12 +243,64 @@ public sealed class CacheCascade : ICacheEngine
         return (null, -1, null);
     }
 
-    private void StoreToAllTiers(CacheKey key, string stringKey, byte[] data, CacheEntryMetadata metadata)
+    /// <summary>
+    /// Ask all providers (except the hit provider) if they want to store this data.
+    /// Returns the list of (providerName, provider) pairs that want the data.
+    /// </summary>
+    private List<(string Name, ICacheProvider Provider)> GetSubscribers(
+        CacheKey key, long sizeBytes, CacheStoreReason reason,
+        int hitProviderIndex, string hitProviderName)
     {
+        var subscribers = new List<(string, ICacheProvider)>();
+
+        for (int i = 0; i < _providerOrder.Count; i++)
+        {
+            var providerName = _providerOrder[i];
+
+            // Don't store to the provider that already had it
+            if (providerName == hitProviderName) continue;
+
+            if (!_providers.TryGetValue(providerName, out var provider)) continue;
+
+            if (provider.WantsToStore(key, sizeBytes, reason))
+            {
+                subscribers.Add((providerName, provider));
+            }
+        }
+
+        return subscribers;
+    }
+
+    /// <summary>
+    /// Store freshly-created data to all providers that want it.
+    /// </summary>
+    private void StoreToSubscribers(CacheKey key, string stringKey, byte[] data, CacheEntryMetadata metadata)
+    {
+        var subscribers = new List<(string Name, ICacheProvider Provider)>();
+
         foreach (var providerName in _providerOrder)
         {
             if (!_providers.TryGetValue(providerName, out var provider)) continue;
+            if (provider.WantsToStore(key, data.Length, CacheStoreReason.FreshlyCreated))
+            {
+                subscribers.Add((providerName, provider));
+            }
+        }
 
+        if (subscribers.Count == 0) return;
+
+        DistributeToSubscribers(key, stringKey, data, metadata, subscribers);
+    }
+
+    /// <summary>
+    /// Distribute data to the given list of subscriber providers.
+    /// Inline providers get stored synchronously. Async providers go through the upload queue.
+    /// </summary>
+    private void DistributeToSubscribers(CacheKey key, string stringKey, byte[] data,
+        CacheEntryMetadata metadata, List<(string Name, ICacheProvider Provider)> subscribers)
+    {
+        foreach (var (providerName, provider) in subscribers)
+        {
             // Update bloom filter for cloud providers
             if (!provider.Capabilities.IsLocal)
             {
@@ -270,7 +331,7 @@ public sealed class CacheCascade : ICacheEngine
             }
             else
             {
-                // Async store via upload queue
+                // Async store via upload queue — queue takes ownership of data reference
                 var queueKey = stringKey + ":" + providerName;
                 var capturedProvider = provider;
                 var capturedKey = key;
@@ -286,42 +347,6 @@ public sealed class CacheCascade : ICacheEngine
                     FireEvent(CacheEventKind.Store, key, providerName);
                 }
             }
-        }
-    }
-
-    private void ReplicateToFasterTiers(CacheKey key, string stringKey, byte[] data,
-        CacheEntryMetadata metadata, int hitIndex)
-    {
-        for (int i = 0; i < hitIndex; i++)
-        {
-            var providerName = _providerOrder[i];
-            if (!_providers.TryGetValue(providerName, out var provider)) continue;
-
-            if (provider.Capabilities.RequiresInlineExecution)
-            {
-                try
-                {
-                    var task = provider.StoreAsync(key, data, metadata);
-                    if (!task.IsCompletedSuccessfully)
-                    {
-                        task.AsTask().ContinueWith(_ => { }, TaskScheduler.Default);
-                    }
-                }
-                catch
-                {
-                    // Best-effort replication
-                }
-            }
-            else
-            {
-                var queueKey = stringKey + ":" + providerName;
-                var capturedProvider = provider;
-                var capturedKey = key;
-                _uploadQueue.TryEnqueue(queueKey, data, metadata,
-                    (d, m, ct2) => capturedProvider.StoreAsync(capturedKey, d, m, ct2).AsTask());
-            }
-
-            FireEvent(CacheEventKind.Replicate, key, providerName);
         }
     }
 

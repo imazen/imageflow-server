@@ -60,10 +60,9 @@ public class CacheCascadeTests : IDisposable
         Assert.Equal("image/jpeg", result.ContentType);
         Assert.Equal(1, factoryCallCount);
 
-        // Verify data
-        using var ms = new MemoryStream();
-        await result.Data!.CopyToAsync(ms);
-        Assert.Equal(expectedData, ms.ToArray());
+        // Verify data via Data property
+        Assert.NotNull(result.Data);
+        Assert.Equal(expectedData, result.Data);
 
         result.Dispose();
     }
@@ -104,12 +103,12 @@ public class CacheCascadeTests : IDisposable
 
         result.Dispose();
 
-        // After a disk hit, the data should be replicated to memory (inline)
+        // After a disk hit, memory should receive the data (it subscribes to external hits)
         Assert.True(_memory.Contains(key));
     }
 
     [Fact]
-    public async Task StoreToAllTiers_AfterFactoryCall()
+    public async Task StoreToSubscribers_AfterFactoryCall()
     {
         var key = CacheKey.FromStrings("source4", "variant4");
         var data = TestData();
@@ -120,12 +119,149 @@ public class CacheCascadeTests : IDisposable
         });
         result.Dispose();
 
-        // Memory should have it (inline store)
+        // Memory should have it (inline store, subscribes to fresh)
         Assert.True(_memory.Contains(key));
 
-        // Disk should get it via upload queue
+        // Disk should get it via upload queue (subscribes to fresh)
         await _cascade.UploadQueue.DrainAsync();
         Assert.True(_disk.Contains(key));
+    }
+
+    [Fact]
+    public async Task SubscriptionModel_ProviderCanRejectData()
+    {
+        var memory = new InMemoryCacheProvider("memory", requiresInline: true);
+        var disk = new InMemoryCacheProvider("disk") { AcceptsFreshResults = false }; // Disk rejects fresh data
+
+        var cascade = new CacheCascade(new CascadeConfig
+        {
+            Providers = new List<string> { "memory", "disk" },
+            EnableRequestCoalescing = false,
+            BloomFilterEstimatedItems = 100,
+        });
+        cascade.RegisterProvider(memory);
+        cascade.RegisterProvider(disk);
+
+        var key = CacheKey.FromStrings("reject-src", "reject-var");
+        var result = await cascade.GetOrCreateAsync(key, async ct =>
+            (TestData(), new CacheEntryMetadata()));
+        result.Dispose();
+
+        // Memory accepted the data
+        Assert.True(memory.Contains(key));
+
+        // Disk rejected it
+        await cascade.UploadQueue.DrainAsync();
+        Assert.False(disk.Contains(key));
+
+        cascade.Dispose();
+    }
+
+    [Fact]
+    public async Task SubscriptionModel_SizeLimit_RejectsLargeEntries()
+    {
+        var memory = new InMemoryCacheProvider("memory", requiresInline: true)
+        {
+            MaxAcceptableBytes = 50 // Only accept entries <= 50 bytes
+        };
+        var disk = new InMemoryCacheProvider("disk");
+
+        var cascade = new CacheCascade(new CascadeConfig
+        {
+            Providers = new List<string> { "memory", "disk" },
+            EnableRequestCoalescing = false,
+            BloomFilterEstimatedItems = 100,
+        });
+        cascade.RegisterProvider(memory);
+        cascade.RegisterProvider(disk);
+
+        var key = CacheKey.FromStrings("big-src", "big-var");
+        var largeData = TestData(200); // 200 bytes > 50 limit
+
+        var result = await cascade.GetOrCreateAsync(key, async ct =>
+            (largeData, new CacheEntryMetadata()));
+        result.Dispose();
+
+        // Memory rejected (too large)
+        Assert.False(memory.Contains(key));
+
+        // Disk accepted
+        await cascade.UploadQueue.DrainAsync();
+        Assert.True(disk.Contains(key));
+
+        cascade.Dispose();
+    }
+
+    [Fact]
+    public async Task SubscriptionModel_ExternalHitReplication_Bidirectional()
+    {
+        // Test that replication isn't just "up" — a disk hit can replicate to cloud
+        var memory = new InMemoryCacheProvider("memory", requiresInline: true);
+        var disk = new InMemoryCacheProvider("disk");
+        var cloud = new InMemoryCacheProvider("cloud", latencyZone: "s3:us-east-1")
+        {
+            AcceptsExternalHits = true // Cloud wants data it missed
+        };
+
+        var cascade = new CacheCascade(new CascadeConfig
+        {
+            Providers = new List<string> { "memory", "disk", "cloud" },
+            EnableRequestCoalescing = false,
+            BloomFilterEstimatedItems = 100,
+        });
+        cascade.RegisterProvider(memory);
+        cascade.RegisterProvider(disk);
+        cascade.RegisterProvider(cloud);
+
+        var key = CacheKey.FromStrings("bidir-src", "bidir-var");
+        var data = TestData();
+
+        // Pre-populate disk only
+        await disk.StoreAsync(key, data, new CacheEntryMetadata());
+
+        var result = await cascade.GetOrCreateAsync(key, ct =>
+            throw new InvalidOperationException("Should hit disk"));
+        result.Dispose();
+
+        // Memory should get it (faster tier, subscribes to external hits)
+        Assert.True(memory.Contains(key));
+
+        // Cloud should also get it (subscribes to external hits) — via upload queue
+        await cascade.UploadQueue.DrainAsync();
+        Assert.True(cloud.Contains(key));
+
+        cascade.Dispose();
+    }
+
+    [Fact]
+    public async Task SubscriptionModel_NoSubscribers_NoStoreEvents()
+    {
+        var events = new List<CacheEvent>();
+        var memory = new InMemoryCacheProvider("memory", requiresInline: true)
+        {
+            AcceptsFreshResults = false,
+            AcceptsExternalHits = false
+        };
+
+        var cascade = new CacheCascade(new CascadeConfig
+        {
+            Providers = new List<string> { "memory" },
+            EnableRequestCoalescing = false,
+            BloomFilterEstimatedItems = 100,
+            OnCacheEvent = e => events.Add(e)
+        });
+        cascade.RegisterProvider(memory);
+
+        var key = CacheKey.FromStrings("nosub-src", "nosub-var");
+        var result = await cascade.GetOrCreateAsync(key, async ct =>
+            (TestData(), new CacheEntryMetadata()));
+        result.Dispose();
+
+        // No Store events should fire since nobody subscribed
+        Assert.DoesNotContain(events, e => e.Kind == CacheEventKind.Store);
+        Assert.False(memory.Contains(key));
+
+        cascade.Dispose();
     }
 
     [Fact]
@@ -252,5 +388,24 @@ public class CacheCascadeTests : IDisposable
         Assert.Contains(events, e => e.Kind == CacheEventKind.Hit);
 
         cascade.Dispose();
+    }
+
+    [Fact]
+    public async Task GetStream_ReturnsUsableStream()
+    {
+        var key = CacheKey.FromStrings("stream-src", "stream-var");
+        var expectedData = TestData();
+
+        var result = await _cascade.GetOrCreateAsync(key, async ct =>
+            (expectedData, new CacheEntryMetadata { ContentType = "image/jpeg" }));
+
+        // GetStream() should return a usable stream regardless of path
+        using var stream = result.GetStream();
+        Assert.NotNull(stream);
+        using var ms = new MemoryStream();
+        await stream!.CopyToAsync(ms);
+        Assert.Equal(expectedData, ms.ToArray());
+
+        result.Dispose();
     }
 }

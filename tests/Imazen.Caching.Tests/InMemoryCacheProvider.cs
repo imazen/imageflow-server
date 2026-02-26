@@ -12,6 +12,19 @@ public class InMemoryCacheProvider : ICacheProvider
     public int FetchCount;
     public int StoreCount;
 
+    /// <summary>
+    /// Controls what this provider's WantsToStore returns.
+    /// Default: always wants fresh results and external hits.
+    /// Set to false to simulate a provider that rejects data (e.g., full disk).
+    /// </summary>
+    public bool AcceptsFreshResults { get; set; } = true;
+    public bool AcceptsExternalHits { get; set; } = true;
+
+    /// <summary>
+    /// Optional: reject entries larger than this many bytes. -1 = no limit.
+    /// </summary>
+    public long MaxAcceptableBytes { get; set; } = -1;
+
     public string Name { get; }
     public CacheProviderCapabilities Capabilities { get; }
 
@@ -41,6 +54,18 @@ public class InMemoryCacheProvider : ICacheProvider
         Interlocked.Increment(ref StoreCount);
         _store[key.ToStoragePath()] = (data, metadata);
         return default;
+    }
+
+    public bool WantsToStore(CacheKey key, long sizeBytes, CacheStoreReason reason)
+    {
+        if (MaxAcceptableBytes >= 0 && sizeBytes > MaxAcceptableBytes) return false;
+
+        return reason switch
+        {
+            CacheStoreReason.FreshlyCreated => AcceptsFreshResults,
+            CacheStoreReason.ExternalHit => AcceptsExternalHits,
+            _ => true
+        };
     }
 
     public ValueTask<bool> InvalidateAsync(CacheKey key, CancellationToken ct = default)
@@ -97,6 +122,9 @@ public class SlowCacheProvider : ICacheProvider
         await Task.Delay(_delay, ct);
         await _inner.StoreAsync(key, data, metadata, ct);
     }
+
+    public bool WantsToStore(CacheKey key, long sizeBytes, CacheStoreReason reason) =>
+        _inner.WantsToStore(key, sizeBytes, reason);
 
     public ValueTask<bool> InvalidateAsync(CacheKey key, CancellationToken ct = default) => _inner.InvalidateAsync(key, ct);
     public ValueTask<int> PurgeBySourceAsync(ReadOnlyMemory<byte> sourceHash, CancellationToken ct = default) => _inner.PurgeBySourceAsync(sourceHash, ct);

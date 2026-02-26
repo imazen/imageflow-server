@@ -6,6 +6,17 @@ using System.Threading.Tasks;
 namespace Imazen.Caching;
 
 /// <summary>
+/// Why the cascade is offering data to a provider.
+/// </summary>
+public enum CacheStoreReason
+{
+    /// <summary>Factory just produced this — it's a brand-new result.</summary>
+    FreshlyCreated,
+    /// <summary>Found in another tier; this provider missed it.</summary>
+    ExternalHit,
+}
+
+/// <summary>
 /// Describes the nature of a cache provider for the cascade to make decisions.
 /// </summary>
 public sealed class CacheProviderCapabilities
@@ -30,7 +41,7 @@ public sealed class CacheProviderCapabilities
 
 /// <summary>
 /// A cache storage backend. Implementations are simple: store bytes, fetch bytes.
-/// Routing and coalescing are handled by the cascade, not the provider.
+/// The cascade handles coalescing, bloom filtering, and upload queue management.
 /// </summary>
 public interface ICacheProvider
 {
@@ -40,6 +51,7 @@ public interface ICacheProvider
 
     /// <summary>
     /// Attempt to fetch a cached entry. Returns null if not found.
+    /// The returned Stream is owned by the caller and must be disposed.
     /// </summary>
     ValueTask<CacheFetchResult?> FetchAsync(CacheKey key, CancellationToken ct = default);
 
@@ -47,6 +59,16 @@ public interface ICacheProvider
     /// Store data to the cache. The data byte array must not be modified by the provider.
     /// </summary>
     ValueTask StoreAsync(CacheKey key, byte[] data, CacheEntryMetadata metadata, CancellationToken ct = default);
+
+    /// <summary>
+    /// Called by the cascade after a miss is resolved or a hit is found in another tier.
+    /// Return true if this provider wants to receive the data for storage.
+    /// This gates buffering — the cascade only buffers when at least one subscriber wants data.
+    /// </summary>
+    /// <param name="key">The cache key.</param>
+    /// <param name="sizeBytes">Approximate size of the data in bytes, or -1 if unknown.</param>
+    /// <param name="reason">Why the data is being offered.</param>
+    bool WantsToStore(CacheKey key, long sizeBytes, CacheStoreReason reason);
 
     /// <summary>
     /// Remove a specific entry. Returns true if the entry was found and removed.
@@ -74,6 +96,7 @@ public interface ICacheProvider
 
 /// <summary>
 /// Result of fetching from a cache provider.
+/// Providers return the raw data; the cascade decides whether to buffer or stream through.
 /// </summary>
 public sealed class CacheFetchResult : IDisposable
 {

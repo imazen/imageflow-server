@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -18,6 +19,10 @@ public enum EnqueueResult
 /// <summary>
 /// A bounded, byte-counted async upload queue with deduplication and read-through.
 ///
+/// The queue takes ownership of byte[] buffers. When an entry completes (upload finishes
+/// or is cancelled), the buffer is returned via the optional OnBufferRelease callback.
+/// This enables deterministic ArrayPool.Return without ref-counting.
+///
 /// Entries can be served from the queue while their upload is in-flight (read-through),
 /// acting as a short-lived memory cache for pending writes.
 ///
@@ -31,6 +36,13 @@ public sealed class AsyncUploadQueue : IDisposable
     private long _queuedBytes;
     private readonly CancellationTokenSource _cts = new();
     private volatile bool _disposed;
+
+    /// <summary>
+    /// Optional callback invoked when a buffer is no longer needed by the queue.
+    /// Use this for ArrayPool.Return or other deterministic cleanup.
+    /// Called exactly once per enqueued entry, in the finally block after upload completes.
+    /// </summary>
+    public Action<byte[]>? OnBufferRelease { get; set; }
 
     private sealed class UploadEntry
     {
@@ -55,13 +67,10 @@ public sealed class AsyncUploadQueue : IDisposable
 
     /// <summary>
     /// Enqueue a store operation. The storeFunc runs in the background.
+    /// The queue takes ownership of the data array — caller must not modify or return it to a pool.
+    /// When the upload completes, OnBufferRelease is called with the data array.
     /// Returns Enqueued, QueueFull, or AlreadyPresent.
     /// </summary>
-    /// <param name="key">Dedup key (e.g., CacheKey.ToStringKey() + ":" + providerName).</param>
-    /// <param name="data">The data to store. The queue takes ownership of this array.</param>
-    /// <param name="metadata">Cache entry metadata.</param>
-    /// <param name="storeFunc">The async store operation to run in the background.</param>
-    /// <returns>Enqueue result.</returns>
     public EnqueueResult TryEnqueue(string key, byte[] data, CacheEntryMetadata metadata,
         Func<byte[], CacheEntryMetadata, CancellationToken, Task> storeFunc)
     {
@@ -99,6 +108,8 @@ public sealed class AsyncUploadQueue : IDisposable
                 {
                     Interlocked.Add(ref _queuedBytes, -entry.Size);
                 }
+                // Transfer ownership back — caller can return to pool
+                OnBufferRelease?.Invoke(entry.Data);
             }
         });
 

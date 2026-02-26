@@ -7,16 +7,22 @@ namespace Imazen.Caching;
 /// <summary>
 /// High-level cache engine interface. Handles multi-tier cascade, request coalescing,
 /// bloom filtering, and backpressure internally.
+///
+/// The cascade uses a subscription model: after a miss is resolved or a hit is found
+/// in one tier, each provider is asked via WantsToStore whether it wants the data.
+/// Only providers that opt in receive the data. If no provider wants it, the data
+/// is streamed directly without buffering.
 /// </summary>
 public interface ICacheEngine : IDisposable
 {
     /// <summary>
-    /// Fetch from cache or create via factory. Always stores produced results to all tiers.
+    /// Fetch from cache or create via factory. Produced results are offered to
+    /// subscribing tiers via the WantsToStore subscription model.
     /// </summary>
     /// <param name="key">The cache key.</param>
     /// <param name="factory">
     /// Called on cache miss. Returns the produced data and metadata, or null if production fails.
-    /// The byte array returned is owned by the caller and will be stored to all tiers.
+    /// The byte array returned is owned by the caller after this method returns.
     /// </param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>A CacheResult that must be disposed by the caller.</returns>

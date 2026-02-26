@@ -28,11 +28,29 @@ public enum CacheResultStatus
 
 /// <summary>
 /// The result of a cache lookup or creation. Caller must dispose.
+///
+/// May contain either a Stream (for direct streaming) or a byte[] (when data
+/// was buffered for distribution to cache subscribers). Both are exposed;
+/// callers should prefer Data when present (zero-copy from buffer),
+/// falling back to DataStream for the streaming path.
 /// </summary>
 public sealed class CacheResult : IDisposable
 {
     public CacheResultStatus Status { get; init; }
-    public Stream? Data { get; init; }
+
+    /// <summary>
+    /// Buffered data. Non-null when the cascade buffered for subscribers or the data
+    /// was already in memory (memory hit, queue hit, factory result).
+    /// Prefer this over DataStream when available — avoids a MemoryStream wrapper.
+    /// </summary>
+    public byte[]? Data { get; init; }
+
+    /// <summary>
+    /// Stream-based data. Non-null on the pure streaming path (cache hit, no subscribers).
+    /// Caller must dispose when done.
+    /// </summary>
+    public Stream? DataStream { get; init; }
+
     public string? ContentType { get; init; }
     public string? ProviderName { get; init; }
     public TimeSpan? Latency { get; init; }
@@ -43,29 +61,68 @@ public sealed class CacheResult : IDisposable
         or CacheResultStatus.CloudHit
         or CacheResultStatus.QueueHit;
 
-    public void Dispose()
+    /// <summary>
+    /// Returns a Stream for the data, regardless of whether this is a buffered or streaming result.
+    /// </summary>
+    public Stream? GetStream()
     {
-        Data?.Dispose();
+        if (DataStream != null) return DataStream;
+        if (Data != null) return new MemoryStream(Data, writable: false);
+        return null;
     }
 
-    public static CacheResult Hit(CacheResultStatus status, byte[] data, string? contentType, string providerName, TimeSpan? latency = null)
+    public void Dispose()
     {
+        DataStream?.Dispose();
+    }
+
+    // --- Factory methods for the cascade ---
+
+    /// <summary>
+    /// Path A: Stream-through hit. No buffering, no subscribers wanted the data.
+    /// The caller streams from DataStream and disposes it.
+    /// </summary>
+    internal static CacheResult StreamHit(CacheResultStatus status, byte[] data,
+        string? contentType, string providerName, TimeSpan? latency = null)
+    {
+        // For now, providers return byte[]. When providers return Stream in the future,
+        // this factory will set DataStream instead. The cascade decides the path.
         return new CacheResult
         {
             Status = status,
-            Data = new MemoryStream(data, writable: false),
+            Data = data,
             ContentType = contentType,
             ProviderName = providerName,
             Latency = latency
         };
     }
 
-    public static CacheResult Created(byte[] data, string? contentType, TimeSpan? latency = null)
+    /// <summary>
+    /// Path B: Buffered hit. Data was buffered because subscribers wanted it.
+    /// The cascade has already distributed copies to subscribers.
+    /// </summary>
+    internal static CacheResult BufferedHit(CacheResultStatus status, byte[] data,
+        string? contentType, string providerName, TimeSpan? latency = null)
+    {
+        return new CacheResult
+        {
+            Status = status,
+            Data = data,
+            ContentType = contentType,
+            ProviderName = providerName,
+            Latency = latency
+        };
+    }
+
+    /// <summary>
+    /// Factory-created result. Data is always buffered (factory returns byte[]).
+    /// </summary>
+    internal static CacheResult Created(byte[] data, string? contentType, TimeSpan? latency = null)
     {
         return new CacheResult
         {
             Status = CacheResultStatus.Created,
-            Data = new MemoryStream(data, writable: false),
+            Data = data,
             ContentType = contentType,
             Latency = latency
         };
