@@ -17,8 +17,9 @@ namespace Imazen.Caching;
 /// - Async upload queue for deferred writes to slow tiers (disk/cloud)
 /// - Backpressure: upload queue is byte-bounded, drops on overflow
 /// - Subscription model: providers declare whether they want data via WantsToStore
-/// - Two paths: Path A (pure streaming, no buffering) when no subscribers,
-///   Path B (buffer and distribute) when subscribers exist
+///   with per-provider reasons (Missed vs NotQueried) so providers can make
+///   smart decisions about re-accepting data they may have evicted
+/// - Replication is direction-agnostic: any tier can replicate to any other
 /// </summary>
 public sealed class CacheCascade : ICacheEngine
 {
@@ -60,6 +61,21 @@ public sealed class CacheCascade : ICacheEngine
         }
     }
 
+    /// <summary>
+    /// Result of TryFetchAsync, including which providers were checked and missed.
+    /// </summary>
+    private readonly struct FetchOutcome
+    {
+        public CacheFetchResult? Result { get; init; }
+        public string? HitProviderName { get; init; }
+        /// <summary>
+        /// Providers that were checked and definitely don't have the entry.
+        /// Includes bloom-gated skips (bloom negative = definite miss).
+        /// Excludes providers that weren't reached because a faster tier hit.
+        /// </summary>
+        public HashSet<string>? CheckedAndMissed { get; init; }
+    }
+
     /// <inheritdoc />
     public async ValueTask<CacheResult> GetOrCreateAsync(
         CacheKey key,
@@ -72,29 +88,28 @@ public sealed class CacheCascade : ICacheEngine
         var stringKey = key.ToStringKey();
 
         // 1. Try fetch from all tiers
-        var (fetchResult, hitProviderIndex, hitProviderName) = await TryFetchAsync(key, stringKey, ct).ConfigureAwait(false);
+        var outcome = await TryFetchAsync(key, stringKey, ct).ConfigureAwait(false);
 
-        if (fetchResult != null)
+        if (outcome.Result != null)
         {
             sw.Stop();
-            var status = ClassifyHitStatus(hitProviderName!);
-            FireEvent(CacheEventKind.Hit, key, hitProviderName!, sw.Elapsed);
+            var status = ClassifyHitStatus(outcome.HitProviderName!);
+            FireEvent(CacheEventKind.Hit, key, outcome.HitProviderName!, sw.Elapsed);
 
-            // Ask non-hit providers if they want this data (subscription model)
-            var subscribers = GetSubscribers(key, fetchResult.Data.Length,
-                CacheStoreReason.ExternalHit, hitProviderIndex, hitProviderName!);
+            // Ask non-hit providers if they want this data.
+            // Each provider gets Missed or NotQueried depending on whether
+            // the cascade actually checked it during this fetch.
+            var subscribers = GetHitSubscribers(key, stringKey, outcome.Result.Data.Length,
+                outcome.HitProviderName!, outcome.CheckedAndMissed);
 
             if (subscribers.Count > 0)
             {
-                // Path B: subscribers want the data — distribute via store
-                DistributeToSubscribers(key, stringKey, fetchResult.Data, fetchResult.Metadata, subscribers);
+                DistributeToSubscribers(key, stringKey, outcome.Result.Data,
+                    outcome.Result.Metadata, subscribers);
             }
-            // else: Path A — pure streaming, no buffering overhead
-            // (In both cases, data is byte[] from the provider, so no difference today.
-            //  When providers return Stream, Path A will skip the buffer-to-byte[] step.)
 
-            return CacheResult.BufferedHit(status, fetchResult.Data, fetchResult.Metadata.ContentType,
-                hitProviderName!, sw.Elapsed);
+            return CacheResult.BufferedHit(status, outcome.Result.Data,
+                outcome.Result.Metadata.ContentType, outcome.HitProviderName!, sw.Elapsed);
         }
 
         // 2. Cache miss — invoke factory (with optional coalescing)
@@ -108,10 +123,10 @@ public sealed class CacheCascade : ICacheEngine
                 async innerCt =>
                 {
                     // Double-check: another coalesced request may have populated the cache
-                    var (recheck, _, _) = await TryFetchAsync(key, stringKey, innerCt).ConfigureAwait(false);
-                    if (recheck != null)
+                    var recheck = await TryFetchAsync(key, stringKey, innerCt).ConfigureAwait(false);
+                    if (recheck.Result != null)
                     {
-                        return (recheck.Data, recheck.Metadata, false);
+                        return (recheck.Result.Data, recheck.Result.Metadata, false);
                     }
 
                     var produced = await factory(innerCt).ConfigureAwait(false);
@@ -133,7 +148,7 @@ public sealed class CacheCascade : ICacheEngine
             sw.Stop();
             if (result.WasCreated)
             {
-                StoreToSubscribers(key, stringKey, result.Data, result.Metadata!);
+                StoreToFreshSubscribers(key, stringKey, result.Data, result.Metadata!);
             }
 
             return CacheResult.Created(result.Data, result.Metadata?.ContentType, sw.Elapsed);
@@ -148,7 +163,7 @@ public sealed class CacheCascade : ICacheEngine
             }
 
             sw.Stop();
-            StoreToSubscribers(key, stringKey, produced.Value.Data, produced.Value.Metadata);
+            StoreToFreshSubscribers(key, stringKey, produced.Value.Data, produced.Value.Metadata);
             return CacheResult.Created(produced.Value.Data, produced.Value.Metadata.ContentType, sw.Elapsed);
         }
     }
@@ -193,9 +208,11 @@ public sealed class CacheCascade : ICacheEngine
         return total;
     }
 
-    private async ValueTask<(CacheFetchResult? Result, int ProviderIndex, string? ProviderName)> TryFetchAsync(
+    private async ValueTask<FetchOutcome> TryFetchAsync(
         CacheKey key, string stringKey, CancellationToken ct)
     {
+        HashSet<string>? checkedAndMissed = null;
+
         // Sequential fetch through providers, checking upload queue at each tier
         for (int i = 0; i < _providerOrder.Count; i++)
         {
@@ -205,7 +222,12 @@ public sealed class CacheCascade : ICacheEngine
             var queueKey = stringKey + ":" + providerName;
             if (_uploadQueue.TryGet(queueKey, out var queueData, out var queueMeta) && queueData != null && queueMeta != null)
             {
-                return (new CacheFetchResult(queueData, queueMeta), i, providerName);
+                return new FetchOutcome
+                {
+                    Result = new CacheFetchResult(queueData, queueMeta),
+                    HitProviderName = providerName,
+                    CheckedAndMissed = checkedAndMissed
+                };
             }
 
             if (!_providers.TryGetValue(providerName, out var provider)) continue;
@@ -216,7 +238,10 @@ public sealed class CacheCascade : ICacheEngine
                 var bloomKey = stringKey + ":" + providerName;
                 if (!_bloom.ProbablyContains(bloomKey))
                 {
-                    continue; // Definitely not there
+                    // Bloom negative = definite miss. We know it's not there.
+                    checkedAndMissed ??= new HashSet<string>();
+                    checkedAndMissed.Add(providerName);
+                    continue;
                 }
             }
 
@@ -225,42 +250,85 @@ public sealed class CacheCascade : ICacheEngine
                 var result = await provider.FetchAsync(key, ct).ConfigureAwait(false);
                 if (result != null)
                 {
-                    return (result, i, providerName);
+                    return new FetchOutcome
+                    {
+                        Result = result,
+                        HitProviderName = providerName,
+                        CheckedAndMissed = checkedAndMissed
+                    };
                 }
+
+                // Direct miss: provider was queried and returned null
+                checkedAndMissed ??= new HashSet<string>();
+                checkedAndMissed.Add(providerName);
             }
             catch
             {
                 FireEvent(CacheEventKind.Error, key, providerName, detail: "Fetch failed");
+                // Fetch failure counts as checked-and-missed (we tried, it failed)
+                checkedAndMissed ??= new HashSet<string>();
+                checkedAndMissed.Add(providerName);
             }
         }
 
         // Check for a general queue key (not tier-specific)
         if (_uploadQueue.TryGet(stringKey, out var generalData, out var generalMeta) && generalData != null && generalMeta != null)
         {
-            return (new CacheFetchResult(generalData, generalMeta), 0, "upload-queue");
+            return new FetchOutcome
+            {
+                Result = new CacheFetchResult(generalData, generalMeta),
+                HitProviderName = "upload-queue",
+                CheckedAndMissed = checkedAndMissed
+            };
         }
 
-        return (null, -1, null);
+        return new FetchOutcome
+        {
+            Result = null,
+            HitProviderName = null,
+            CheckedAndMissed = checkedAndMissed
+        };
     }
 
     /// <summary>
-    /// Ask all providers (except the hit provider) if they want to store this data.
-    /// Returns the list of (providerName, provider) pairs that want the data.
+    /// After a cache hit, ask all non-hit providers if they want the data.
+    /// Each provider gets a per-provider reason:
+    /// - Missed: provider was checked during fetch, or bloom filter says definitely not there
+    /// - NotQueried: provider wasn't checked and bloom says "maybe" (may still have it)
+    /// For non-local providers not reached during fetch, we check their bloom filter
+    /// to distinguish "definitely doesn't have it" (Missed) from "might still have it" (NotQueried).
+    /// This is zero-cost (in-memory hash check) and enables direction-agnostic replication.
     /// </summary>
-    private List<(string Name, ICacheProvider Provider)> GetSubscribers(
-        CacheKey key, long sizeBytes, CacheStoreReason reason,
-        int hitProviderIndex, string hitProviderName)
+    private List<(string Name, ICacheProvider Provider)> GetHitSubscribers(
+        CacheKey key, string stringKey, long sizeBytes, string hitProviderName,
+        HashSet<string>? checkedAndMissed)
     {
         var subscribers = new List<(string, ICacheProvider)>();
 
-        for (int i = 0; i < _providerOrder.Count; i++)
+        foreach (var providerName in _providerOrder)
         {
-            var providerName = _providerOrder[i];
-
-            // Don't store to the provider that already had it
             if (providerName == hitProviderName) continue;
-
             if (!_providers.TryGetValue(providerName, out var provider)) continue;
+
+            CacheStoreReason reason;
+            if (checkedAndMissed != null && checkedAndMissed.Contains(providerName))
+            {
+                // Provider was checked during fetch (directly or bloom-gated) and missed
+                reason = CacheStoreReason.Missed;
+            }
+            else if (!provider.Capabilities.IsLocal)
+            {
+                // Non-local provider we didn't reach during fetch.
+                // Check bloom filter: negative = definite miss (safe to classify as Missed)
+                var bloomKey = stringKey + ":" + providerName;
+                reason = !_bloom.ProbablyContains(bloomKey)
+                    ? CacheStoreReason.Missed
+                    : CacheStoreReason.NotQueried;
+            }
+            else
+            {
+                reason = CacheStoreReason.NotQueried;
+            }
 
             if (provider.WantsToStore(key, sizeBytes, reason))
             {
@@ -273,8 +341,9 @@ public sealed class CacheCascade : ICacheEngine
 
     /// <summary>
     /// Store freshly-created data to all providers that want it.
+    /// All providers get FreshlyCreated since nobody had this entry.
     /// </summary>
-    private void StoreToSubscribers(CacheKey key, string stringKey, byte[] data, CacheEntryMetadata metadata)
+    private void StoreToFreshSubscribers(CacheKey key, string stringKey, byte[] data, CacheEntryMetadata metadata)
     {
         var subscribers = new List<(string Name, ICacheProvider Provider)>();
 
@@ -295,6 +364,7 @@ public sealed class CacheCascade : ICacheEngine
     /// <summary>
     /// Distribute data to the given list of subscriber providers.
     /// Inline providers get stored synchronously. Async providers go through the upload queue.
+    /// Direction-agnostic: any tier can store to any other tier.
     /// </summary>
     private void DistributeToSubscribers(CacheKey key, string stringKey, byte[] data,
         CacheEntryMetadata metadata, List<(string Name, ICacheProvider Provider)> subscribers)
@@ -331,7 +401,7 @@ public sealed class CacheCascade : ICacheEngine
             }
             else
             {
-                // Async store via upload queue — queue takes ownership of data reference
+                // Async store via upload queue
                 var queueKey = stringKey + ":" + providerName;
                 var capturedProvider = provider;
                 var capturedKey = key;

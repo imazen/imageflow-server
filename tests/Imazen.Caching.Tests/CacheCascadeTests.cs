@@ -193,15 +193,15 @@ public class CacheCascadeTests : IDisposable
     }
 
     [Fact]
-    public async Task SubscriptionModel_ExternalHitReplication_Bidirectional()
+    public async Task SubscriptionModel_Replication_Bidirectional()
     {
-        // Test that replication isn't just "up" — a disk hit can replicate to cloud
+        // Replication goes in ALL directions: faster and slower tiers equally.
+        // Disk hit → memory gets Missed (it was checked during fetch, didn't have it)
+        // Disk hit → cloud gets Missed (bloom filter checked post-hit, negative = definite miss)
         var memory = new InMemoryCacheProvider("memory", requiresInline: true);
         var disk = new InMemoryCacheProvider("disk");
-        var cloud = new InMemoryCacheProvider("cloud", latencyZone: "s3:us-east-1")
-        {
-            AcceptsExternalHits = true // Cloud wants data it missed
-        };
+        var cloud = new InMemoryCacheProvider("cloud", latencyZone: "s3:us-east-1");
+        // cloud.AcceptsMissed is true by default — cloud accepts data it definitely doesn't have
 
         var cascade = new CacheCascade(new CascadeConfig
         {
@@ -223,10 +223,11 @@ public class CacheCascadeTests : IDisposable
             throw new InvalidOperationException("Should hit disk"));
         result.Dispose();
 
-        // Memory should get it (faster tier, subscribes to external hits)
+        // Memory was checked before disk and missed during fetch → gets Missed reason → accepts
         Assert.True(memory.Contains(key));
 
-        // Cloud should also get it (subscribes to external hits) — via upload queue
+        // Cloud wasn't reached during fetch, but post-hit bloom check says
+        // "definitely not there" → gets Missed reason → accepts
         await cascade.UploadQueue.DrainAsync();
         Assert.True(cloud.Contains(key));
 
@@ -240,7 +241,8 @@ public class CacheCascadeTests : IDisposable
         var memory = new InMemoryCacheProvider("memory", requiresInline: true)
         {
             AcceptsFreshResults = false,
-            AcceptsExternalHits = false
+            AcceptsMissed = false,
+            AcceptsNotQueried = false
         };
 
         var cascade = new CacheCascade(new CascadeConfig
@@ -260,6 +262,88 @@ public class CacheCascadeTests : IDisposable
         // No Store events should fire since nobody subscribed
         Assert.DoesNotContain(events, e => e.Kind == CacheEventKind.Store);
         Assert.False(memory.Contains(key));
+
+        cascade.Dispose();
+    }
+
+    [Fact]
+    public async Task SubscriptionModel_MissedVsNotQueried_Distinction()
+    {
+        // memory → disk → cloud. If disk hits, memory gets Missed (it was checked),
+        // cloud gets Missed (bloom-negative = checked). Both accept.
+        // But if memory hits, disk gets NotQueried (wasn't checked at all).
+        // Disk declines NotQueried by default (might still have it).
+        var memory = new InMemoryCacheProvider("memory", requiresInline: true);
+        var disk = new InMemoryCacheProvider("disk");
+        // disk.AcceptsNotQueried is false by default
+
+        var cascade = new CacheCascade(new CascadeConfig
+        {
+            Providers = new List<string> { "memory", "disk" },
+            EnableRequestCoalescing = false,
+            BloomFilterEstimatedItems = 100,
+        });
+        cascade.RegisterProvider(memory);
+        cascade.RegisterProvider(disk);
+
+        var key = CacheKey.FromStrings("mvsn-src", "mvsn-var");
+        var data = TestData();
+
+        // Pre-populate both tiers
+        await memory.StoreAsync(key, data, new CacheEntryMetadata());
+        await disk.StoreAsync(key, data, new CacheEntryMetadata());
+
+        disk.StoreCount = 0; // Reset counter
+
+        // Memory hit → disk gets NotQueried → disk declines (already has it)
+        var result = await cascade.GetOrCreateAsync(key, ct =>
+            throw new InvalidOperationException("Should hit memory"));
+        result.Dispose();
+
+        // Disk's StoreAsync should NOT have been called (it declined NotQueried)
+        Assert.Equal(0, disk.StoreCount);
+
+        cascade.Dispose();
+    }
+
+    [Fact]
+    public async Task Eviction_FallThrough_Recovers()
+    {
+        // When a fast tier evicts and a slow tier still has it,
+        // the sequential fetch falls through and the slow tier serves it.
+        // The fast tier gets Missed (was checked) and re-accepts.
+        var memory = new InMemoryCacheProvider("memory", requiresInline: true);
+        var disk = new InMemoryCacheProvider("disk");
+
+        var cascade = new CacheCascade(new CascadeConfig
+        {
+            Providers = new List<string> { "memory", "disk" },
+            EnableRequestCoalescing = false,
+            BloomFilterEstimatedItems = 100,
+        });
+        cascade.RegisterProvider(memory);
+        cascade.RegisterProvider(disk);
+
+        var key = CacheKey.FromStrings("evict-src", "evict-var");
+        var data = TestData();
+
+        // Populate both tiers
+        await memory.StoreAsync(key, data, new CacheEntryMetadata());
+        await disk.StoreAsync(key, data, new CacheEntryMetadata());
+
+        // Simulate memory eviction
+        await memory.InvalidateAsync(key);
+        Assert.False(memory.Contains(key));
+
+        // Request: memory miss → disk hit → memory gets Missed → re-populates
+        var result = await cascade.GetOrCreateAsync(key, ct =>
+            throw new InvalidOperationException("Should hit disk"));
+
+        Assert.Equal(CacheResultStatus.DiskHit, result.Status);
+        result.Dispose();
+
+        // Memory should be repopulated (got Missed reason, accepted)
+        Assert.True(memory.Contains(key));
 
         cascade.Dispose();
     }

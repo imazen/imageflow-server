@@ -13,12 +13,16 @@ public class InMemoryCacheProvider : ICacheProvider
     public int StoreCount;
 
     /// <summary>
-    /// Controls what this provider's WantsToStore returns.
-    /// Default: always wants fresh results and external hits.
-    /// Set to false to simulate a provider that rejects data (e.g., full disk).
+    /// Controls what this provider's WantsToStore returns per reason.
+    /// Default: accepts FreshlyCreated and Missed, declines NotQueried (already has it).
     /// </summary>
     public bool AcceptsFreshResults { get; set; } = true;
-    public bool AcceptsExternalHits { get; set; } = true;
+    public bool AcceptsMissed { get; set; } = true;
+    /// <summary>
+    /// Whether to accept NotQueried offers. Default false: if we weren't checked,
+    /// we probably still have it. Set true to always accept (e.g., for durability).
+    /// </summary>
+    public bool AcceptsNotQueried { get; set; } = false;
 
     /// <summary>
     /// Optional: reject entries larger than this many bytes. -1 = no limit.
@@ -63,7 +67,8 @@ public class InMemoryCacheProvider : ICacheProvider
         return reason switch
         {
             CacheStoreReason.FreshlyCreated => AcceptsFreshResults,
-            CacheStoreReason.ExternalHit => AcceptsExternalHits,
+            CacheStoreReason.Missed => AcceptsMissed,
+            CacheStoreReason.NotQueried => AcceptsNotQueried,
             _ => true
         };
     }

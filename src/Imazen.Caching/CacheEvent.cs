@@ -8,8 +8,7 @@ public enum CacheEventKind
     Miss,
     Store,
     StoreDropped,
-    Error,
-    Replicate
+    Error
 }
 
 public readonly struct CacheEvent

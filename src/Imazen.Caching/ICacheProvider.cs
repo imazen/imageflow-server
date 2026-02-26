@@ -7,13 +7,27 @@ namespace Imazen.Caching;
 
 /// <summary>
 /// Why the cascade is offering data to a provider.
+/// Providers use this to make smarter accept/reject decisions.
 /// </summary>
 public enum CacheStoreReason
 {
-    /// <summary>Factory just produced this — it's a brand-new result.</summary>
+    /// <summary>
+    /// Factory just produced this — no tier had it. You definitely don't have it.
+    /// </summary>
     FreshlyCreated,
-    /// <summary>Found in another tier; this provider missed it.</summary>
-    ExternalHit,
+
+    /// <summary>
+    /// This provider was queried (directly or bloom-gated) and definitely doesn't
+    /// have the entry. Another tier supplied it. Safe to accept unconditionally.
+    /// </summary>
+    Missed,
+
+    /// <summary>
+    /// This provider was NOT queried because a faster tier hit first. We don't know
+    /// if you still have it — you might, or you might have evicted it. Provider
+    /// should check its own state before accepting (e.g., ProbablyContains).
+    /// </summary>
+    NotQueried,
 }
 
 /// <summary>
