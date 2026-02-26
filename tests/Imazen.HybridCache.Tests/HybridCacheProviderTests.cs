@@ -214,21 +214,6 @@ public class HybridCacheProviderTests : ReLoggerTestBase
     }
 
     [Fact]
-    public async Task ProbablyContains_AlwaysTrue()
-    {
-        var (cache, provider, tempDir) = CreateProvider();
-        try
-        {
-            var key = CacheKey.FromStrings("/never-stored", "anything");
-            Assert.True(provider.ProbablyContains(key));
-        }
-        finally
-        {
-            await CleanupAsync(cache, tempDir);
-        }
-    }
-
-    [Fact]
     public async Task HealthCheck_ReturnsTrue_WhenHealthy()
     {
         var (cache, provider, tempDir) = CreateProvider();

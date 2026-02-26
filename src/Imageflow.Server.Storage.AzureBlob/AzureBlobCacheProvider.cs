@@ -145,12 +145,6 @@ public sealed class AzureBlobCacheProvider : ICacheProvider
         return count;
     }
 
-    public bool ProbablyContains(CacheKey key)
-    {
-        // Cloud provider — the cascade's bloom filter handles gating.
-        return true;
-    }
-
     public async ValueTask<bool> HealthCheckAsync(CancellationToken ct = default)
     {
         try

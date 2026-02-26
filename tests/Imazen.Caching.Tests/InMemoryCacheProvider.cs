@@ -88,8 +88,6 @@ public class InMemoryCacheProvider : ICacheProvider
         return new ValueTask<int>(count);
     }
 
-    public bool ProbablyContains(CacheKey key) => _store.ContainsKey(key.ToStoragePath());
-
     public ValueTask<bool> HealthCheckAsync(CancellationToken ct = default)
     {
         return new ValueTask<bool>(true);
@@ -175,7 +173,6 @@ public class StreamingCacheProvider : ICacheProvider
         return new ValueTask<int>(count);
     }
 
-    public bool ProbablyContains(CacheKey key) => _store.ContainsKey(key.ToStoragePath());
     public ValueTask<bool> HealthCheckAsync(CancellationToken ct = default) => new ValueTask<bool>(true);
     public bool Contains(CacheKey key) => _store.ContainsKey(key.ToStoragePath());
 }
@@ -214,7 +211,6 @@ public class SlowCacheProvider : ICacheProvider
 
     public ValueTask<bool> InvalidateAsync(CacheKey key, CancellationToken ct = default) => _inner.InvalidateAsync(key, ct);
     public ValueTask<int> PurgeBySourceAsync(ReadOnlyMemory<byte> sourceHash, CancellationToken ct = default) => _inner.PurgeBySourceAsync(sourceHash, ct);
-    public bool ProbablyContains(CacheKey key) => _inner.ProbablyContains(key);
     public ValueTask<bool> HealthCheckAsync(CancellationToken ct = default) => _inner.HealthCheckAsync(ct);
     public int FetchCount => _inner.FetchCount;
     public int StoreCount => _inner.StoreCount;

@@ -189,14 +189,6 @@ public class S3CacheProviderTests
     }
 
     [Fact]
-    public void ProbablyContains_AlwaysTrue()
-    {
-        var provider = CreateProvider();
-        var key = CacheKey.FromStrings("/anything", "params");
-        Assert.True(provider.ProbablyContains(key));
-    }
-
-    [Fact]
     public async Task HealthCheckAsync_ReturnsTrueOnSuccess()
     {
         var mock = new Mock<IAmazonS3>();

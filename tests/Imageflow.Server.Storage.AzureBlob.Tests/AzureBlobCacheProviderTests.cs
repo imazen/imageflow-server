@@ -128,14 +128,6 @@ public class AzureBlobCacheProviderTests
     }
 
     [Fact]
-    public void ProbablyContains_AlwaysTrue()
-    {
-        var (provider, _) = CreateProvider();
-        var key = CacheKey.FromStrings("/anything", "params");
-        Assert.True(provider.ProbablyContains(key));
-    }
-
-    [Fact]
     public async Task HealthCheckAsync_ReturnsTrueWhenContainerExists()
     {
         var (provider, containerMock) = CreateProvider();

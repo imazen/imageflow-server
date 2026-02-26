@@ -224,13 +224,6 @@ public class HybridCacheProvider : ICacheProvider
 #endif
     }
 
-    public bool ProbablyContains(CacheKey key)
-    {
-        // Local disk provider — always return true.
-        // The cascade's bloom filter handles cloud gating; local providers are always checked.
-        return true;
-    }
-
     public async ValueTask<bool> HealthCheckAsync(CancellationToken ct = default)
     {
         try

@@ -24,8 +24,7 @@ public enum CacheStoreReason
 
     /// <summary>
     /// This provider was NOT queried because a faster tier hit first. We don't know
-    /// if you still have it — you might, or you might have evicted it. Provider
-    /// should check its own state before accepting (e.g., ProbablyContains).
+    /// if you still have it — you might, or you might have evicted it.
     /// </summary>
     NotQueried,
 }
@@ -94,13 +93,6 @@ public interface ICacheProvider
     /// Uses the source hash prefix for listing/deletion.
     /// </summary>
     ValueTask<int> PurgeBySourceAsync(ReadOnlyMemory<byte> sourceHash, CancellationToken ct = default);
-
-    /// <summary>
-    /// Check if the provider probably contains the key.
-    /// For local providers, return true (always try). For cloud, this may return false
-    /// to skip unnecessary network calls. The cascade's bloom filter is the primary gate.
-    /// </summary>
-    bool ProbablyContains(CacheKey key);
 
     /// <summary>
     /// Health check. Returns true if the provider is operational.

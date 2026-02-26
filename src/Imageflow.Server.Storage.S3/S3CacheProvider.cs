@@ -179,13 +179,6 @@ public sealed class S3CacheProvider : ICacheProvider
         return count;
     }
 
-    public bool ProbablyContains(CacheKey key)
-    {
-        // Cloud provider — the cascade's bloom filter handles gating.
-        // Return true so the cascade will try to fetch when bloom says "maybe".
-        return true;
-    }
-
     public async ValueTask<bool> HealthCheckAsync(CancellationToken ct = default)
     {
         try
