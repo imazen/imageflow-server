@@ -127,9 +127,10 @@ namespace Imageflow.Server.Storage.RemoteReader
             // Per the docs, we do not need to dispose HttpClient instances. HttpFactories track backing resources and handle
             // everything. https://source.dot.net/#Microsoft.Extensions.Http/IHttpClientFactory.cs,4f4eda17fc4cd91b
             var client = httpFactory.CreateClient(httpClientName);
+            HttpResponseMessage? resp = null;
             try
             {
-                var resp = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
+                resp = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
 
                 if (!resp.IsSuccessStatusCode)
                 {
@@ -147,10 +148,11 @@ namespace Imageflow.Server.Storage.RemoteReader
                     LastModifiedDateUtc = resp.Content.Headers.LastModified,
                     Etag = resp.Headers.ETag?.ToString()
                 };
-                var disposeAfter = resp;
                 var stream = await resp.Content.ReadAsStreamAsync().ConfigureAwait(false);
 
-                return new BlobWrapper(GetLatencyZone(virtualPath), new StreamBlob(attributes, stream, logger?.WithReScopeData("virtualPath", virtualPath), disposeAfter));
+                CodeResult<IBlobWrapper> result = new BlobWrapper(GetLatencyZone(virtualPath), new StreamBlob(attributes, stream, logger?.WithReScopeData("virtualPath", virtualPath), resp));
+                resp = null; // Ownership transferred to StreamBlob
+                return result;
             }
             catch (BlobMissingException)
             {
@@ -162,6 +164,10 @@ namespace Imageflow.Server.Storage.RemoteReader
                     virtualPath);
                 throw new BlobMissingException(
                     $"RemoteReader blob error retrieving \"{url}\" for \"{virtualPath}\".", ex);
+            }
+            finally
+            {
+                resp?.Dispose();
             }
         }
 

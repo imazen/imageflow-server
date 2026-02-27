@@ -207,7 +207,7 @@ internal class NonOverlappingTaskRunner<T> : IHostedService, IDisposable, INonOv
         if (_cancellationTokenSource != null)
         {
             
-#if NETSTANDARD2_1_OR_GREATER
+#if NET8_0_OR_GREATER
             _logger?.WriteLine("_cancellationTokenSource.CancelAsync()");
             await _cancellationTokenSource.CancelAsync();
 #else

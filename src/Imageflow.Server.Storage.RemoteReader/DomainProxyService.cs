@@ -76,23 +76,24 @@ namespace Imageflow.Server.Storage.RemoteReader
         public async Task<CodeResult<IBlobWrapper>> Fetch(string virtualPath)
         {
             var prefix = GetPrefix(virtualPath);
-            if (prefix == null) return CodeResult<IBlobWrapper>.Err(HttpStatus.NotFound.WithMessage("No prefix found for {virtualPath}"));
+            if (prefix == null) return CodeResult<IBlobWrapper>.Err(HttpStatus.NotFound.WithMessage($"No prefix found for {virtualPath}"));
 
             var url = $"{prefix.RemoteUriBase}/{virtualPath.Substring(prefix.Prefix.Length)}";
 
             // Per the docs, we do not need to dispose HttpClient instances. HttpFactories track backing resources and handle
             // everything. https://source.dot.net/#Microsoft.Extensions.Http/IHttpClientFactory.cs,4f4eda17fc4cd91b
             var client = httpFactory.CreateClient(prefix.HttpClientName ?? "default");
+            HttpResponseMessage? resp = null;
             try
             {
-                var resp = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
+                resp = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
 
                 if (!resp.IsSuccessStatusCode)
                 {
                     logger?.LogWarning(
                         "DomainProxy blob {VirtualPath} not found. The remote {Url} responded with status: {StatusCode}",
                         virtualPath, url, resp.StatusCode);
-                    return CodeResult<IBlobWrapper>.Err(HttpStatus.NotFound.WithMessage("DomainProxy blob \"{virtualPath}\" not found. The remote \"{url}\" responded with status: {resp.StatusCode}"));
+                    return CodeResult<IBlobWrapper>.Err(HttpStatus.NotFound.WithMessage($"DomainProxy blob \"{virtualPath}\" not found. The remote \"{url}\" responded with status: {resp.StatusCode}"));
                 }
 
                 var attrs = new BlobAttributes()
@@ -105,8 +106,10 @@ namespace Imageflow.Server.Storage.RemoteReader
 
                 var stream = await resp.Content.ReadAsStreamAsync().ConfigureAwait(false);
 
-                return CodeResult<IBlobWrapper>.Ok(new BlobWrapper(prefix.Zone,
-                    new StreamBlob(attrs, stream,logger?.WithReScopeData("virtualPath", virtualPath), resp)));
+                var result = CodeResult<IBlobWrapper>.Ok(new BlobWrapper(prefix.Zone,
+                    new StreamBlob(attrs, stream, logger?.WithReScopeData("virtualPath", virtualPath), resp)));
+                resp = null; // Ownership transferred to StreamBlob
+                return result;
             }
             catch (BlobMissingException)
             {
@@ -117,8 +120,12 @@ namespace Imageflow.Server.Storage.RemoteReader
                 logger?.LogWarning(ex, "DomainProxy blob error retrieving {Url} for {VirtualPath}", url,
                     virtualPath);
                 return CodeResult<IBlobWrapper>.Err(HttpStatus.ServerError
-                .WithMessage("DomainProxy blob error retrieving \"{url}\" for \"{virtualPath}\".")
+                .WithMessage($"DomainProxy blob error retrieving \"{url}\" for \"{virtualPath}\".")
                 .WithAppend(ex.Message));
+            }
+            finally
+            {
+                resp?.Dispose();
             }
         
         }

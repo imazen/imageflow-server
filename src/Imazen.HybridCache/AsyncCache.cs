@@ -729,7 +729,7 @@ namespace Imazen.HybridCache
             TimeSpan dataCreationTime, CancellationToken cancellationToken)
         {
             var cacheDetailResult = AsyncCacheDetailResult.Unknown;
-            var writeLockComplete = await EvictAndWriteLocks.TryExecuteAsync(entry.HashString,
+            var writeLockComplete = await EvictAndWriteLocks.TryExecuteAsync(entry.RelativePath,
                 Options.WaitForIdenticalCachePutTimeoutMs, cancellationToken,
                 async () =>
                 {

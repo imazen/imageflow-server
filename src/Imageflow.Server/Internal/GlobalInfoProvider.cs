@@ -93,7 +93,8 @@ namespace Imageflow.Server.Internal
         
         private static string Sha256TruncatedBase64(string input, int bytes)
         {
-            var hash = System.Security.Cryptography.SHA256.Create().ComputeHash(System.Text.Encoding.UTF8.GetBytes(input));
+            using var sha = System.Security.Cryptography.SHA256.Create();
+            var hash = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(input));
             return EncodingUtils.ToBase64U(hash.Take(bytes).ToArray());
         }
     }

@@ -127,7 +127,7 @@ public class NonOverlappingCachedRunner<T> : INonOverlappingRunner<T>
     public Task StopAsync(CancellationToken cancellationToken)
     {
         allowStartingTasks = false;
-#if NETSTANDARD2_1
+#if NET8_0_OR_GREATER
         _logger?.WriteLine("cts.CancelAsync()");
         _cts?.CancelAsync();
 #else
@@ -149,7 +149,7 @@ public class NonOverlappingCachedRunner<T> : INonOverlappingRunner<T>
     {
         disposeCalled = true;
         allowStartingTasks = false;
-#if NETSTANDARD2_1
+#if NET8_0_OR_GREATER
         _logger?.WriteLine("cts.CancelAsync()");
         _cts?.CancelAsync();
 #else
