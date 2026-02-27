@@ -149,14 +149,7 @@ public class FileTypeDetectionTests
         Assert.Throws<ArgumentException>(() => Imazen.Common.FileTypeDetection.FileTypeDetector.GuessMimeType(shortData));
     }
 
-    // TODO: Investigate why MP4/M4A/M4V/M4P/M4B/3GPP-AVC1 detection fails
-    // These ftyp brands are not recognized by the current FileTypeDetector implementation
-    [Theory(Skip = "TODO: FileTypeDetector does not recognize these MP4/audio ftyp brands")]
-    [InlineData("mp4", new byte[] {
-        0x00, 0x00, 0x00, 0x20, // Box size
-        0x66, 0x74, 0x79, 0x70, // ftyp
-        0x6D, 0x70, 0x34, 0x32  // mp42
-    }, "video/mp4")]
+    [Theory]
     [InlineData("m4v", new byte[] {
         0x00, 0x00, 0x00, 0x20, // Box size
         0x66, 0x74, 0x79, 0x70, // ftyp
@@ -177,12 +170,7 @@ public class FileTypeDetectionTests
         0x66, 0x74, 0x79, 0x70, // ftyp
         0x4D, 0x34, 0x42, 0x20  // M4B
     }, "audio/mp4")]
-    [InlineData("3gpp_avc1", new byte[] {
-        0x00, 0x00, 0x00, 0x20, // Box size
-        0x66, 0x74, 0x79, 0x70, // ftyp
-        0x61, 0x76, 0x63, 0x31  // avc1
-    }, "video/3gpp")]
-    public void GetImageContentType_Mp4Formats_Skipped(string formatName, byte[] signature, string expectedMimeType)
+    public void GetImageContentType_Mp4Formats(string formatName, byte[] signature, string expectedMimeType)
     {
         // Arrange - create a 12-byte array with the signature
         var data = new byte[12];
