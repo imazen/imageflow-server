@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Concurrent;
-using System.Security.Cryptography;
 
 namespace Imazen.HybridCache
 {
@@ -104,15 +103,21 @@ namespace Imazen.HybridCache
 
         public int GetHash(byte[] bytes)
         {
-            // Since this class is about approximation
-            // We should probably use something even faster
-            // This is not cryptographic or security-relevant
-            using (var sha1 = SHA1.Create())
+            // Input is typically two concatenated hash halves (source[0..15] + variant[16..31]),
+            // already uniformly distributed SHA256 output. XOR from both halves for entropy
+            // from source AND variant. No need for a crypto hash on already-hashed data.
+            uint raw;
+            if (bytes.Length >= 20)
+                raw = BitConverter.ToUInt32(bytes, 0) ^ BitConverter.ToUInt32(bytes, 16);
+            else if (bytes.Length >= 4)
+                raw = BitConverter.ToUInt32(bytes, 0);
+            else
             {
-                var hash = sha1.ComputeHash(bytes);
-                var index = BitConverter.ToUInt32(hash, 16);
-                return (int) (index & HashMask);
+                raw = 0;
+                for (int i = 0; i < bytes.Length; i++)
+                    raw = (raw << 8) | bytes[i];
             }
+            return (int)(raw & HashMask);
         }
 
 
