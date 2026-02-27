@@ -51,9 +51,12 @@ namespace Imazen.HybridCache.MetaStore
 
         public async Task UpdateLastDeletionAttempt(string relativePath, DateTime when)
         {
-            if ((await GetLoadedDict()).TryGetValue(relativePath, out var record))
+            using (await createLock.LockAsync())
             {
-                record.LastDeletionAttempt = when;
+                if ((await GetLoadedDict()).TryGetValue(relativePath, out var record))
+                {
+                    record.LastDeletionAttempt = when;
+                }
             }
         }
         
@@ -84,7 +87,7 @@ namespace Imazen.HybridCache.MetaStore
             var results = (await GetLoadedDict()).Values
                 .Where(r => r.CreatedAt < maxCreatedDate && r.LastDeletionAttempt < maxLastDeletionAttemptTime)
                 .Select(r => new Tuple<CacheDatabaseRecord, ushort>(r, getUsageCount(r.AccessCountKey)))
-                .OrderByDescending(t => t.Item2)
+                .OrderBy(t => t.Item2)
                 .Select(t => (ICacheDatabaseRecord) t.Item1)
                 .Take(count).ToArray();
             //logger?.LogInformation("Found {DeletionCandidates} deletion candidates in shard {ShardId} of MetaStore", results.Length, shardId);
@@ -134,7 +137,7 @@ namespace Imazen.HybridCache.MetaStore
                 var newRecord = new CacheDatabaseRecord()
                 {
                     AccessCountKey = accessCountKey,
-                    ContentType = contentType,
+                    ContentType = ContentTypePool.Deduplicate(contentType),
                     CreatedAt = createdDate,
                     DiskSize = recordDiskSpace,
                     LastDeletionAttempt = DateTime.MinValue,
@@ -172,7 +175,7 @@ namespace Imazen.HybridCache.MetaStore
                         new CacheDatabaseRecord()
                         {
                             AccessCountKey = accessCountKey,
-                            ContentType = contentType,
+                            ContentType = ContentTypePool.Deduplicate(contentType),
                             CreatedAt = createdDate,
                             DiskSize = recordDiskSpace,
                             LastDeletionAttempt = DateTime.MinValue,

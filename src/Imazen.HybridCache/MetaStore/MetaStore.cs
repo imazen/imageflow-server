@@ -52,17 +52,30 @@ namespace Imazen.HybridCache.MetaStore
 
         public int GetShardForKey(string key)
         {
+#if NET8_0_OR_GREATER
+            var keyByteCount = Encoding.UTF8.GetByteCount(key);
+            Span<byte> keyBytes = keyByteCount <= 256 ? stackalloc byte[keyByteCount] : new byte[keyByteCount];
+            Encoding.UTF8.GetBytes(key, keyBytes);
+            Span<byte> hash = stackalloc byte[32];
+            SHA256.HashData(keyBytes, hash);
+            var shardSeed = BitConverter.ToUInt32(hash.Slice(8, 4));
+            return (int)(shardSeed % (uint)shards.Length);
+#else
             var stringBytes = Encoding.UTF8.GetBytes(key);
-            
-            using (var h = SHA256.Create())
+            byte[] a;
+            lock (Sha256Lock)
             {
-                var a = h.ComputeHash(stringBytes);
-                var shardSeed = BitConverter.ToUInt32(a, 8);
-
-                var shard = (int)(shardSeed % shards.Length);
-                return shard;
+                a = Sha256Instance.ComputeHash(stringBytes);
             }
+            var shardSeed = BitConverter.ToUInt32(a, 8);
+            return (int)(shardSeed % shards.Length);
+#endif
         }
+
+#if !NET8_0_OR_GREATER
+        private static readonly SHA256 Sha256Instance = SHA256.Create();
+        private static readonly object Sha256Lock = new object();
+#endif
 
         public Task DeleteRecord(int shard, ICacheDatabaseRecord record)
         {
