@@ -1,8 +1,8 @@
-[![.NET 6/7](https://github.com/imazen/imageflow-dotnet-server/workflows/Build/badge.svg)](https://github.com/imazen/imageflow-dotnet-server/actions/workflows/dotnet-core.yml)
+[![Build](https://github.com/imazen/imageflow-dotnet-server/workflows/Build/badge.svg)](https://github.com/imazen/imageflow-dotnet-server/actions/workflows/dotnet-core.yml)
 
-#### Imageflow.NET Server is image processing and optimizing middleware for ASP.NET 6 & 7. 
+#### Imageflow.NET Server is image processing and optimizing middleware for ASP.NET Core.
 
-** Try [the new configuration system](https://github.com/imazen/imageflow-dotnet-server/blob/main/CONFIGURATION.md) to avoid a build step & C#! **
+**Try [the new configuration system](https://github.com/imazen/imageflow-dotnet-server/blob/main/CONFIGURATION.md) to avoid a build step & C#.**
 
 If you don't need an HTTP server, [try Imageflow.NET](https://github.com/imazen/imageflow-dotnet). If you don't want to use .NET, try [Imageflow](https://imageflow.io), which has a server, command-line tool, and library with language bindings for Go, C, Rust, Node, Ruby and more. Imageflow is specifically designed for web servers and focuses on security, quality, and performance. 
 
@@ -10,7 +10,9 @@ If you don't need an HTTP server, [try Imageflow.NET](https://github.com/imazen/
 
 Imageflow.NET Server edits and optimizes images so quickly you can do it on-demand. No need to manually generate every size/format combination of every image.
 
-![Imageflow Server Diagram](https://www.imageflow.io/images/imageflow-responsive.svg)![Querystring animation](https://www.imageflow.io/images/edit-url.gif)
+![Imageflow Server Diagram](docs/diagram.svg)
+
+![Querystring animation](https://www.imageflow.io/images/edit-url.gif)
 
 
 <sup>[1]</sup>According to the HTTP Archive, 60% of the data transferred to fetch a web page is images composed of JPEGs, PNGs and GIFs.
@@ -58,7 +60,7 @@ These steps assume you want to serve and modify images from the `wwwroot` folder
 You can call `.SetMapWebRoot(false).MapPath("/", physicalPath)` to map a different physical folder. 
 For examples on serving files from S3 or Azure, see the full example after this. 
 
-1. Create a new ASP.NET Core 3.1 project using the Empty template. 
+1. Create a new ASP.NET Core project using the Empty template.
 2. Create a directory called "wwwroot" and add a file "image.jpg"
 3. Install Imageflow.Server
     ```
@@ -315,9 +317,8 @@ namespace Imageflow.Server.Example
   additional sharpening is appropriate. You can make images slightly sharper by using
   the Mitchell resampling filter with `.AddCommandDefault("down.filter", "mitchell")`. 
   You can add stronger sharpening with `.AddCommandDefault("f.sharpen", "15")`
-* Unlike ImageResizer, Imageflow does not support .TIFF files. Please convert them to 
-.png or .jpg before migrating to Imageflow.NET Server. There is no secure open-source codec for .TIFF files, so we chose to not support the format.
-* Nearly all querystring commands are supported, with few infrequently exceptions:
+* Unlike ImageResizer, Imageflow does not support .TIFF files. Please convert them to .png or .jpg before migrating to Imageflow.NET Server. There is no secure open-source codec for .TIFF files, so we chose to not support the format.
+* Nearly all querystring commands are supported, with few exceptions:
     * We no longer support adding borders to images as that can be done better in CSS.
     * We no longer support adding drop shadows; this can also be done in CSS.
     * Rotation must be in intervals of 90 degrees.
@@ -347,7 +348,7 @@ namespace Imageflow.Server.Example
     `jpeg_idct_downscale_linear`, `watermark`, `s.invert`, `s.sepia`, 
     `s.grayscale`, `s.alpha`, `s.brightness`, `s.contrast`, `s.saturation`, 
     `trim.threshold`, `trim.percentpadding`, `a.balancewhite`,  `jpeg.progressive`,
-    `decoder.min_precise_scaling_ratio`, `scale`, `preset`, `s.roundcorners`, 'ignoreicc'
+    `decoder.min_precise_scaling_ratio`, `scale`, `preset`, `s.roundcorners`, `ignoreicc`
  * TIFF files are not supported, so `page=x` is not supported.
  * Animated GIFs are fully supported, so `frame=x` is ignored.
  * Images are always auto-rotated based on Exif information, so `autorotate` is ignored. 

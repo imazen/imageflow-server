@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 260" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <style>
+    /* Dark mode (default for GitHub dark) */
+    .box { fill: none; stroke-width: 1.5; }
+    .box-server { stroke: #58a6ff; }
+    .box-storage { stroke: #8b949e; }
+    .box-client { stroke: #7ee787; }
+    .box-cache { stroke: #d2a8ff; }
+    .title { fill: #e6edf3; font-weight: 600; font-size: 14px; }
+    .detail { fill: #8b949e; font-size: 11.5px; }
+    .line { stroke: #484f58; stroke-width: 1.5; }
+    .arrow-tip { fill: #484f58; }
+    .line-label { fill: #8b949e; font-size: 10.5px; }
+    .footnote { fill: #6e7681; font-size: 11px; font-style: italic; }
+
+    @media (prefers-color-scheme: light) {
+      .title { fill: #1f2328; }
+      .detail { fill: #656d76; }
+      .box-server { stroke: #0969da; }
+      .box-storage { stroke: #656d76; }
+      .box-client { stroke: #1a7f37; }
+      .box-cache { stroke: #8250df; }
+      .line { stroke: #d0d7de; }
+      .arrow-tip { fill: #d0d7de; }
+      .line-label { fill: #656d76; }
+      .footnote { fill: #656d76; }
+    }
+  </style>
+
+  <!-- Client / Browser -->
+  <rect x="16" y="75" width="148" height="90" rx="8" class="box box-client"/>
+  <text x="90" y="108" text-anchor="middle" class="title">Browser</text>
+  <text x="90" y="128" text-anchor="middle" class="detail">&lt;img src="photo.jpg</text>
+  <text x="90" y="143" text-anchor="middle" class="detail">?width=800&amp;format=webp"&gt;</text>
+
+  <!-- Arrow: Client → Server -->
+  <line x1="164" y1="120" x2="238" y2="120" class="line"/>
+  <polygon points="238,115 248,120 238,125" class="arrow-tip"/>
+  <text x="206" y="112" text-anchor="middle" class="line-label">HTTP</text>
+
+  <!-- Imageflow Server -->
+  <rect x="248" y="50" width="196" height="160" rx="8" class="box box-server"/>
+  <text x="346" y="82" text-anchor="middle" class="title">Imageflow Server</text>
+  <text x="346" y="106" text-anchor="middle" class="detail">Decode · Process · Encode</text>
+  <text x="346" y="130" text-anchor="middle" class="detail">Resize, crop, watermark,</text>
+  <text x="346" y="145" text-anchor="middle" class="detail">sharpen, format convert</text>
+  <text x="346" y="172" text-anchor="middle" class="detail">WebP · JPEG · PNG · GIF</text>
+
+  <!-- Arrow: Server → Storage -->
+  <line x1="444" y1="100" x2="508" y2="100" class="line"/>
+  <polygon points="508,95 518,100 508,105" class="arrow-tip"/>
+  <text x="481" y="92" text-anchor="middle" class="line-label">fetch</text>
+
+  <!-- Storage sources -->
+  <rect x="518" y="55" width="186" height="84" rx="8" class="box box-storage"/>
+  <text x="611" y="82" text-anchor="middle" class="title">Image Sources</text>
+  <text x="611" y="102" text-anchor="middle" class="detail">Disk · S3 · Azure Blob</text>
+  <text x="611" y="117" text-anchor="middle" class="detail">Remote URLs · Custom</text>
+
+  <!-- Arrow: Server → Cache -->
+  <line x1="444" y1="170" x2="508" y2="170" class="line"/>
+  <polygon points="508,165 518,170 508,175" class="arrow-tip"/>
+  <text x="481" y="162" text-anchor="middle" class="line-label">cache</text>
+
+  <!-- Cache -->
+  <rect x="518" y="145" width="186" height="72" rx="8" class="box box-cache"/>
+  <text x="611" y="170" text-anchor="middle" class="title">HybridCache</text>
+  <text x="611" y="190" text-anchor="middle" class="detail">Size-limited disk cache</text>
+  <text x="611" y="205" text-anchor="middle" class="detail">with write-ahead log</text>
+
+  <!-- Footnote -->
+  <text x="360" y="248" text-anchor="middle" class="footnote">On-demand processing — no pre-generation needed</text>
+</svg>
