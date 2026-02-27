@@ -96,7 +96,7 @@ namespace Imazen.HybridCache
                     .Select(r =>
                         new Tuple<ushort, ICacheDatabaseRecord>(
                             AccessCounter.Get(r.AccessCountKey), r))
-                    .OrderByDescending(r => r.Item1)
+                    .OrderBy(r => r.Item1)
                     .Select(r => r.Item2).ToArray();
                 
                 foreach (var record in records)
