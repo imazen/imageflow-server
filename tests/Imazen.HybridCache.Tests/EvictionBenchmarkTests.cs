@@ -221,10 +221,11 @@ namespace Imazen.HybridCache.Tests
             // With correct eviction (least-used first), Zipfian workload should achieve
             // a meaningful hit rate. The exact threshold depends on many factors (timing,
             // MinAgeToDelete, etc.) but it should be well above random chance.
-            // With wrong eviction, this would typically be <15%.
-            Assert.True(hitRate > 0.20,
+            // Simulation shows 68.5%, real cache consistently hits 70%+.
+            // Threshold of 35% catches regressions while allowing for timing variance.
+            Assert.True(hitRate > 0.35,
                 $"Hit rate {hitRate:P1} is too low — eviction may be removing popular items. " +
-                $"Expected >20% with Zipfian skew=1.0 and 20% cache capacity.");
+                $"Expected >35% with Zipfian skew=1.0 and 20% cache capacity.");
             Assert.Equal(0, errors);
         }
 

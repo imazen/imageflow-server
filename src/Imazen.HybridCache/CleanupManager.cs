@@ -91,13 +91,10 @@ namespace Imazen.HybridCache
                 var deletionCutoff = DateTime.UtcNow.Subtract(Options.RetryDeletionAfter);
                 var creationCutoff = DateTime.UtcNow.Subtract(Options.MinAgeToDelete);
                 
+                // GetDeletionCandidates already returns candidates sorted by usage count (least-used first)
                 var records =
                     (await Database.GetDeletionCandidates(shard, deletionCutoff, creationCutoff, Options.CleanupSelectBatchSize, AccessCounter.Get))
-                    .Select(r =>
-                        new Tuple<ushort, ICacheDatabaseRecord>(
-                            AccessCounter.Get(r.AccessCountKey), r))
-                    .OrderBy(r => r.Item1)
-                    .Select(r => r.Item2).ToArray();
+                    .ToArray();
                 
                 foreach (var record in records)
                 {
