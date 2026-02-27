@@ -34,7 +34,7 @@ namespace Imazen.HybridCache.MetaStore
             return new CacheDatabaseRecord()
             {
                 AccessCountKey = AccessCountKey,
-                ContentType = ContentType,
+                ContentType = ContentType != null ? string.Intern(ContentType) : null,
                 CreatedAt = CreatedAt,
                 DiskSize = DiskSize,
                 LastDeletionAttempt = LastDeletionAttempt,

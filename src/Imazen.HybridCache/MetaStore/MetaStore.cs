@@ -62,7 +62,7 @@ namespace Imazen.HybridCache.MetaStore
             return (int)(shardSeed % (uint)shards.Length);
 #else
             var stringBytes = Encoding.UTF8.GetBytes(key);
-            var a = Sha256ThreadLocal.Value!.ComputeHash(stringBytes);
+            var a = Sha256ThreadLocal.Value.ComputeHash(stringBytes);
             var shardSeed = BitConverter.ToUInt32(a, 8);
             return (int)(shardSeed % shards.Length);
 #endif

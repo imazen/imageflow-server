@@ -137,7 +137,7 @@ namespace Imazen.HybridCache.MetaStore
                 var newRecord = new CacheDatabaseRecord()
                 {
                     AccessCountKey = accessCountKey,
-                    ContentType = contentType,
+                    ContentType = contentType != null ? string.Intern(contentType) : null,
                     CreatedAt = createdDate,
                     DiskSize = recordDiskSpace,
                     LastDeletionAttempt = DateTime.MinValue,
@@ -175,7 +175,7 @@ namespace Imazen.HybridCache.MetaStore
                         new CacheDatabaseRecord()
                         {
                             AccessCountKey = accessCountKey,
-                            ContentType = contentType,
+                            ContentType = contentType != null ? string.Intern(contentType) : null,
                             CreatedAt = createdDate,
                             DiskSize = recordDiskSpace,
                             LastDeletionAttempt = DateTime.MinValue,
