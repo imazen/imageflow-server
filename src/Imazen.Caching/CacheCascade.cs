@@ -105,15 +105,25 @@ public sealed class CacheCascade : ICacheEngine
             if (subscribers.Count > 0)
             {
                 // Subscribers need bytes — buffer if we have a stream, then distribute.
-                var data = outcome.Result.Data
-                    ?? await BufferStreamAsync(outcome.Result.DataStream!, ct).ConfigureAwait(false);
-                outcome.Result.Dispose(); // close original stream if any
+                byte[] data;
+                try
+                {
+                    data = outcome.Result.Data
+                        ?? await BufferStreamAsync(outcome.Result.DataStream!, ct).ConfigureAwait(false);
+                }
+                catch
+                {
+                    outcome.Result.Dispose(); // close stream on failure
+                    throw;
+                }
 
-                DistributeToSubscribers(key, stringKey, data,
-                    outcome.Result.Metadata, subscribers);
+                var metadata = outcome.Result.Metadata;
+                outcome.Result.Dispose(); // close original stream after buffering
+
+                DistributeToSubscribers(key, stringKey, data, metadata, subscribers);
 
                 return CacheResult.BufferedHit(status, data,
-                    outcome.Result.Metadata.ContentType, outcome.HitProviderName!, sw.Elapsed);
+                    metadata.ContentType, outcome.HitProviderName!, sw.Elapsed);
             }
 
             // No subscribers — stream through directly (hot path for CDN).
@@ -569,9 +579,18 @@ public sealed class CacheCascade : ICacheEngine
         try
         {
             var result = await provider.FetchAsync(BloomPersistenceKey, ct).ConfigureAwait(false);
-            if (result?.Data != null)
+            if (result == null) return;
+
+            try
             {
-                _bloom.LoadFromBytes(result.Data);
+                // Handle both buffered and streaming providers
+                var data = result.Data
+                    ?? await BufferStreamAsync(result.DataStream!, ct).ConfigureAwait(false);
+                _bloom.LoadFromBytes(data);
+            }
+            finally
+            {
+                result.Dispose();
             }
         }
         catch
