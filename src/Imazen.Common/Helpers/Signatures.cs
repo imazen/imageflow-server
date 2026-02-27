@@ -9,7 +9,7 @@ namespace Imazen.Common.Helpers
         public static string SignString(string data, string key, int signatureLengthInBytes)
         {
             if (signatureLengthInBytes < 1 || signatureLengthInBytes > 32) throw new ArgumentOutOfRangeException(nameof(signatureLengthInBytes));
-            HMACSHA256 hmac = new HMACSHA256(Encoding.UTF8.GetBytes(key));
+            using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(key));
             byte[] hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(data));
             //32-byte hash is a bit overkill. Truncation only marginally weakens the algorithm integrity.
             byte[] shorterHash = new byte[signatureLengthInBytes];
@@ -53,7 +53,6 @@ namespace Imazen.Common.Helpers
                 
                 if (newQuery.Length > 0) newPathAndQuery += "?" + newQuery.TrimStart('&');
             }
-            Console.WriteLine($"Normalized url from {pathAndQuery} to {newPathAndQuery}");
             return newPathAndQuery;
         }
 

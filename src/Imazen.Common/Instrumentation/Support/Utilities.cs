@@ -11,19 +11,22 @@ namespace Imazen.Common.Instrumentation.Support
         
         public static string Sha256Hex(string input)
         {
-            var hash = System.Security.Cryptography.SHA256.Create().ComputeHash(System.Text.Encoding.UTF8.GetBytes(input));
+            using var sha = System.Security.Cryptography.SHA256.Create();
+            var hash = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(input));
             return BitConverter.ToString(hash, 0, 4).Replace("-", "").ToLowerInvariant();
         }
 
         public static string Sha256Base64(string input)
         {
-            var hash = System.Security.Cryptography.SHA256.Create().ComputeHash(System.Text.Encoding.UTF8.GetBytes(input));
+            using var sha = System.Security.Cryptography.SHA256.Create();
+            var hash = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(input));
             return EncodingUtils.ToBase64U(hash);
         }
 
         public static string Sha256TruncatedBase64(string input, int bytes)
         {
-            var hash = System.Security.Cryptography.SHA256.Create().ComputeHash(System.Text.Encoding.UTF8.GetBytes(input));
+            using var sha = System.Security.Cryptography.SHA256.Create();
+            var hash = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(input));
             return EncodingUtils.ToBase64U(hash.Take(bytes).ToArray());
         }
 

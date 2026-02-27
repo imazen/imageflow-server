@@ -81,9 +81,10 @@ public class HybridCacheProvider : ICacheProvider
         if (!File.Exists(entry.PhysicalPath))
             return null;
 
+        FileStream? fs = null;
         try
         {
-            var fs = new FileStream(entry.PhysicalPath, FileMode.Open, FileAccess.Read,
+            fs = new FileStream(entry.PhysicalPath, FileMode.Open, FileAccess.Read,
                 FileShare.Read, 4096, FileOptions.Asynchronous | FileOptions.SequentialScan);
 
             // Try to get content type from metadata store
@@ -103,7 +104,9 @@ public class HybridCacheProvider : ICacheProvider
                 ContentType = contentType,
                 ContentLength = fs.Length,
             };
-            return new CacheFetchResult(fs, metadata);
+            var result = new CacheFetchResult(fs, metadata);
+            fs = null; // Ownership transferred to CacheFetchResult
+            return result;
         }
         catch (FileNotFoundException)
         {
@@ -117,6 +120,11 @@ public class HybridCacheProvider : ICacheProvider
         {
             // File locked or other I/O error — treat as miss
             return null;
+        }
+        finally
+        {
+            // Dispose if ownership was not transferred (exception paths)
+            fs?.Dispose();
         }
     }
 

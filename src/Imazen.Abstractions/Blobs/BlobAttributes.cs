@@ -51,7 +51,7 @@ public record class BlobAttributes : IBlobAttributes
         + EstimatedBlobByteCount.EstimateMemorySize(true)
         + LastModifiedDateUtc.EstimateMemorySize(true)
         + EstimatedExpiry.EstimateMemorySize(true)
-        + 8 + BlobStorageReference?.EstimateAllocatedBytesRecursive ?? 0
+        + 8 + (BlobStorageReference?.EstimateAllocatedBytesRecursive ?? 0)
         + StorageTags.EstimateMemorySize(true);
     
 }

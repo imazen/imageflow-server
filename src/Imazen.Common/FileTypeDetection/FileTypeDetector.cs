@@ -288,7 +288,7 @@ namespace Imazen.Common.FileTypeDetection{
                 // HEIF/HEIC has.. a lot of variations
                 // http://nokiatech.github.io/heif/technical.html
                 // https://mimetype.io/image/heic
-                if (bytes[8] == 'm' && bytes[10] == 'f' & bytes[11] == '1')
+                if (bytes[8] == 'm' && bytes[10] == 'f' && bytes[11] == '1')
                 {
                     if (bytes[9] == 'i')
                         return ImageFormat.Heif;
@@ -327,22 +327,22 @@ namespace Imazen.Common.FileTypeDetection{
 
                 if (bytes[8] == 'M' && bytes[9] == '4')
                 {
-                    if (bytes[9] == 'V')
+                    if (bytes[10] == 'V')
                     {
                         return ImageFormat.M4V;
                     }
 
-                    if (bytes[9] == 'P')
+                    if (bytes[10] == 'P')
                     {
                         return ImageFormat.M4P;
                     }
 
-                    if (bytes[9] == 'B')
+                    if (bytes[10] == 'B')
                     {
                         return ImageFormat.M4B;
                     }
 
-                    if (bytes[9] == 'A')
+                    if (bytes[10] == 'A')
                     {
                         return ImageFormat.M4A;
                     }
@@ -351,22 +351,22 @@ namespace Imazen.Common.FileTypeDetection{
                 if (bytes[8] == 'F' && bytes[9] == '4')
                 {
                     //These are adobe flash video/audio formats, meh..
-                    if (bytes[9] == 'V')
+                    if (bytes[10] == 'V')
                     {
                         return ImageFormat.F4V;
                     }
 
-                    if (bytes[9] == 'P')
+                    if (bytes[10] == 'P')
                     {
                         return ImageFormat.F4P;
                     }
 
-                    if (bytes[9] == 'B')
+                    if (bytes[10] == 'B')
                     {
                         return ImageFormat.F4B;
                     }
 
-                    if (bytes[9] == 'A')
+                    if (bytes[10] == 'A')
                     {
                         return ImageFormat.F4A;
                     }

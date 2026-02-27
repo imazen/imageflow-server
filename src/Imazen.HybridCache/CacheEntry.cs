@@ -22,7 +22,7 @@ namespace Imazen.HybridCache
         internal static CacheEntry FromHash(byte[] hash, string hashString, HashBasedPathBuilder builder)
         {
             var relative = builder.GetRelativePathFromHash(hash);
-            return new CacheEntry(hash, builder.GetRelativePathFromHash(hash), builder.GetPhysicalPathFromRelativePath(relative), hashString);
+            return new CacheEntry(hash, relative, builder.GetPhysicalPathFromRelativePath(relative), hashString);
         }
         
     }

@@ -165,11 +165,9 @@ public class MemoryCache(MemoryCacheOptions options, IReLogger<MemoryCache> logg
             var candidate = snapshotOfEntries[nextCandidateIndex++];
             if (candidate.UsageTracker.LastAccessedUtc > DateTimeOffset.UtcNow - options.MinKeepNewItemsFor)
             {
-                nextCandidateIndex++; // Skip this item
                 continue; // This item is too new to evict.
             }
-            var _ = TryRemove(candidate.CacheKey, out var _);
-            nextCandidateIndex++;
+            TryRemove(candidate.CacheKey, out _);
         }
         return true;
     }
@@ -182,21 +180,16 @@ public class MemoryCache(MemoryCacheOptions options, IReLogger<MemoryCache> logg
             throw new InvalidOperationException("Cannot cache a blob that does not have an EstimateAllocatedBytes");
         }
 
-        IBlobWrapper? existingBlob = null;
-        if (__cache.TryGetValue(cacheKey, out var oldEntry))
+        if (__cache.TryGetValue(cacheKey, out _))
         {
-            // Something already exists with this key.
-            // Not sure why previous code wanted to replace entries. We'd have to immutably swap the whole entry anyway.
-            existingBlob = oldEntry.BlobWrapper;
-            // We can exit.
+            // Already exists with this key — don't replace.
             return Task.FromResult(false);
         }
-        var replacementSizeDifference = (long)estimateAllocatedBytes! - (existingBlob?.EstimateAllocatedBytes ?? 0);
         if (estimateAllocatedBytes > options.MaxItemSizeKb * 1024)
         {
             return Task.FromResult(false);
         }
-        if (!TryEnsureCapacity(replacementSizeDifference))
+        if (!TryEnsureCapacity((long)estimateAllocatedBytes!))
         {
             return Task.FromResult(false); // Can't make space? That's odd.
         }
@@ -210,7 +203,6 @@ public class MemoryCache(MemoryCacheOptions options, IReLogger<MemoryCache> logg
         {
             Interlocked.Increment(ref itemCountSync);
             Interlocked.Add(ref memoryUsedSync, estimateAllocatedBytes ?? 0);
-            itemCountSync++;
             return Task.FromResult(true);
         }
         else

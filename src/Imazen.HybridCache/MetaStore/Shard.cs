@@ -106,7 +106,7 @@ namespace Imazen.HybridCache.MetaStore
                             !r.Flags.HasFlag(CacheEntryFlags.DoNotEvict))
                 .OrderBy(r => (byte)r.Flags)
                 .Select(r => new Tuple<CacheDatabaseRecord, ushort>(r, getUsageCount(r.AccessCountKey)))
-                .OrderByDescending(t => t.Item2)
+                .OrderBy(t => t.Item2)
                 .Select(t => (ICacheDatabaseRecord) t.Item1)
                 .Take(count).ToArray();
             //logger?.LogInformation("Found {DeletionCandidates} deletion candidates in shard {ShardId} of MetaStore", results.Length, shardId);

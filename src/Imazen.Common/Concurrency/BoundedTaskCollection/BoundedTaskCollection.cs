@@ -55,8 +55,8 @@ namespace Imazen.Common.Concurrency.BoundedTaskCollection {
             
             // Deal with maximum queue size
             var taskSize = taskItem.GetTaskSizeInMemory();
-            Interlocked.Add(ref queuedBytes, taskSize);
-            if (queuedBytes > MaxQueueBytes) {
+            var newTotal = Interlocked.Add(ref queuedBytes, taskSize);
+            if (newTotal > MaxQueueBytes) {
                 Interlocked.Add(ref queuedBytes, -taskSize);
                 return TaskEnqueueResult.QueueFull; //Because we would use too much ram.
             }

@@ -22,7 +22,7 @@ namespace Imazen.HybridCache
         public int EstimateAllocatedBytesRecursive =>
             RelativePath.EstimateMemorySize(true) +
             24 + 8 +
-            Record?.EstimateAllocatedBytesRecursive ?? 0;
+            (Record?.EstimateAllocatedBytesRecursive ?? 0);
             
     
         public string GetFullyQualifiedRepresentation()

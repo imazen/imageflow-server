@@ -45,7 +45,8 @@ namespace Imazen.Common.Persistence
         
         string HashToBase16(string data)
         {
-            byte[] bytes = SHA256.Create().ComputeHash(new UTF8Encoding().GetBytes(data));
+            using var sha = SHA256.Create();
+            byte[] bytes = sha.ComputeHash(new UTF8Encoding().GetBytes(data));
             StringBuilder sb = new StringBuilder(bytes.Length * 2);
             foreach (byte b in bytes)
                 sb.Append(b.ToString("x", NumberFormatInfo.InvariantInfo).PadLeft(2, '0'));

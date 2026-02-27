@@ -50,16 +50,16 @@ internal sealed class BlobWrapperCore : IDisposable
 
     private bool disposed = false;
 
-#if DEBUG
+    private static long _instanceCounter;
     private readonly long id = Interlocked.Increment(ref _instanceCounter);
+
+#if DEBUG
     private BlobWrapperSource source = BlobWrapperSource.Unknown;
     private readonly StackTrace? creationStackTrace;
 
     private readonly ConcurrentDictionary<object,OutstandingReference> outstandingReferences = new();
     private int referenceOrder = 0;
 
-
-    private static long _instanceCounter; 
     private static readonly ConcurrentDictionary<BlobWrapperCore,bool> Instances = new();
 #endif
 

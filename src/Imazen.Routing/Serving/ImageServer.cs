@@ -390,9 +390,6 @@ internal class ImageServer<TRequest, TResponse, TContext> : IImageServer<TReques
                 perf.IncrementCounter("module_response_ext_" + imageExtension);
             }
         }
-
-        throw new NotImplementedException("Unreachable");
-        
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)

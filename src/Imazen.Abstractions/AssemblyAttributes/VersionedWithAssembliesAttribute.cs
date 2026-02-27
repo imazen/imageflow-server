@@ -11,6 +11,6 @@ public class VersionedWithAssembliesAttribute(params string[] assemblyPatterns) 
 
     public override string ToString()
     {
-        return string.Join("This assembly should match the version of , ", AssemblyPatterns);
+        return $"This assembly should match the version of {string.Join(", ", AssemblyPatterns)}";
     }
 }
