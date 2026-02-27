@@ -27,8 +27,8 @@ jobs:
             os: ubuntu-24-arm-16gb #our imazen large runner
             cache_dependencies: true
           
-          - name: macos-13-x86_64
-            os: macos-13
+          - name: macos-15-intel
+            os: macos-15-intel
             cache_dependencies: true
             
           - name: macos-14-arm
