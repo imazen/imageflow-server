@@ -78,8 +78,10 @@ public sealed class RequestCoalescer : IDisposable
         {
             if (Interlocked.Decrement(ref entry.WaiterCount) == 0)
             {
-                // Last waiter cleans up. Race-safe: if another thread just incremented,
-                // TryRemove will fail because GetOrAdd already replaced the entry.
+                // Last waiter cleans up. There's a narrow race where a new thread
+                // could GetOrAdd the same entry between our decrement and TryRemove,
+                // causing a missed coalescing opportunity. This is benign — both
+                // requests produce valid results, just without sharing the factory call.
                 _entries.TryRemove(key, out _);
             }
         }
