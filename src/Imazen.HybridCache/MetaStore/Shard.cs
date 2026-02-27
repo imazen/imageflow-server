@@ -66,9 +66,12 @@ namespace Imazen.HybridCache.MetaStore
 
         public async Task UpdateLastDeletionAttempt(string relativePath, DateTime when)
         {
-            if ((await GetLoadedDict()).TryGetValue(relativePath, out var record))
+            using (await createLock.LockAsync())
             {
-                record.LastDeletionAttempt = when;
+                if ((await GetLoadedDict()).TryGetValue(relativePath, out var record))
+                {
+                    record.LastDeletionAttempt = when;
+                }
             }
         }
 

@@ -43,14 +43,11 @@ public readonly struct HttpStatus(int statusCode, string? reasonPhrase)
         return Message == null ? StatusCode.ToString() : $"{StatusCode} {Message}";
     }
     
-    // equality based on status code and message
+    // equality based on status code only — consistent with operator ==, GetHashCode, and cross-type operators
     public override bool Equals(object? obj)
     {
         if (obj is not HttpStatus other) return false;
-        if (StatusCode != other.StatusCode ||
-            (Message == null) != (other.Message == null))
-            return false;
-        return Message == null || Message.Equals(other.Message, StringComparison.Ordinal);
+        return StatusCode == other.StatusCode;
     }
     
     public static bool operator ==(HttpStatus left, HttpStatus right)
