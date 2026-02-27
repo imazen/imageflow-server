@@ -8,6 +8,7 @@ using Imazen.Common.Extensibility.StreamCache;
 using Imazen.HybridCache.MetaStore;
 using Xunit;
 using Xunit.Abstractions;
+using static Imazen.HybridCache.AsyncCache;
 
 namespace Imazen.HybridCache.Tests
 {
@@ -27,6 +28,14 @@ namespace Imazen.HybridCache.Tests
         public EvictionBenchmarkTests(ITestOutputHelper output)
         {
             _output = output;
+        }
+
+        private static bool IsCacheHit(string status)
+        {
+            return status == nameof(AsyncCacheDetailResult.DiskHit)
+                || status == nameof(AsyncCacheDetailResult.MemoryHit)
+                || status == nameof(AsyncCacheDetailResult.ContendedDiskHit)
+                || status == nameof(AsyncCacheDetailResult.FileAlreadyExists);
         }
 
         /// <summary>
@@ -138,7 +147,7 @@ namespace Imazen.HybridCache.Tests
                     {
                         var result = await cache.GetOrCreateBytes(key, DataProvider, cancellationToken, false);
 
-                        if (result.Status == "DiskHit")
+                        if (IsCacheHit(result.Status))
                             hits++;
                         else
                             misses++; // WriteSucceeded, etc. = cache miss (had to generate)
@@ -282,18 +291,18 @@ namespace Imazen.HybridCache.Tests
                 {
                     MaxQueuedBytes = maxCacheBytes * 2,
                     WriteSynchronouslyWhenQueueFull = true
+                },
+                CleanupManagerOptions = new CleanupManagerOptions()
+                {
+                    MaxCacheBytes = maxCacheBytes,
+                    MinCleanupBytes = itemSizeBytes * 2,
+                    MinAgeToDelete = TimeSpan.FromMilliseconds(1),
+                    RetryDeletionAfter = TimeSpan.FromMilliseconds(1),
+                    AccessTrackingBits = 16
                 }
             };
 
             var metaStoreOptions = new MetaStoreOptions(testDir) { Shards = 2 };
-            var cleanupOptions = new CleanupManagerOptions()
-            {
-                MaxCacheBytes = maxCacheBytes,
-                MinCleanupBytes = itemSizeBytes * 2,
-                MinAgeToDelete = TimeSpan.FromMilliseconds(1),
-                RetryDeletionAfter = TimeSpan.FromMilliseconds(1),
-                AccessTrackingBits = 16
-            };
 
             var database = new MetaStore.MetaStore(metaStoreOptions, cacheOptions, null);
             var cache = new HybridCache(database, cacheOptions, null);
@@ -342,7 +351,7 @@ namespace Imazen.HybridCache.Tests
                             try
                             {
                                 var result = await cache.GetOrCreateBytes(key, DataProvider, cancellationToken, false);
-                                if (result.Status == "DiskHit")
+                                if (IsCacheHit(result.Status))
                                     hits++;
                                 else
                                     misses++;
@@ -416,8 +425,11 @@ namespace Imazen.HybridCache.Tests
             _output.WriteLine($"  Evictions: {antiResult.evictions}");
 
             _output.WriteLine("");
+            var improvementText = antiResult.hitRate == 0
+                ? (lfuResult.hitRate > 0 ? "∞" : "n/a")
+                : $"{lfuResult.hitRate / antiResult.hitRate:F1}x";
             _output.WriteLine($"Hit rate delta: {(lfuResult.hitRate - antiResult.hitRate):P1} " +
-                $"({lfuResult.hitRate / antiResult.hitRate:F1}x improvement)");
+                $"({improvementText} improvement)");
 
             // Correct eviction should significantly outperform reversed eviction
             Assert.True(lfuResult.hitRate > antiResult.hitRate * 1.5,
