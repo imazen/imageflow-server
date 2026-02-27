@@ -263,7 +263,7 @@ namespace Imazen.Common.Tests.Licensing
 
                 Mock.Verify(httpHandler);
                 Assert.StartsWith(
-                    "https://s3-us-west-2.amazonaws.com/licenses.imazen.net/v1/licenses/latest/",
+                    "https://s3.us-west-2.amazonaws.com/licenses.imazen.net/v1/licenses/latest/",
                     invokedUri.ToString());
 
 

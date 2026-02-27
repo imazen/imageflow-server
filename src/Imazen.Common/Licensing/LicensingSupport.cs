@@ -27,9 +27,11 @@ namespace Imazen.Common.Licensing
 
         public DateTimeOffset? GetAssemblyWriteDate()
         {
-            var path = GetType().Assembly.Location;
             try {
-                return path != null && File.Exists(path)
+#pragma warning disable IL3000 // Assembly.Location returns empty string in single-file/AOT
+                var path = GetType().Assembly.Location;
+#pragma warning restore IL3000
+                return !string.IsNullOrEmpty(path) && File.Exists(path)
                     ? new DateTimeOffset?(File.GetLastWriteTimeUtc(path))
                     : null;
             } catch {

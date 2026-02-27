@@ -13,8 +13,9 @@ namespace Imazen.HybridCache
         public bool WriteSynchronouslyWhenQueueFull { get; set; } = true;
         
         /// <summary>
-        /// If this is used from .NET Core, set to File.Move(from, to, true)
-        /// Used by deletion code even if MoveFilesIntoPlace is false
+        /// Optional custom move function. When null (the default), uses File.Move with
+        /// overwrite support on .NET 5+ and without on older frameworks.
+        /// On .NET Framework / netstandard2.0, set this to enable overwrite behavior if needed.
         /// </summary>
         public Action<string,string> MoveFileOverwriteFunc { get; set; }
 

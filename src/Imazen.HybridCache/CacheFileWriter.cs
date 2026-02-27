@@ -23,12 +23,28 @@ namespace Imazen.HybridCache
         private readonly Action<string, string> moveFileOverwriteFunc;
         private AsyncLockProvider WriteLocks { get; }
 
-        private bool moveIntoPlace;
+        private readonly bool moveIntoPlace;
         public CacheFileWriter(AsyncLockProvider writeLocks, Action<string,string> moveFileOverwriteFunc, bool moveIntoPlace)
         {
             this.moveIntoPlace = moveIntoPlace;
             WriteLocks = writeLocks;
-            this.moveFileOverwriteFunc = moveFileOverwriteFunc ?? File.Move;
+            this.moveFileOverwriteFunc = moveFileOverwriteFunc;
+        }
+
+        private void MoveOverwrite(string from, string to)
+        {
+            if (moveFileOverwriteFunc != null)
+            {
+                moveFileOverwriteFunc(from, to);
+            }
+            else
+            {
+#if NET5_0_OR_GREATER
+                File.Move(from, to, true);
+#else
+                File.Move(from, to);
+#endif
+            }
         }
 
 
@@ -68,9 +84,17 @@ namespace Imazen.HybridCache
 
                     var subdirectoryPath = Path.GetDirectoryName(entry.PhysicalPath);
                     //Create subdirectory if needed.
-                    if (subdirectoryPath != null && !Directory.Exists(subdirectoryPath))
+                    if (!string.IsNullOrEmpty(subdirectoryPath))
                     {
-                        Directory.CreateDirectory(subdirectoryPath);
+                        if (!Directory.Exists(subdirectoryPath))
+                        {
+                            Directory.CreateDirectory(subdirectoryPath);
+                        }
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException(
+                            "CacheEntry.PhysicalPath must be a valid path; found " + entry.PhysicalPath);
                     }
 
                     string writeToFile;
@@ -103,7 +127,7 @@ namespace Imazen.HybridCache
                         {
                             if (moveIntoPlace)
                             {
-                                moveFileOverwriteFunc(writeToFile, entry.PhysicalPath);
+                                MoveOverwrite(writeToFile, entry.PhysicalPath);
                             }
 
                             resultStatus = FileWriteStatus.FileCreated;

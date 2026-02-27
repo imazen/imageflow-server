@@ -38,14 +38,17 @@ namespace Imazen.HybridCache {
         }
         
         /// <summary>
-        /// Removes the specified object based on its relativePath and modifiedDateUtc values.
+        /// Removes the specified object based on its key and decrements queuedBytes.
+        /// Only decrements if the key was actually present, preventing queuedBytes from going negative.
         /// </summary>
         /// <param name="w"></param>
         private void Remove(AsyncWrite w) {
             lock (sync)
             {
-                c.Remove(w.Key);
-                queuedBytes -= w.GetEntrySizeInMemory();
+                if (c.Remove(w.Key))
+                {
+                    queuedBytes -= w.GetEntrySizeInMemory();
+                }
             }
         }
 
@@ -75,6 +78,14 @@ namespace Imazen.HybridCache {
                         {
                             await writerDelegate(w);
                         }
+                        catch
+                        {
+                            // Caller's writerDelegate is expected to handle its own exceptions.
+                            // Catch here to prevent unobserved task exceptions: since Remove()
+                            // in the finally block removes this task from the collection before
+                            // the exception propagates, AwaitAllCurrentTasks() would never
+                            // observe it, leading to UnobservedTaskException on the finalizer thread.
+                        }
                         finally
                         {
                             Remove(w);
@@ -88,7 +99,7 @@ namespace Imazen.HybridCache {
         {
             lock (sync)
             {
-                var tasks = c.Values.Select(w => w.RunningTask).ToArray();
+                var tasks = c.Values.Select(w => w.RunningTask).Where(t => t != null).ToArray();
                 return Task.WhenAll(tasks);
             }
         }

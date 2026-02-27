@@ -52,7 +52,7 @@ namespace Imazen.Common.Issues
 
         public override string ToString() {
             return Source + "(" + Severity.ToString() + "):\t" + Summary +
-                    ("\n" + Details).Replace("\n", "\n\t\t\t") + "\n";
+                    ("\n" + (Details ?? "")).Replace("\n", "\n\t\t\t") + "\n";
         }
     }
 }

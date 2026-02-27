@@ -85,7 +85,7 @@ namespace Imazen.Common.Concurrency {
             // Tracks whether the lock acquired is still correct
             bool validLock = true; 
             // The lock corresponding to 'key'
-            SemaphoreSlim itemLock = null;
+            SemaphoreSlim? itemLock = null;
 
             try {
                 //We have to loop until we get a valid lock and it stays valid until we lock it.
@@ -167,7 +167,9 @@ namespace Imazen.Common.Concurrency {
                 }
             }
             // Ideally the only objects in 'locks' will be open operations now.
-            return true;
+            // This should be unreachable: the loop only exits when validLock is true,
+            // and a valid lock always returns from inside the loop.
+            throw new InvalidOperationException("Unreachable code in AsyncLockProvider.TryExecuteAsync");
         }
     }
 }

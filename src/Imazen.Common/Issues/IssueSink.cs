@@ -9,8 +9,14 @@ namespace Imazen.Common.Issues
 {
     public class IssueSink: IIssueProvider,IIssueReceiver {
         private readonly string defaultSource;
-        public IssueSink(string defaultSource) {
+        private readonly int maxIssues;
+
+        public IssueSink(string defaultSource) : this(defaultSource, int.MaxValue) {
+        }
+
+        public IssueSink(string defaultSource, int maxIssues) {
             this.defaultSource = defaultSource;
+            this.maxIssues = maxIssues;
         }
 
         private readonly IDictionary<int, IIssue> issueSet = new Dictionary<int,IIssue>();
@@ -24,9 +30,21 @@ namespace Imazen.Common.Issues
             lock (issueSync) {
                 return new List<IIssue>(issues);
             }
-        }  
+        }
+
         /// <summary>
-        /// Adds the specified issue to the list unless it is an exact duplicate of another instance.
+        /// Clears all tracked issues.
+        /// </summary>
+        public virtual void ClearIssues() {
+            lock (issueSync) {
+                issueSet.Clear();
+                issues.Clear();
+            }
+        }
+
+        /// <summary>
+        /// Adds the specified issue to the list unless it is an exact duplicate of another instance
+        /// or the maximum issue count has been reached.
         /// </summary>
         /// <param name="i"></param>
         public virtual void AcceptIssue(IIssue i) {
@@ -37,6 +55,7 @@ namespace Imazen.Common.Issues
             var hash = i.Hash();
             lock (issueSync)
             {
+                if (issues.Count >= maxIssues) return;
                 if (issueSet.ContainsKey(hash)) return;
                 issueSet[hash] = i;
                 issues.Add(i);

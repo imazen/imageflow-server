@@ -32,6 +32,22 @@ namespace Imazen.HybridCache
             Database = database;
             accessCounter = new Lazy<BucketCounter>(() => new BucketCounter(Options.AccessTrackingBits));
         }
+
+        private void MoveOverwrite(string from, string to)
+        {
+            if (Options.MoveFileOverwriteFunc != null)
+            {
+                Options.MoveFileOverwriteFunc(from, to);
+            }
+            else
+            {
+#if NET5_0_OR_GREATER
+                File.Move(from, to, true);
+#else
+                File.Move(from, to);
+#endif
+            }
+        }
         public void NotifyUsed(CacheEntry cacheEntry)
         {
             AccessCounter.Increment(cacheEntry.Hash);
@@ -211,7 +227,7 @@ namespace Imazen.HybridCache
                         //Move it so it usage will decrease and it can be deleted later
                         //TODO: This is not transactional, as the db record is written *after* the file is moved
                         //This should be split up into create and delete
-                        (Options.MoveFileOverwriteFunc ?? File.Move)(physicalPath, movedPath);
+                        MoveOverwrite(physicalPath, movedPath);
                         await Database.ReplaceRelativePathAndUpdateLastDeletion(shard, record, movedRelativePath,
                             DateTime.UtcNow);
                         Logger?.LogError(ioException,"HybridCache: Error deleting file, moved for eventual deletion - {Path}", record.RelativePath);
