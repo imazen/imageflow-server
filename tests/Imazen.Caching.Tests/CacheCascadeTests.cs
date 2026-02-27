@@ -767,4 +767,62 @@ public class CacheCascadeTests : IDisposable
         result.Dispose();
         cascade.Dispose();
     }
+
+    [Fact]
+    public async Task Coalescing_Recheck_HandlesStreamingProvider()
+    {
+        // Bug regression: when the coalescing recheck finds data in a streaming provider
+        // (disk/cloud), it must buffer the stream — not return null Data.
+        var disk = new StreamingCacheProvider("disk");
+
+        var cascade = new CacheCascade(new CascadeConfig
+        {
+            Providers = new List<string> { "disk" },
+            EnableRequestCoalescing = true,
+            CoalescingTimeoutMs = 10000,
+            BloomFilterEstimatedItems = 100,
+        });
+        cascade.RegisterProvider(disk);
+
+        var key = CacheKey.FromStrings("coal-stream-src", "coal-stream-var");
+        var expectedData = TestData();
+        var gate = new SemaphoreSlim(0, 1);
+        int factoryCalls = 0;
+
+        // First request: slow factory populates disk, then signals
+        var task1 = Task.Run(async () =>
+        {
+            var result = await cascade.GetOrCreateAsync(key, async ct =>
+            {
+                Interlocked.Increment(ref factoryCalls);
+                await disk.StoreAsync(key, expectedData,
+                    new CacheEntryMetadata { ContentType = "image/jpeg" });
+                gate.Release();
+                return (expectedData, new CacheEntryMetadata { ContentType = "image/jpeg" });
+            });
+            result.Dispose();
+        });
+
+        // Wait for factory to populate disk, then make second request
+        await gate.WaitAsync();
+
+        // Second request: coalescer re-checks cache, should find the streaming disk result
+        var task2 = Task.Run(async () =>
+        {
+            var result = await cascade.GetOrCreateAsync(key, async ct =>
+            {
+                Interlocked.Increment(ref factoryCalls);
+                return (expectedData, new CacheEntryMetadata { ContentType = "image/jpeg" });
+            });
+
+            // Must NOT be Error — should be a hit or created
+            Assert.NotEqual(CacheResultStatus.Error, result.Status);
+            Assert.NotNull(result.Data ?? (result.DataStream != null ? Array.Empty<byte>() : null));
+            result.Dispose();
+        });
+
+        await Task.WhenAll(task1, task2);
+        await cascade.UploadQueue.DrainAsync();
+        cascade.Dispose();
+    }
 }

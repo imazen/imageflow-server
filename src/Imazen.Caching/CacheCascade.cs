@@ -144,7 +144,12 @@ public sealed class CacheCascade : ICacheEngine
                     var recheck = await TryFetchAsync(key, stringKey, innerCt).ConfigureAwait(false);
                     if (recheck.Result != null)
                     {
-                        return (recheck.Result.Data, recheck.Result.Metadata, false);
+                        // Buffer stream if needed — streaming providers return DataStream, not Data
+                        var recheckData = recheck.Result.Data
+                            ?? await BufferStreamAsync(recheck.Result.DataStream!, innerCt).ConfigureAwait(false);
+                        var recheckMeta = recheck.Result.Metadata;
+                        recheck.Result.Dispose(); // close original stream
+                        return (recheckData, recheckMeta, false);
                     }
 
                     var produced = await factory(innerCt).ConfigureAwait(false);

@@ -22,8 +22,6 @@ public readonly struct CacheKey : IEquatable<CacheKey>
     /// </summary>
     public ReadOnlyMemory<byte> VariantHash { get; }
 
-    private readonly string? _storagePath;
-
     public CacheKey(ReadOnlyMemory<byte> sourceHash, ReadOnlyMemory<byte> variantHash)
     {
         if (sourceHash.Length != 16)
@@ -32,13 +30,8 @@ public readonly struct CacheKey : IEquatable<CacheKey>
             throw new ArgumentException("Variant hash must be 16 bytes", nameof(variantHash));
         SourceHash = sourceHash;
         VariantHash = variantHash;
-        _storagePath = null;
     }
 
-    /// <summary>
-    /// Creates a CacheKey from string identifiers. The source is hashed to produce
-    /// the source prefix, and source+variant together produce the variant hash.
-    /// </summary>
     /// <summary>
     /// Creates a CacheKey from a raw 32-byte hash by splitting into two 16-byte halves.
     /// First 16 bytes → source hash, last 16 → variant hash.
@@ -107,8 +100,6 @@ public readonly struct CacheKey : IEquatable<CacheKey>
     /// </summary>
     public string ToStoragePath()
     {
-        if (_storagePath != null) return _storagePath;
-
 #if NET8_0_OR_GREATER
         var sourceHex = Convert.ToHexString(SourceHash.Span).ToLowerInvariant();
         var variantHex = Convert.ToHexString(VariantHash.Span).ToLowerInvariant();
