@@ -1,5 +1,7 @@
 using System;
 
+#nullable enable
+
 namespace Imazen.HybridCache.MetaStore
 {
     internal enum LogEntryType: byte
@@ -16,7 +18,7 @@ namespace Imazen.HybridCache.MetaStore
     /// </summary>
     internal static class ContentTypePool
     {
-        internal static string Deduplicate(string contentType)
+        internal static string? Deduplicate(string? contentType)
         {
             if (contentType == null) return null;
             switch (contentType)
