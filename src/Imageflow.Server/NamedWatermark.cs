@@ -25,7 +25,7 @@ namespace Imageflow.Server
         internal IEnumerable<string> Serialized()
         {
             if (serialized != null) return serialized;
-            var bytes = JsonSerializer.SerializeToUtf8Bytes(Watermark.ToImageflowDynamic(0));
+            var bytes = JsonSerializer.SerializeToUtf8Bytes(Watermark);
             var json64 = Convert.ToBase64String(bytes);
             return new[] { Name, VirtualPath, json64 };
         }

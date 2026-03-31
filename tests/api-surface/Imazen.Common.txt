@@ -196,7 +196,9 @@ namespace Imazen.Common.Issues
     public class IssueSink : Imazen.Common.Issues.IIssueProvider, Imazen.Common.Issues.IIssueReceiver
     {
         public IssueSink(string defaultSource) { }
+        public IssueSink(string defaultSource, int maxIssues) { }
         public virtual void AcceptIssue(Imazen.Common.Issues.IIssue i) { }
+        public virtual void ClearIssues() { }
         public virtual System.Collections.Generic.IEnumerable<Imazen.Common.Issues.IIssue> GetIssues() { }
     }
 }

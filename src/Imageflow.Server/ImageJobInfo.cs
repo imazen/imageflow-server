@@ -373,17 +373,15 @@ namespace Imageflow.Server
         private class BlobFetchResult: IDisposable
         {
             private IBlobData blob;
-            private StreamSource streamSource;
-            private ArraySegment<byte> bytes;
+            private IAsyncMemorySource memorySource;
 
-
-            internal BytesSource GetBytesSource()
+            internal IAsyncMemorySource GetMemorySource()
             {
-                return new BytesSource(bytes);
+                return memorySource;
             }
             public void Dispose()
             {
-                streamSource?.Dispose();
+                memorySource?.Dispose();
                 blob?.Dispose();
             }
 
@@ -392,16 +390,16 @@ namespace Imageflow.Server
                 var sw = Stopwatch.StartNew();
                 using var blob = await blobFetchCache.GetBlob();
                 if (blob == null) return null;
-                
-                var source = new StreamSource(blob.OpenRead(), true);
+
+                var source = BufferedStreamSource.UseStreamRemainderAndDisposeWithSource(blob.OpenRead());
+                var bytes = await source.BorrowReadOnlyMemoryAsync(CancellationToken.None);
                 var result = new BlobFetchResult()
                 {
-                    streamSource = source,
+                    memorySource = source,
                     blob = blob,
-                    bytes = await source.GetBytesAsync(CancellationToken.None)
                 };
                 sw.Stop();
-                GlobalPerf.BlobRead(sw.ElapsedTicks, result.bytes.Count);
+                GlobalPerf.BlobRead(sw.ElapsedTicks, bytes.Length);
                 return result;
             }
         }
@@ -426,14 +424,14 @@ namespace Imageflow.Server
                                 throw new BlobMissingException(
                                     $"Cannot locate watermark \"{t.Name}\" at virtual path \"{t.VirtualPath}\"");
                             return new InputWatermark(
-                                blobs[i + 1].GetBytesSource(),
+                                blobs[i + 1].GetMemorySource(),
                                 t.Watermark);
                         }));
                 }
 
                 using var buildJob = new ImageJob();
                 var jobResult = await buildJob.BuildCommandString(
-                        blobs[0].GetBytesSource(),
+                        blobs[0].GetMemorySource(),
                         new BytesDestination(), CommandString, watermarks)
                     .Finish()
                     .SetSecurityOptions(options.JobSecurityOptions)
