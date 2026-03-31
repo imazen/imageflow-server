@@ -152,7 +152,7 @@ jobs:
         verbose: true
         
     - name: Pack
-      run: dotnet pack -c Release --include-source
+      run: dotnet pack -c Release --include-source ${{ env.TAGGED_VERSION == '' && '/p:EnablePackageValidation=false' || '' }}
 
     - name: Publish NuGet packages to Nuget.org
       if: steps.version.outputs.is_valid == 'true' && github.event_name == 'release' && matrix.uploader
