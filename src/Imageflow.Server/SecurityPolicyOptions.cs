@@ -129,9 +129,12 @@ namespace Imageflow.Server
 
             // ---- Merge format killbits ----
 
-            // If the operator set AllowEncode, their list wins — the server
-            // default is not applied. Similarly, if they set a table that
-            // mentions a risky format, that format is operator-controlled.
+            // Figure out whether the operator took explicit control over
+            // encode gating. In that case the server default does not apply
+            // and mutual-exclusion forbids us from layering a deny list on
+            // top of an allow list.
+            var usesAllowEncode = formats.AllowEncode != null;
+            var usesTableForm = formats.Formats != null;
             var operatorControlledEncode = BuildOperatorControlledEncodeSet(formats);
             var effectiveRiskyDefault = ServerRiskyEncode
                 .Where(f => !operatorControlledEncode.Contains(f))
@@ -153,38 +156,17 @@ namespace Imageflow.Server
                 formatKillbits.DenyDecode = formats.DenyDecode.ToList();
             }
 
-            // DenyEncode merges operator's DenyEncode plus the effective risky default.
-            var denyEncode = new List<ImageFormat>();
-            if (effectiveRiskyDefault.Count > 0)
+            if (usesTableForm)
             {
-                denyEncode.AddRange(effectiveRiskyDefault);
-            }
-            if (formats.DenyEncode != null)
-            {
-                foreach (var f in formats.DenyEncode)
-                {
-                    if (!denyEncode.Contains(f))
-                    {
-                        denyEncode.Add(f);
-                    }
-                }
-            }
-            if (denyEncode.Count > 0)
-            {
-                formatKillbits.DenyEncode = denyEncode;
-            }
-
-            // If the operator used table form, AllowEncode/AllowDecode/DenyEncode/DenyDecode
-            // must all be null (mutual exclusion). Push the server default into the table
-            // instead.
-            if (formats.Formats != null)
-            {
+                // Table form: allow/deny lists are forbidden (mutual exclusion
+                // on the native side). Push unmentioned risky defaults into
+                // the table as explicit encode-false entries.
                 formatKillbits.AllowEncode = null;
                 formatKillbits.AllowDecode = null;
                 formatKillbits.DenyEncode = null;
                 formatKillbits.DenyDecode = null;
                 var mergedTable = new Dictionary<ImageFormat, FormatPermissions>();
-                foreach (var kv in formats.Formats)
+                foreach (var kv in formats.Formats!)
                 {
                     mergedTable[kv.Key] = kv.Value;
                 }
@@ -192,11 +174,40 @@ namespace Imageflow.Server
                 {
                     if (!mergedTable.ContainsKey(risky))
                     {
-                        // deny encode, leave decode at the layer's existing state (true)
                         mergedTable[risky] = new FormatPermissions(decode: true, encode: false);
                     }
                 }
                 formatKillbits.Formats = mergedTable;
+            }
+            else if (usesAllowEncode)
+            {
+                // Allow-list form: we cannot add a deny list (mutual exclusion).
+                // The operator took control; server default does not apply.
+                formatKillbits.DenyEncode = null;
+            }
+            else
+            {
+                // Deny-list form (default path): merge operator's DenyEncode
+                // with the effective risky default.
+                var denyEncode = new List<ImageFormat>();
+                if (effectiveRiskyDefault.Count > 0)
+                {
+                    denyEncode.AddRange(effectiveRiskyDefault);
+                }
+                if (formats.DenyEncode != null)
+                {
+                    foreach (var f in formats.DenyEncode)
+                    {
+                        if (!denyEncode.Contains(f))
+                        {
+                            denyEncode.Add(f);
+                        }
+                    }
+                }
+                if (denyEncode.Count > 0)
+                {
+                    formatKillbits.DenyEncode = denyEncode;
+                }
             }
 
             // Skip sending empty killbits — the native side treats a missing
