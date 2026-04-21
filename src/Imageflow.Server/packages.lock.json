@@ -2,14 +2,19 @@
   "version": 1,
   "dependencies": {
     "net6.0": {
-      "Imageflow.AllPlatforms": {
+      "Imageflow.NativeRuntime.All": {
         "type": "Direct",
-        "requested": "[0.15.1, )",
-        "resolved": "0.15.1",
-        "contentHash": "Oiaeaz+0ZJip+n+0LD05boBiHKHBWVO79Wnitms3GYzjm9kxYqcSnPtQ9QRdUrwlP39dq8vurYtL4dAZaRmliQ==",
+        "requested": "[2.3.1-rc01, 4.0.0)",
+        "resolved": "2.3.1-rc01",
+        "contentHash": "JfHaGqSChFOZcyXH8cUXMF/fm1Bn32BBjgkLY+OSCWpVlL82lrsYr/Ue5Llf74q+tEEIIO7U7Xrw1NbugGKB8w==",
         "dependencies": {
-          "Imageflow.NativeRuntime.All": "2.3.1-rc01",
-          "Imageflow.Net": "0.15.1"
+          "Imageflow.NativeRuntime.linux-arm64": "2.3.1-rc01",
+          "Imageflow.NativeRuntime.linux-x64": "2.3.1-rc01",
+          "Imageflow.NativeRuntime.osx-arm64": "2.3.1-rc01",
+          "Imageflow.NativeRuntime.osx-x86_64": "2.3.1-rc01",
+          "Imageflow.NativeRuntime.win-arm64": "2.3.1-rc01",
+          "Imageflow.NativeRuntime.win-x86": "2.3.1-rc01",
+          "Imageflow.NativeRuntime.win-x86_64": "2.3.1-rc01"
         }
       },
       "Microsoft.CodeAnalysis.PublicApiAnalyzers": {
@@ -36,20 +41,6 @@
         "dependencies": {
           "System.Runtime.CompilerServices.Unsafe": "6.0.0",
           "System.Text.Encodings.Web": "8.0.0"
-        }
-      },
-      "Imageflow.NativeRuntime.All": {
-        "type": "Transitive",
-        "resolved": "2.3.1-rc01",
-        "contentHash": "JfHaGqSChFOZcyXH8cUXMF/fm1Bn32BBjgkLY+OSCWpVlL82lrsYr/Ue5Llf74q+tEEIIO7U7Xrw1NbugGKB8w==",
-        "dependencies": {
-          "Imageflow.NativeRuntime.linux-arm64": "2.3.1-rc01",
-          "Imageflow.NativeRuntime.linux-x64": "2.3.1-rc01",
-          "Imageflow.NativeRuntime.osx-arm64": "2.3.1-rc01",
-          "Imageflow.NativeRuntime.osx-x86_64": "2.3.1-rc01",
-          "Imageflow.NativeRuntime.win-arm64": "2.3.1-rc01",
-          "Imageflow.NativeRuntime.win-x86": "2.3.1-rc01",
-          "Imageflow.NativeRuntime.win-x86_64": "2.3.1-rc01"
         }
       },
       "Imageflow.NativeRuntime.linux-arm64": {
@@ -86,15 +77,6 @@
         "type": "Transitive",
         "resolved": "2.3.1-rc01",
         "contentHash": "rkUNn0BVgwobB05obVXEtrX4CvOpcIJ2A8InvO2vPJkRYgqjr5+GIKT0ItgCd90K30ozkWIyvG70KxDs/OL/dw=="
-      },
-      "Imageflow.Net": {
-        "type": "Transitive",
-        "resolved": "0.15.1",
-        "contentHash": "A+gdXZ4gxl++sjGEQIEh1r4CiRMBM5KD2Y0/993weNSPbfkUu+jrP4nGZ/nAOvjM/eRXFYP/gNnazaxDA2QeeQ==",
-        "dependencies": {
-          "Microsoft.IO.RecyclableMemoryStream": "[3.0.1, 4.0.0)",
-          "System.Text.Json": "8.0.6"
-        }
       },
       "Microsoft.Build.Tasks.Git": {
         "type": "Transitive",
@@ -175,6 +157,13 @@
           "System.Runtime.CompilerServices.Unsafe": "6.0.0"
         }
       },
+      "imageflow.net": {
+        "type": "Project",
+        "dependencies": {
+          "Microsoft.IO.RecyclableMemoryStream": "[3.*, 4.0.0)",
+          "System.Text.Json": "[8.0.6, )"
+        }
+      },
       "imazen.common": {
         "type": "Project",
         "dependencies": {
@@ -183,14 +172,19 @@
       }
     },
     "net8.0": {
-      "Imageflow.AllPlatforms": {
+      "Imageflow.NativeRuntime.All": {
         "type": "Direct",
-        "requested": "[0.15.1, )",
-        "resolved": "0.15.1",
-        "contentHash": "Oiaeaz+0ZJip+n+0LD05boBiHKHBWVO79Wnitms3GYzjm9kxYqcSnPtQ9QRdUrwlP39dq8vurYtL4dAZaRmliQ==",
+        "requested": "[2.3.1-rc01, 4.0.0)",
+        "resolved": "2.3.1-rc01",
+        "contentHash": "JfHaGqSChFOZcyXH8cUXMF/fm1Bn32BBjgkLY+OSCWpVlL82lrsYr/Ue5Llf74q+tEEIIO7U7Xrw1NbugGKB8w==",
         "dependencies": {
-          "Imageflow.NativeRuntime.All": "2.3.1-rc01",
-          "Imageflow.Net": "0.15.1"
+          "Imageflow.NativeRuntime.linux-arm64": "2.3.1-rc01",
+          "Imageflow.NativeRuntime.linux-x64": "2.3.1-rc01",
+          "Imageflow.NativeRuntime.osx-arm64": "2.3.1-rc01",
+          "Imageflow.NativeRuntime.osx-x86_64": "2.3.1-rc01",
+          "Imageflow.NativeRuntime.win-arm64": "2.3.1-rc01",
+          "Imageflow.NativeRuntime.win-x86": "2.3.1-rc01",
+          "Imageflow.NativeRuntime.win-x86_64": "2.3.1-rc01"
         }
       },
       "Microsoft.CodeAnalysis.PublicApiAnalyzers": {
@@ -214,20 +208,6 @@
         "requested": "[8.0.6, )",
         "resolved": "8.0.6",
         "contentHash": "BvSpVBsVN9b+Y+wONbvJOHd1HjXQf33+XiC28ZMOwRsYb42mz3Q8YHnpTSwpwJLqYCMqM+0UUVC3V+pi25XfkQ=="
-      },
-      "Imageflow.NativeRuntime.All": {
-        "type": "Transitive",
-        "resolved": "2.3.1-rc01",
-        "contentHash": "JfHaGqSChFOZcyXH8cUXMF/fm1Bn32BBjgkLY+OSCWpVlL82lrsYr/Ue5Llf74q+tEEIIO7U7Xrw1NbugGKB8w==",
-        "dependencies": {
-          "Imageflow.NativeRuntime.linux-arm64": "2.3.1-rc01",
-          "Imageflow.NativeRuntime.linux-x64": "2.3.1-rc01",
-          "Imageflow.NativeRuntime.osx-arm64": "2.3.1-rc01",
-          "Imageflow.NativeRuntime.osx-x86_64": "2.3.1-rc01",
-          "Imageflow.NativeRuntime.win-arm64": "2.3.1-rc01",
-          "Imageflow.NativeRuntime.win-x86": "2.3.1-rc01",
-          "Imageflow.NativeRuntime.win-x86_64": "2.3.1-rc01"
-        }
       },
       "Imageflow.NativeRuntime.linux-arm64": {
         "type": "Transitive",
@@ -263,14 +243,6 @@
         "type": "Transitive",
         "resolved": "2.3.1-rc01",
         "contentHash": "rkUNn0BVgwobB05obVXEtrX4CvOpcIJ2A8InvO2vPJkRYgqjr5+GIKT0ItgCd90K30ozkWIyvG70KxDs/OL/dw=="
-      },
-      "Imageflow.Net": {
-        "type": "Transitive",
-        "resolved": "0.15.1",
-        "contentHash": "A+gdXZ4gxl++sjGEQIEh1r4CiRMBM5KD2Y0/993weNSPbfkUu+jrP4nGZ/nAOvjM/eRXFYP/gNnazaxDA2QeeQ==",
-        "dependencies": {
-          "Microsoft.IO.RecyclableMemoryStream": "[3.0.1, 4.0.0)"
-        }
       },
       "Microsoft.Build.Tasks.Git": {
         "type": "Transitive",
@@ -342,6 +314,12 @@
         "type": "Transitive",
         "resolved": "4.5.1",
         "contentHash": "Zh8t8oqolRaFa9vmOZfdQm/qKejdqz0J9kr7o2Fu0vPeoH3BL1EOXipKWwkWtLT1JPzjByrF19fGuFlNbmPpiw=="
+      },
+      "imageflow.net": {
+        "type": "Project",
+        "dependencies": {
+          "Microsoft.IO.RecyclableMemoryStream": "[3.*, 4.0.0)"
+        }
       },
       "imazen.common": {
         "type": "Project",
