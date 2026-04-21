@@ -82,6 +82,19 @@ namespace Imageflow.Server
             
             options.Licensing.Initialize(this.options);
 
+            // If the operator configured a three-layer killbits policy,
+            // validate it once on a scratch context, cache the resulting
+            // net-support grid for diagnostics, and stash a narrowing-only
+            // effective SecurityOptions to apply per job. Any failure here
+            // takes down startup — a silent degraded mode would defeat the
+            // point of the killbits surface.
+            if (options.SecurityPolicyOptions != null)
+            {
+                var validator = new SecurityPolicyValidator();
+                validator.Apply(options.SecurityPolicyOptions, this.logger);
+                options.SecurityPolicyValidator = validator;
+            }
+
             blobProvider = new BlobProvider(providers, mappedPaths);
             diagnosticsPage = new DiagnosticsPage(options, env, this.logger, streamCache, this.diskCache, providers);
             licensePage = new LicensePage(options);
@@ -219,6 +232,11 @@ namespace Imageflow.Server
             {
                 await NotFound(context, e);
             }
+            catch (KillbitsDeniedException e)
+            {
+                GlobalPerf.Singleton.IncrementCounter("middleware_killbits_denied");
+                await KillbitsDenied(context, e);
+            }
             catch (Exception e)
             {
                 var errorName = e.GetType().Name;
@@ -236,6 +254,71 @@ namespace Imageflow.Server
                     GlobalPerf.Singleton.IncrementCounter("module_response_ext_" + imageExtension);
                 }
             }
+        }
+
+        private async Task KillbitsDenied(HttpContext context, KillbitsDeniedException e)
+        {
+            // The native side embeds a JSON envelope in the error message
+            // with a structured reasons grid; surface it as HTTP 422 so
+            // clients can distinguish "your format isn't allowed" from
+            // "server is broken".
+            var body = new StringBuilder();
+            body.Append("{\"error\":\"");
+            body.Append(e.DenialKind switch
+            {
+                KillbitsDenialKind.CodecNotAvailable => "codec_not_available",
+                KillbitsDenialKind.DecodeNotAvailable => "decode_not_available",
+                KillbitsDenialKind.EncodeNotAvailable => "encode_not_available",
+                _ => "killbits_denied",
+            });
+            body.Append('"');
+            if (!string.IsNullOrEmpty(e.Codec))
+            {
+                body.Append(",\"codec\":\"").Append(e.Codec).Append('"');
+            }
+            if (!string.IsNullOrEmpty(e.Format))
+            {
+                body.Append(",\"format\":\"").Append(e.Format).Append('"');
+            }
+            if (e.Reasons.Count > 0)
+            {
+                body.Append(",\"reasons\":[");
+                for (var i = 0; i < e.Reasons.Count; i++)
+                {
+                    if (i > 0) body.Append(',');
+                    body.Append('"').Append(e.Reasons[i]).Append('"');
+                }
+                body.Append(']');
+            }
+            body.Append('}');
+
+            context.Response.StatusCode = 422;
+            context.Response.ContentType = "application/json; charset=utf-8";
+            context.Response.Headers[HeaderNames.CacheControl] = "no-store";
+            MaybeEmitNetSupportHeader(context);
+            var bytes = Encoding.UTF8.GetBytes(body.ToString());
+            context.Response.ContentLength = bytes.Length;
+            await context.Response.Body.WriteAsync(bytes, 0, bytes.Length);
+        }
+
+        private void MaybeEmitNetSupportHeader(HttpContext context)
+        {
+            if (!options.ExposeNetSupportHeader) return;
+            var grid = options.SecurityPolicyValidator?.EffectiveNetSupport;
+            if (grid == null) return;
+
+            // Compact form: "formats=jpeg,png,webp;encoders=zen_jpeg_encoder,..."
+            var sb = new StringBuilder();
+            sb.Append("formats=");
+            var first = true;
+            foreach (var kv in grid.Formats)
+            {
+                if (!kv.Value.Encode) continue;
+                if (!first) sb.Append(',');
+                sb.Append(kv.Key);
+                first = false;
+            }
+            context.Response.Headers["X-Imageflow-Net-Support"] = sb.ToString();
         }
 
         private async Task NotAuthorized(HttpContext context, string detail)
