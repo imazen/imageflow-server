@@ -302,7 +302,13 @@ namespace Imageflow.Server
             }
 
             var redirectPath = BuildImage404RedirectPath(context, requestedFallback);
-            context.Response.Redirect(redirectPath, false);
+            if (!IsSafeLocalRedirectPath(redirectPath))
+            {
+                throw new InvalidOperationException("Image 404 redirects must be server-local.");
+            }
+
+            context.Response.StatusCode = StatusCodes.Status302Found;
+            context.Response.Headers[HeaderNames.Location] = redirectPath;
             return true;
         }
 
@@ -380,6 +386,14 @@ namespace Imageflow.Server
             }
 
             return "/" + path.TrimStart('/');
+        }
+
+        private static bool IsSafeLocalRedirectPath(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return false;
+            if (!path.StartsWith("/", StringComparison.Ordinal)) return false;
+            if (path.StartsWith("//", StringComparison.Ordinal)) return false;
+            return !path.StartsWith("/\\", StringComparison.Ordinal);
         }
 
         private static Image404FilterMode ParseFilterMode(string value)

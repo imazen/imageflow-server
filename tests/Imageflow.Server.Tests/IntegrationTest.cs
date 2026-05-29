@@ -73,14 +73,22 @@ namespace Imageflow.Server.Tests
                 Assert.Equal(HttpStatusCode.NotFound,notFoundResponse.StatusCode);
 
                 using var image404Response = await client.GetAsync("/not_there.jpg?404=logo.png&width=1");
-                image404Response.EnsureSuccessStatusCode();
-                Assert.Equal("image/png", image404Response.Content.Headers.ContentType.MediaType);
-                var image404ResponseBytes = await image404Response.Content.ReadAsByteArrayAsync();
+                Assert.Equal(HttpStatusCode.Found, image404Response.StatusCode);
+                Assert.Equal("/logo.png?width=1", image404Response.Headers.Location?.ToString());
+                
+                using var image404FollowResponse = await client.GetAsync(image404Response.Headers.Location?.ToString());
+                image404FollowResponse.EnsureSuccessStatusCode();
+                Assert.Equal("image/png", image404FollowResponse.Content.Headers.ContentType.MediaType);
+                var image404ResponseBytes = await image404FollowResponse.Content.ReadAsByteArrayAsync();
                 Assert.True(image404ResponseBytes.Length < 1000);
                 
                 using var image404FilterResponse = await client.GetAsync("/not_there.jpg?404=logo.png&watermark=broken&width=1");
-                image404FilterResponse.EnsureSuccessStatusCode();
-                Assert.Equal("image/png", image404FilterResponse.Content.Headers.ContentType.MediaType);
+                Assert.Equal(HttpStatusCode.Found, image404FilterResponse.StatusCode);
+                Assert.Equal("/logo.png?width=1", image404FilterResponse.Headers.Location?.ToString());
+                
+                using var image404FilterFollowResponse = await client.GetAsync(image404FilterResponse.Headers.Location?.ToString());
+                image404FilterFollowResponse.EnsureSuccessStatusCode();
+                Assert.Equal("image/png", image404FilterFollowResponse.Content.Headers.ContentType.MediaType);
                 
                 await Assert.ThrowsAsync<InvalidOperationException>(async () =>
                 {
