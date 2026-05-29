@@ -71,6 +71,21 @@ namespace Imageflow.Server.Tests
 
                 using var notFoundResponse = await client.GetAsync("/not_there.jpg");
                 Assert.Equal(HttpStatusCode.NotFound,notFoundResponse.StatusCode);
+
+                using var image404Response = await client.GetAsync("/not_there.jpg?404=logo.png&width=1");
+                image404Response.EnsureSuccessStatusCode();
+                Assert.Equal("image/png", image404Response.Content.Headers.ContentType.MediaType);
+                var image404ResponseBytes = await image404Response.Content.ReadAsByteArrayAsync();
+                Assert.True(image404ResponseBytes.Length < 1000);
+                
+                using var image404FilterResponse = await client.GetAsync("/not_there.jpg?404=logo.png&watermark=broken&width=1");
+                image404FilterResponse.EnsureSuccessStatusCode();
+                Assert.Equal("image/png", image404FilterResponse.Content.Headers.ContentType.MediaType);
+                
+                await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+                {
+                    using var image404UnsafeRedirect = await client.GetAsync("/not_there.jpg?404=https://example.com/image.jpg");
+                });
                 
                 using var watermarkBrokenResponse = await client.GetAsync("/fire.jpg?watermark=broken");
                 Assert.Equal(HttpStatusCode.NotFound,watermarkBrokenResponse.StatusCode);

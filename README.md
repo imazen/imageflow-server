@@ -328,7 +328,7 @@ namespace Imageflow.Server.Example
     PrettyGifs, SimpleFilters, FastScaling, Watermark, VirtualFolder,
      ClientCache, AutoRotate, and WhitespaceTrimmer.
 * The following plugins are not available: DropShadow,
-    Gradient, Image404, RedEye, Faces, SeamCarving, WIC, TinyCache, 
+    Gradient, RedEye, Faces, SeamCarving, WIC, TinyCache, 
     PsdReader, PsdComposer, MongoReader, FreeImage, FFMpeg, 
     AdvancedFilters, CopyMetadata. 
 * SqlReader functionality can be replicated by implementing Imazen.Common.Storage.IBlobProvider.
@@ -365,7 +365,7 @@ namespace Imageflow.Server.Example
  * Sharpening is now done with `f.sharpen`, not `a.sharpen`, and `a.sharpen` is ignored.
  * Noise removal is not yet supported, so `a.removenoise` is ignored.
  * Blurring is not yet supported, so `a.blur` is ignored.
- * 404 redirects are not implemented, so `404` is ignored.
+ * `404` redirects are supported with Image404-compatible filtering behavior.
 
 ## Integrations into Other Systems
 

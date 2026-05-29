@@ -16,12 +16,22 @@ using Imazen.Common.Instrumentation.Support.InfoAccumulators;
 using Imazen.Common.Licensing;
 using Imazen.Common.Storage;
 using Microsoft.Net.Http.Headers;
+using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Extensions.Primitives;
 
 namespace Imageflow.Server
 {
     // ReSharper disable once ClassNeverInstantiated.Global
     public class ImageflowMiddleware
     {
+        private enum Image404FilterMode
+        {
+            IncludeUnknownCommands,
+            ExcludeUnknownCommands,
+            IncludeAllCommands,
+            ExcludeAllCommands
+        }
+
         private readonly RequestDelegate next;
         private readonly ILogger<ImageflowMiddleware> logger;
         // ReSharper disable once PrivateFieldCanBeConvertedToLocalVariable
@@ -171,6 +181,10 @@ namespace Imageflow.Server
             // Remote providers will fail late rather than make 2 requests
             if (!imageJobInfo.PrimaryBlobMayExist())
             {
+                if (TryHandleImage404(context))
+                {
+                    return;
+                }
                 await next.Invoke(context);
                 return;
             }
@@ -217,6 +231,10 @@ namespace Imageflow.Server
             }
             catch (BlobMissingException e)
             {
+                if (TryHandleImage404(context))
+                {
+                    return;
+                }
                 await NotFound(context, e);
             }
             catch (Exception e)
@@ -268,6 +286,203 @@ namespace Imageflow.Server
             var bytes = Encoding.UTF8.GetBytes(contents);
             context.Response.ContentLength = bytes.Length;
             await context.Response.Body.WriteAsync(bytes, 0, bytes.Length);
+        }
+
+        private bool TryHandleImage404(HttpContext context)
+        {
+            if (!context.Request.Query.TryGetValue("404", out var image404Value))
+            {
+                return false;
+            }
+
+            var requestedFallback = image404Value.ToString();
+            if (string.IsNullOrWhiteSpace(requestedFallback))
+            {
+                return false;
+            }
+
+            var redirectPath = BuildImage404RedirectPath(context, requestedFallback);
+            context.Response.Redirect(redirectPath, false);
+            return true;
+        }
+
+        private string BuildImage404RedirectPath(HttpContext context, string requestedFallback)
+        {
+            var fallbackWithQuery = ResolveImage404Path(requestedFallback);
+            var imageQuery = PathHelpers.ToQueryDictionary(context.Request.Query);
+
+            var filterMode = imageQuery.TryGetValue("404.filterMode", out var modeString)
+                ? ParseFilterMode(modeString)
+                : Image404FilterMode.ExcludeUnknownCommands;
+            var except = imageQuery.TryGetValue("404.except", out var exceptString)
+                ? ParseCommandList(exceptString)
+                : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            var keys = imageQuery.Keys.ToList();
+            foreach (var key in keys)
+            {
+                if (ShouldRemoveCommand(filterMode, except, key, imageQuery[key]))
+                {
+                    imageQuery.Remove(key);
+                }
+            }
+
+            imageQuery.Remove("404");
+            imageQuery.Remove("404.filterMode");
+            imageQuery.Remove("404.except");
+
+            var (fallbackPath, fallbackQuery) = SplitPathAndQuery(fallbackWithQuery);
+            foreach (var pair in fallbackQuery)
+            {
+                imageQuery[pair.Key] = pair.Value;
+            }
+
+            var query = QueryString.Create(imageQuery.Select(p => new KeyValuePair<string, StringValues>(p.Key, p.Value)))
+                .ToString();
+            return string.IsNullOrEmpty(query) ? fallbackPath : fallbackPath + query;
+        }
+
+        private static (string Path, Dictionary<string, string> Query) SplitPathAndQuery(string pathWithQuery)
+        {
+            var queryIndex = pathWithQuery.IndexOf('?');
+            if (queryIndex < 0)
+            {
+                return (pathWithQuery, new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
+            }
+
+            var path = pathWithQuery.Substring(0, queryIndex);
+            var queryString = pathWithQuery.Substring(queryIndex);
+            var parsed = QueryHelpers.ParseQuery(queryString);
+            var query = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var pair in parsed)
+            {
+                query[pair.Key] = pair.Value.ToString();
+            }
+
+            return (path, query);
+        }
+
+        private static string ResolveImage404Path(string path)
+        {
+            if (path.StartsWith("http", StringComparison.OrdinalIgnoreCase) || path.StartsWith("//", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Image 404 redirects must be server-local.");
+            }
+
+            if (path.StartsWith("/", StringComparison.Ordinal))
+            {
+                return path;
+            }
+
+            if (path.StartsWith("~", StringComparison.Ordinal))
+            {
+                return "/" + path.TrimStart('~', '/');
+            }
+
+            return "/" + path.TrimStart('/');
+        }
+
+        private static Image404FilterMode ParseFilterMode(string value)
+        {
+            return Enum.TryParse<Image404FilterMode>(value, true, out var mode)
+                ? mode
+                : Image404FilterMode.ExcludeUnknownCommands;
+        }
+
+        private static HashSet<string> ParseCommandList(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            return new HashSet<string>(
+                value.Split(',').Select(v => v.Trim()).Where(v => v.Length > 0),
+                StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static bool ShouldRemoveCommand(Image404FilterMode filterMode, HashSet<string> except, string name, string value)
+        {
+            return filterMode switch
+            {
+                Image404FilterMode.IncludeUnknownCommands => IsBlacklisted(name, value) || except.Contains(name),
+                Image404FilterMode.ExcludeUnknownCommands => !(IsWhitelisted(name, value) || except.Contains(name)),
+                Image404FilterMode.IncludeAllCommands => except.Contains(name),
+                Image404FilterMode.ExcludeAllCommands => !except.Contains(name),
+                _ => true
+            };
+        }
+
+        private static bool IsWhitelisted(string name, string value)
+        {
+            if (name.StartsWith("s.", StringComparison.OrdinalIgnoreCase) ||
+                name.StartsWith("a.", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            if (name.Equals("crop", StringComparison.OrdinalIgnoreCase))
+            {
+                return value.Equals("auto", StringComparison.OrdinalIgnoreCase);
+            }
+
+            return name.Equals("maxwidth", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("maxheight", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("width", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("height", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("w", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("h", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("mode", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("anchor", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("scale", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("zoom", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("bgcolor", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("paddingwidth", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("paddingcolor", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("borderwidth", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("bordercolor", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("shadowwidth", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("shadowoffset", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("shadowcolor", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("margin", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("dpi", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("format", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("quality", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("colors", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("subsampling", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("dither", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("speed", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("ignoreicc", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("flip", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("rotate", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsBlacklisted(string name, string value)
+        {
+            if (name.Equals("crop", StringComparison.OrdinalIgnoreCase))
+            {
+                return !value.Equals("auto", StringComparison.OrdinalIgnoreCase);
+            }
+
+            return name.Equals("watermark", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("cache", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("process", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("builder", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("decoder", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("encoder", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("sflip", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("srotate", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("autorotate", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("cropxunits", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("cropyunits", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("trim.threshold", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("trim.percentpadding", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("hmac", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("urlb64", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("frame", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("page", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("color1", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("color2", StringComparison.OrdinalIgnoreCase);
         }
 
         private async Task ProcessWithStreamCache(HttpContext context, string cacheKey, ImageJobInfo info)
