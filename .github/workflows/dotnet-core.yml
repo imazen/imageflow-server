@@ -45,15 +45,15 @@ jobs:
 
     runs-on: ${{matrix.os}}
     steps:     
-    - uses: actions/checkout@v4
-    - uses: actions/cache@v4
+    - uses: actions/checkout@v7
+    - uses: actions/cache@v6
       id: cache
       with:
         path: ~/.nuget/packages
         key: ${{ runner.os }}-nuget-breaker3-${{ hashFiles('**/packages.lock.json') }}
       if: matrix.cache_dependencies
         
-    - uses: nowsprinting/check-version-format-action@v4
+    - uses: nowsprinting/check-version-format-action@v5
       id: version
       with:
         prefix: 'v'
@@ -93,7 +93,7 @@ jobs:
         dotnet --list-sdks
       
     - name: Setup .NET 6,8
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v6
       
       with:
         dotnet-version: "6\n8\n"
@@ -113,7 +113,7 @@ jobs:
     - name: Test
       run: dotnet test -c Release --blame --no-build
 
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v7
       if: failure()
       with:
         name: TestResults-${{matrix.os}}-${{ env.ARTIFACT_VERSION }}
@@ -133,7 +133,7 @@ jobs:
 
     # Upload the publish folder for src/Imageflow.Server.Host to the release artifacts
     - name: Upload Imageflow.Server.Host to artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       if: success()
       with:
         name: ${{env.HOST_ZIP_FILE}}
