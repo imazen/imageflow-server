@@ -1,0 +1,65 @@
+#nullable enable
+Imageflow.Server.CodecOptions
+Imageflow.Server.CodecOptions.AllowDecoders.get -> System.Collections.Generic.IList<Imageflow.Fluent.NamedDecoderName>?
+Imageflow.Server.CodecOptions.AllowDecoders.set -> void
+Imageflow.Server.CodecOptions.AllowEncoders.get -> System.Collections.Generic.IList<Imageflow.Fluent.NamedEncoderName>?
+Imageflow.Server.CodecOptions.AllowEncoders.set -> void
+Imageflow.Server.CodecOptions.CodecOptions() -> void
+Imageflow.Server.CodecOptions.DenyDecoders.get -> System.Collections.Generic.IList<Imageflow.Fluent.NamedDecoderName>?
+Imageflow.Server.CodecOptions.DenyDecoders.set -> void
+Imageflow.Server.CodecOptions.DenyEncoders.get -> System.Collections.Generic.IList<Imageflow.Fluent.NamedEncoderName>?
+Imageflow.Server.CodecOptions.DenyEncoders.set -> void
+Imageflow.Server.FormatOptions
+Imageflow.Server.FormatOptions.AllowDecode.get -> System.Collections.Generic.IList<Imageflow.Fluent.ImageFormat>?
+Imageflow.Server.FormatOptions.AllowDecode.set -> void
+Imageflow.Server.FormatOptions.AllowEncode.get -> System.Collections.Generic.IList<Imageflow.Fluent.ImageFormat>?
+Imageflow.Server.FormatOptions.AllowEncode.set -> void
+Imageflow.Server.FormatOptions.DenyDecode.get -> System.Collections.Generic.IList<Imageflow.Fluent.ImageFormat>?
+Imageflow.Server.FormatOptions.DenyDecode.set -> void
+Imageflow.Server.FormatOptions.DenyEncode.get -> System.Collections.Generic.IList<Imageflow.Fluent.ImageFormat>?
+Imageflow.Server.FormatOptions.DenyEncode.set -> void
+Imageflow.Server.FormatOptions.FormatOptions() -> void
+Imageflow.Server.FormatOptions.Formats.get -> System.Collections.Generic.IDictionary<Imageflow.Fluent.ImageFormat, Imageflow.Fluent.FormatPermissions>?
+Imageflow.Server.FormatOptions.Formats.set -> void
+Imageflow.Server.FormatOptions.OptInEncode.get -> System.Collections.Generic.IList<Imageflow.Fluent.ImageFormat>?
+Imageflow.Server.FormatOptions.OptInEncode.set -> void
+Imageflow.Server.ImageflowMiddlewareOptions.ExposeNetSupportHeader.get -> bool
+Imageflow.Server.ImageflowMiddlewareOptions.ExposeNetSupportHeader.set -> void
+~Imageflow.Server.ImageflowMiddlewareOptions.SecurityPolicyOptions.get -> Imageflow.Server.SecurityPolicyOptions
+~Imageflow.Server.ImageflowMiddlewareOptions.SecurityPolicyOptions.set -> void
+~Imageflow.Server.ImageflowMiddlewareOptions.SetExposeNetSupportHeader(bool value) -> Imageflow.Server.ImageflowMiddlewareOptions
+~Imageflow.Server.ImageflowMiddlewareOptions.SetSecurityPolicyOptions(Imageflow.Server.SecurityPolicyOptions policyOptions) -> Imageflow.Server.ImageflowMiddlewareOptions
+Imageflow.Server.SecurityPolicyConfigurationBinder
+Imageflow.Server.SecurityPolicyOptions
+Imageflow.Server.SecurityPolicyOptions.BuildEffectiveSecurityOptions() -> Imageflow.Fluent.SecurityOptions!
+Imageflow.Server.SecurityPolicyOptions.Codecs.get -> Imageflow.Server.CodecOptions?
+Imageflow.Server.SecurityPolicyOptions.Codecs.set -> void
+Imageflow.Server.SecurityPolicyOptions.Formats.get -> Imageflow.Server.FormatOptions?
+Imageflow.Server.SecurityPolicyOptions.Formats.set -> void
+Imageflow.Server.SecurityPolicyOptions.MaxDecodeSize.get -> Imageflow.Fluent.FrameSizeLimit?
+Imageflow.Server.SecurityPolicyOptions.MaxDecodeSize.set -> void
+Imageflow.Server.SecurityPolicyOptions.MaxEncodeSize.get -> Imageflow.Fluent.FrameSizeLimit?
+Imageflow.Server.SecurityPolicyOptions.MaxEncodeSize.set -> void
+Imageflow.Server.SecurityPolicyOptions.MaxFrameSize.get -> Imageflow.Fluent.FrameSizeLimit?
+Imageflow.Server.SecurityPolicyOptions.MaxFrameSize.set -> void
+Imageflow.Server.SecurityPolicyOptions.MaxInputFileBytes.get -> ulong?
+Imageflow.Server.SecurityPolicyOptions.MaxInputFileBytes.set -> void
+Imageflow.Server.SecurityPolicyOptions.MaxJsonBytes.get -> ulong?
+Imageflow.Server.SecurityPolicyOptions.MaxJsonBytes.set -> void
+Imageflow.Server.SecurityPolicyOptions.MaxTotalFilePixels.get -> ulong?
+Imageflow.Server.SecurityPolicyOptions.MaxTotalFilePixels.set -> void
+Imageflow.Server.SecurityPolicyOptions.SecurityPolicyOptions() -> void
+Imageflow.Server.SecurityPolicyOptions.ServerRiskyEncode.get -> System.Collections.Generic.IReadOnlyList<Imageflow.Fluent.ImageFormat>!
+Imageflow.Server.SecurityPolicyOptions.ServerRiskyEncode.set -> void
+Imageflow.Server.SecurityPolicyOptions.Validate() -> void
+Imageflow.Server.SecurityPolicyValidationException
+Imageflow.Server.SecurityPolicyValidationException.SecurityPolicyValidationException(string! message) -> void
+Imageflow.Server.SecurityPolicyValidationException.SecurityPolicyValidationException(string! message, System.Exception! inner) -> void
+Imageflow.Server.SecurityPolicyValidator
+Imageflow.Server.SecurityPolicyValidator.Apply(Imageflow.Server.SecurityPolicyOptions! options, Microsoft.Extensions.Logging.ILogger? logger = null) -> void
+Imageflow.Server.SecurityPolicyValidator.EffectiveJobSecurity.get -> Imageflow.Fluent.SecurityOptions?
+Imageflow.Server.SecurityPolicyValidator.EffectiveNetSupport.get -> Imageflow.Bindings.NetSupportResponse?
+Imageflow.Server.SecurityPolicyValidator.SecurityPolicyValidator() -> void
+const Imageflow.Server.SecurityPolicyConfigurationBinder.DefaultSectionPath = "Imageflow:Security" -> string!
+static Imageflow.Server.SecurityPolicyConfigurationBinder.Bind(Microsoft.Extensions.Configuration.IConfiguration! section) -> Imageflow.Server.SecurityPolicyOptions?
+static readonly Imageflow.Server.SecurityPolicyOptions.ServerRiskyEncodeDefault -> System.Collections.Generic.IReadOnlyList<Imageflow.Fluent.ImageFormat>!

@@ -430,11 +430,14 @@ namespace Imageflow.Server
                 }
 
                 using var buildJob = new ImageJob();
+                var effectiveSecurity = MergeEffectiveSecurity(
+                    options.JobSecurityOptions,
+                    options.SecurityPolicyValidator?.EffectiveJobSecurity);
                 var jobResult = await buildJob.BuildCommandString(
                         blobs[0].GetMemorySource(),
                         new BytesDestination(), CommandString, watermarks)
                     .Finish()
-                    .SetSecurityOptions(options.JobSecurityOptions)
+                    .SetSecurityOptions(effectiveSecurity)
                     .InProcessAsync();
                 
                 GlobalPerf.Singleton.JobComplete(new ImageJobInstrumentation(jobResult)
@@ -465,6 +468,35 @@ namespace Imageflow.Server
                     b?.Dispose();
                 }
             }
+        }
+
+        /// <summary>
+        /// Combine the legacy per-job <see cref="SecurityOptions"/> with the
+        /// narrowing form derived from
+        /// <see cref="SecurityPolicyOptions"/>. The killbits side always
+        /// wins when both sides specify something (killbits is a hard cap;
+        /// legacy scalar limits fall back only for the fields killbits
+        /// doesn't set).
+        /// </summary>
+        internal static SecurityOptions MergeEffectiveSecurity(
+            SecurityOptions legacy,
+            SecurityOptions fromPolicy)
+        {
+            if (fromPolicy == null) return legacy;
+            if (legacy == null) return fromPolicy;
+
+            var merged = new SecurityOptions
+            {
+                MaxDecodeSize = fromPolicy.MaxDecodeSize ?? legacy.MaxDecodeSize,
+                MaxFrameSize = fromPolicy.MaxFrameSize ?? legacy.MaxFrameSize,
+                MaxEncodeSize = fromPolicy.MaxEncodeSize ?? legacy.MaxEncodeSize,
+                MaxInputFileBytes = fromPolicy.MaxInputFileBytes ?? legacy.MaxInputFileBytes,
+                MaxJsonBytes = fromPolicy.MaxJsonBytes ?? legacy.MaxJsonBytes,
+                MaxTotalFilePixels = fromPolicy.MaxTotalFilePixels ?? legacy.MaxTotalFilePixels,
+                Formats = fromPolicy.Formats,
+                Codecs = fromPolicy.Codecs,
+            };
+            return merged;
         }
     }
     

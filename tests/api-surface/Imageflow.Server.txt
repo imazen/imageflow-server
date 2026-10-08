@@ -11,11 +11,29 @@ namespace Imageflow.Server
         LocalHost = 1,
         AnyHost = 2,
     }
+    public sealed class CodecOptions
+    {
+        public CodecOptions() { }
+        public System.Collections.Generic.IList<Imageflow.Fluent.NamedDecoderName>? AllowDecoders { get; set; }
+        public System.Collections.Generic.IList<Imageflow.Fluent.NamedEncoderName>? AllowEncoders { get; set; }
+        public System.Collections.Generic.IList<Imageflow.Fluent.NamedDecoderName>? DenyDecoders { get; set; }
+        public System.Collections.Generic.IList<Imageflow.Fluent.NamedEncoderName>? DenyEncoders { get; set; }
+    }
     public enum EnforceLicenseWith
     {
         RedDotWatermark = 0,
         Http422Error = 1,
         Http402Error = 2,
+    }
+    public sealed class FormatOptions
+    {
+        public FormatOptions() { }
+        public System.Collections.Generic.IList<Imageflow.Fluent.ImageFormat>? AllowDecode { get; set; }
+        public System.Collections.Generic.IList<Imageflow.Fluent.ImageFormat>? AllowEncode { get; set; }
+        public System.Collections.Generic.IList<Imageflow.Fluent.ImageFormat>? DenyDecode { get; set; }
+        public System.Collections.Generic.IList<Imageflow.Fluent.ImageFormat>? DenyEncode { get; set; }
+        public System.Collections.Generic.IDictionary<Imageflow.Fluent.ImageFormat, Imageflow.Fluent.FormatPermissions>? Formats { get; set; }
+        public System.Collections.Generic.IList<Imageflow.Fluent.ImageFormat>? OptInEncode { get; set; }
     }
     public class ImageflowMiddleware
     {
@@ -33,12 +51,14 @@ namespace Imageflow.Server
         public bool AllowDiskCaching { get; set; }
         public bool ApplyDefaultCommandsToQuerylessUrls { get; set; }
         public string DefaultCacheControlString { get; set; }
+        public bool ExposeNetSupportHeader { get; set; }
         public Imageflow.Fluent.SecurityOptions JobSecurityOptions { get; set; }
         public bool MapWebRoot { get; set; }
         public System.Collections.Generic.IReadOnlyCollection<Imageflow.Server.PathMapping> MappedPaths { get; }
         public string MyOpenSourceProjectUrl { get; set; }
         public System.Collections.Generic.IReadOnlyCollection<Imageflow.Server.NamedWatermark> NamedWatermarks { get; }
         public Imageflow.Server.RequestSignatureOptions RequestSignatureOptions { get; set; }
+        public Imageflow.Server.SecurityPolicyOptions SecurityPolicyOptions { get; set; }
         public bool UsePresetsExclusively { get; set; }
         public Imageflow.Server.ImageflowMiddlewareOptions AddCommandDefault(string key, string value) { }
         public Imageflow.Server.ImageflowMiddlewareOptions AddPostRewriteAuthorizationHandler(string pathPrefix, System.Func<Imageflow.Server.UrlEventArgs, bool> handler) { }
@@ -56,11 +76,13 @@ namespace Imageflow.Server
         public Imageflow.Server.ImageflowMiddlewareOptions SetDefaultCacheControlString(string cacheControlString) { }
         public Imageflow.Server.ImageflowMiddlewareOptions SetDiagnosticsPageAccess(Imageflow.Server.AccessDiagnosticsFrom accessDiagnosticsFrom) { }
         public Imageflow.Server.ImageflowMiddlewareOptions SetDiagnosticsPagePassword(string password) { }
+        public Imageflow.Server.ImageflowMiddlewareOptions SetExposeNetSupportHeader(bool value) { }
         public Imageflow.Server.ImageflowMiddlewareOptions SetJobSecurityOptions(Imageflow.Fluent.SecurityOptions securityOptions) { }
         public Imageflow.Server.ImageflowMiddlewareOptions SetLicenseKey(Imageflow.Server.EnforceLicenseWith enforcementMethod, string licenseKey) { }
         public Imageflow.Server.ImageflowMiddlewareOptions SetMapWebRoot(bool value) { }
         public Imageflow.Server.ImageflowMiddlewareOptions SetMyOpenSourceProjectUrl(string myOpenSourceProjectUrl) { }
         public Imageflow.Server.ImageflowMiddlewareOptions SetRequestSignatureOptions(Imageflow.Server.RequestSignatureOptions options) { }
+        public Imageflow.Server.ImageflowMiddlewareOptions SetSecurityPolicyOptions(Imageflow.Server.SecurityPolicyOptions policyOptions) { }
         public Imageflow.Server.ImageflowMiddlewareOptions SetUsePresetsExclusively(bool value) { }
     }
     public class NamedWatermark
@@ -101,6 +123,39 @@ namespace Imageflow.Server
     {
         public RequestSignatureOptions(Imageflow.Server.SignatureRequired defaultRequirement, System.Collections.Generic.IEnumerable<string> defaultSigningKeys) { }
         public Imageflow.Server.RequestSignatureOptions ForPrefix(string prefix, System.StringComparison prefixComparison, Imageflow.Server.SignatureRequired requirement, System.Collections.Generic.IEnumerable<string> signingKeys) { }
+    }
+    public static class SecurityPolicyConfigurationBinder
+    {
+        public const string DefaultSectionPath = "Imageflow:Security";
+        public static Imageflow.Server.SecurityPolicyOptions? Bind(Microsoft.Extensions.Configuration.IConfiguration section) { }
+    }
+    public sealed class SecurityPolicyOptions
+    {
+        public static readonly System.Collections.Generic.IReadOnlyList<Imageflow.Fluent.ImageFormat> ServerRiskyEncodeDefault;
+        public SecurityPolicyOptions() { }
+        public Imageflow.Server.CodecOptions? Codecs { get; set; }
+        public Imageflow.Server.FormatOptions? Formats { get; set; }
+        public Imageflow.Fluent.FrameSizeLimit? MaxDecodeSize { get; set; }
+        public Imageflow.Fluent.FrameSizeLimit? MaxEncodeSize { get; set; }
+        public Imageflow.Fluent.FrameSizeLimit? MaxFrameSize { get; set; }
+        public ulong? MaxInputFileBytes { get; set; }
+        public ulong? MaxJsonBytes { get; set; }
+        public ulong? MaxTotalFilePixels { get; set; }
+        public System.Collections.Generic.IReadOnlyList<Imageflow.Fluent.ImageFormat> ServerRiskyEncode { get; set; }
+        public Imageflow.Fluent.SecurityOptions BuildEffectiveSecurityOptions() { }
+        public void Validate() { }
+    }
+    public sealed class SecurityPolicyValidationException : System.Exception
+    {
+        public SecurityPolicyValidationException(string message) { }
+        public SecurityPolicyValidationException(string message, System.Exception inner) { }
+    }
+    public sealed class SecurityPolicyValidator
+    {
+        public SecurityPolicyValidator() { }
+        public Imageflow.Fluent.SecurityOptions? EffectiveJobSecurity { get; }
+        public Imageflow.Bindings.NetSupportResponse? EffectiveNetSupport { get; }
+        public void Apply(Imageflow.Server.SecurityPolicyOptions options, Microsoft.Extensions.Logging.ILogger? logger = null) { }
     }
     public enum SignatureRequired
     {

@@ -19,7 +19,28 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Imageflow.AllPlatforms" Version="0.15.1" />
+    <!--
+      DEV-TIME PIN (feat/killbits-server-integration):
+      Pin to a local ProjectReference on the feat/killbits-dotnet-surface
+      branch of imageflow-dotnet so the killbits surface types
+      (SecurityOptions.Formats / .Codecs, JobContext.SetPolicy,
+      KillbitsDeniedException, etc.) resolve during development.
+
+      Native runtime for dev: pair with Imageflow.NativeRuntime.All 2.3.1-rc01
+      or later (the `imageflow2`-branch rc), which carries
+      v1/context/set_policy + v1/context/get_net_support. Older runtimes will
+      throw ImageflowException with InvalidMessageEndpoint at startup.
+
+      RELEASE PIN (apply before merge):
+      Replace this ProjectReference with the published prerelease once
+      imageflow#720 + imageflow-dotnet#68 ship:
+          <PackageReference Include="Imageflow.AllPlatforms"
+                            Version="[3.0.0-alpha.0, 4.0.0)" />
+      The accept range starts at 3.0.0-alpha.0 so v3 prereleases satisfy the
+      constraint, capped below v4 to catch future major bumps.
+    -->
+    <ProjectReference Include="..\..\..\imageflow-dotnet\src\Imageflow\Imageflow.Net.csproj" />
+    <PackageReference Include="Imageflow.NativeRuntime.All" Version="[2.3.1-rc01, 4.0.0)" />
     <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="3.3.4">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>

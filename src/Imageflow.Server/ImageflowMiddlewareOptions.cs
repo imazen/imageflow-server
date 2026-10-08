@@ -44,6 +44,31 @@ namespace Imageflow.Server
         
         public RequestSignatureOptions RequestSignatureOptions { get; set; }
         public SecurityOptions JobSecurityOptions { get; set; }
+
+        /// <summary>
+        /// Three-layer killbits policy (applied once at startup via
+        /// <c>v1/context/set_policy</c> for validation, then mirrored into
+        /// every job as narrowing per-job security). Separate from
+        /// <see cref="JobSecurityOptions"/>, which attaches only the scalar
+        /// limits from the old <see cref="SecurityOptions"/> shape to each
+        /// job verbatim.
+        /// </summary>
+        /// <remarks>
+        /// When this is <c>null</c>, the server behaves exactly as pre-killbits
+        /// releases — no <c>SetPolicy</c> call is issued and no narrowing
+        /// mask is applied. Set a value to turn the killbits surface on.
+        /// </remarks>
+        public SecurityPolicyOptions SecurityPolicyOptions { get; set; }
+
+        internal SecurityPolicyValidator SecurityPolicyValidator { get; set; }
+
+        /// <summary>
+        /// Enable the <c>X-Imageflow-Net-Support</c> response header. Off by
+        /// default — the grid is operator-diagnostic information and may leak
+        /// build details to end users. Turn on only for closed-deployment
+        /// debugging.
+        /// </summary>
+        public bool ExposeNetSupportHeader { get; set; }
         
         internal readonly List<UrlHandler<Action<UrlEventArgs>>> Rewrite = new List<UrlHandler<Action<UrlEventArgs>>>();
 
@@ -177,6 +202,27 @@ namespace Imageflow.Server
         public ImageflowMiddlewareOptions SetJobSecurityOptions(SecurityOptions securityOptions)
         {
             JobSecurityOptions = securityOptions;
+            return this;
+        }
+
+        /// <summary>
+        /// Install a three-layer killbits policy. The server validates it at
+        /// startup via <c>v1/context/set_policy</c> on a scratch context and
+        /// applies its effective narrowing form to every job.
+        /// </summary>
+        public ImageflowMiddlewareOptions SetSecurityPolicyOptions(SecurityPolicyOptions policyOptions)
+        {
+            SecurityPolicyOptions = policyOptions;
+            return this;
+        }
+
+        /// <summary>
+        /// Enable the <c>X-Imageflow-Net-Support</c> response header. Off by
+        /// default.
+        /// </summary>
+        public ImageflowMiddlewareOptions SetExposeNetSupportHeader(bool value)
+        {
+            ExposeNetSupportHeader = value;
             return this;
         }
         
